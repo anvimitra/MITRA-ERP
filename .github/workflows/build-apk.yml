@@ -1,0 +1,55 @@
+name: Build LSK Academy Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Generate Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Root & Monorepo Dependencies
+        run: npm ci || npm install
+
+      - name: Build LSK Academy Mobile Web Assets
+        run: |
+          cd packages/mobile-app
+          npm install
+          npm run build
+
+      - name: Add Capacitor Android Platform
+        run: |
+          cd packages/mobile-app
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap add android || npx cap sync android
+
+      - name: Build Android Debug APK with Gradle
+        run: |
+          cd packages/mobile-app/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LSK-Academy-Mobile-App
+          path: packages/mobile-app/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

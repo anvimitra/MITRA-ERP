@@ -1,0 +1,16 @@
+{
+  "short_name": "LSK Academy",
+  "name": "LSK Academy - ANVIMITRA ERP Mobile",
+  "icons": [
+    {
+      "src": "/school-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "display": "standalone",
+  "orientation": "portrait"
+}

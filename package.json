@@ -1,0 +1,27 @@
+{
+  "name": "anvimitra-erp",
+  "version": "1.0.0",
+  "description": "ANVIMITRA-ERP: Enterprise Multi-Tenant School ERP with Cloudflare Support, Role-Based Portals, Desktop Sync Agent, and Multi-Template Report Cards",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm --prefix packages/backend run dev",
+    "dev:frontend": "npm --prefix packages/frontend run dev",
+    "dev:mobile": "npm --prefix packages/mobile-app run dev",
+    "dev:desktop": "npm --prefix packages/desktop-sync-agent run dev",
+    "build": "npm --prefix packages/backend run build && npm --prefix packages/frontend run build && npm --prefix packages/mobile-app run build",
+    "build:exe": "npm --prefix packages/desktop-sync-agent run build:exe"
+  },
+  "keywords": [
+    "school-erp",
+    "multi-tenant",
+    "cloudflare-workers",
+    "education-management",
+    "report-cards",
+    "desktop-sync"
+  ],
+  "author": "ANVIMITRA-ERP Team",
+  "license": "MIT"
+}

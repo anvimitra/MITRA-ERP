@@ -1,0 +1,17 @@
+name = "anvimitra-erp-backend"
+main = "src/cf-worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+JWT_SECRET = "anvimitra-erp-super-secret-production-key"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "anvimitra_production_d1"
+database_id = "anvimitra-d1-binding-placeholder"
+
+[[r2_buckets]]
+binding = "R2_STORAGE"
+bucket_name = "anvimitra-erp-assets"

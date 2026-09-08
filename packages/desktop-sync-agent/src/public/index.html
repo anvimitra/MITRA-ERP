@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ANVIMITRA-ERP | Secondary Database PC Sync Agent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 2s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+  <!-- Top App Header -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/20">
+          <i class="fa-solid fa-server"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            ANVIMITRA-ERP <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium">Desktop Sync Agent .EXE</span>
+          </h1>
+          <p class="text-xs text-slate-400">On-Prem Secondary Database & Local PC Storage Engine</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <div id="connectionPill" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Cloudflare ERP Online</span>
+        </div>
+        <button onclick="triggerSync()" id="syncBtn" class="flex items-center space-x-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-600/30 transition">
+          <i id="syncIcon" class="fa-solid fa-arrows-rotate"></i>
+          <span id="syncText">Sync Now</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+    <!-- Top Alert & Storage Info Banner -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Target Local Storage</span>
+          <i class="fa-solid fa-hard-drive text-blue-400"></i>
+        </div>
+        <div class="text-sm font-semibold text-slate-200 truncate" id="storagePathDisplay">
+          C:\ANVIMITRA-Storage\anvimitra_secondary.db
+        </div>
+        <p class="text-xs text-slate-500 mt-1">Secondary offline SQLite replica on this computer</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Connected School</span>
+          <i class="fa-solid fa-school text-indigo-400"></i>
+        </div>
+        <div class="text-lg font-bold text-white truncate" id="schoolNameDisplay">
+          Delhi Public Global Academy
+        </div>
+        <p class="text-xs text-indigo-400 mt-1" id="schoolCodeDisplay">Code: DPS01 | Multi-Tenant Isolated</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Sync Status</span>
+          <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i>
+        </div>
+        <div class="text-lg font-bold text-white" id="lastSyncDisplay">
+          Just Now
+        </div>
+        <p class="text-xs text-slate-500 mt-1">Automatic delta synchronization enabled</p>
+      </div>
+    </div>
+
+    <!-- Secondary Database Metrics -->
+    <section>
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Local Database Synced Records</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+          <div class="text-2xl font-black text-white" id="studentCount">0</div>
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-user-graduate text-blue-400"></i> Local Students
+          </div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+          <div class="text-2xl font-black text-white" id="attendanceCount">0</div>
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-calendar-check text-emerald-400"></i> Attendance Logs
+          </div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+          <div class="text-2xl font-black text-white" id="marksCount">0</div>
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-award text-amber-400"></i> Exam & Test Marks
+          </div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+          <div class="text-2xl font-black text-white" id="feesCount">0</div>
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-receipt text-purple-400"></i> Fee Transactions
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configuration & Backup Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Sync Configuration Form -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-400"></i> Sync Agent Settings
+        </h3>
+        <form id="configForm" onsubmit="saveConfig(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Cloudflare ERP Endpoint</label>
+            <input type="text" id="cfgErpUrl" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500" value="http://localhost:4000">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">School Code</label>
+            <input type="text" id="cfgSchoolCode" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500" value="DPS01">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">API Sync Secret Key</label>
+            <input type="password" id="cfgSyncKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500" value="ANVI_SYNC_DPS01_SECRET_KEY_9988">
+          </div>
+          <div class="pt-2 flex gap-3">
+            <button type="submit" class="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-lg transition">
+              Save Settings
+            </button>
+            <button type="button" onclick="testConnection()" class="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-sm font-semibold rounded-lg transition">
+              Test
+            </button>
+          </div>
+        </form>
+
+        <div class="mt-6 pt-6 border-t border-slate-800">
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Offline Backup Export</h4>
+          <div class="flex gap-2">
+            <a href="/api/export/backup.json" target="_blank" class="flex-1 text-center px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 rounded-lg transition">
+              <i class="fa-solid fa-file-code mr-1"></i> Export JSON
+            </a>
+            <a href="/api/export/backup.sqlite" target="_blank" class="flex-1 text-center px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold rounded-lg transition">
+              <i class="fa-solid fa-database mr-1"></i> Download .SQLite
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Local Secondary Database Viewer -->
+      <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-table text-indigo-400"></i> Local Offline Records Browser
+          </h3>
+          <span class="text-xs text-slate-500">Accessible without internet</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">Adm No</th>
+                <th class="py-2.5 px-3">Student Name</th>
+                <th class="py-2.5 px-3">Class</th>
+                <th class="py-2.5 px-3">Gender</th>
+                <th class="py-2.5 px-3">Sync Status</th>
+              </tr>
+            </thead>
+            <tbody id="studentTableBody" class="divide-y divide-slate-800/60">
+              <tr>
+                <td colspan="5" class="py-8 text-center text-slate-500">
+                  <i class="fa-solid fa-arrows-rotate animate-spin text-lg mb-2 block"></i>
+                  Loading local PC database records...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        
+        document.getElementById('studentCount').innerText = data.studentsCount || 0;
+        document.getElementById('attendanceCount').innerText = data.attendanceCount || 0;
+        document.getElementById('marksCount').innerText = data.marksCount || 0;
+        document.getElementById('feesCount').innerText = data.feesCount || 0;
+        document.getElementById('lastSyncDisplay').innerText = data.lastSyncTimestamp ? new Date(data.lastSyncTimestamp).toLocaleTimeString() : 'Never';
+        document.getElementById('storagePathDisplay').innerText = data.storagePath || 'C:\\ANVIMITRA\\secondary.db';
+        if (data.school?.name) {
+          document.getElementById('schoolNameDisplay').innerText = data.school.name;
+          document.getElementById('schoolCodeDisplay').innerText = `Code: ${data.school.code || 'DPS01'} | Multi-Tenant Isolated`;
+        }
+      } catch (e) {
+        console.error('Stats error:', e);
+      }
+    }
+
+    async function loadStudents() {
+      try {
+        const res = await fetch('/api/students');
+        const data = await res.json();
+        const tbody = document.getElementById('studentTableBody');
+        
+        if (!data.students || data.students.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">No students found locally. Click "Sync Now" above.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.students.map(s => `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-2.5 px-3 font-mono text-blue-400 font-semibold">${s.admission_no}</td>
+            <td class="py-2.5 px-3 font-medium text-white">${s.first_name} ${s.last_name || ''}</td>
+            <td class="py-2.5 px-3">${s.class_id} (${s.section_id})</td>
+            <td class="py-2.5 px-3">${s.gender || 'N/A'}</td>
+            <td class="py-2.5 px-3">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-medium">
+                <i class="fa-solid fa-circle-check"></i> Local Verified
+              </span>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error('Students error:', e);
+      }
+    }
+
+    async function triggerSync() {
+      const btn = document.getElementById('syncBtn');
+      const icon = document.getElementById('syncIcon');
+      const text = document.getElementById('syncText');
+      
+      btn.disabled = true;
+      icon.classList.add('animate-spin');
+      text.innerText = 'Syncing...';
+
+      try {
+        const res = await fetch('/api/sync/pull', { method: 'POST' });
+        const result = await res.json();
+        if (result.success) {
+          await loadStats();
+          await loadStudents();
+          alert(`✅ Secondary Database Synced! Total records pulled: ${result.totalRecords}`);
+        } else {
+          alert(`❌ Sync failed: ${result.error || 'Check server connection'}`);
+        }
+      } catch (e) {
+        alert(`❌ Network error during sync: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+        icon.classList.remove('animate-spin');
+        text.innerText = 'Sync Now';
+      }
+    }
+
+    async function testConnection() {
+      try {
+        const res = await fetch('/api/test-connection', { method: 'POST' });
+        const result = await res.json();
+        if (result.success) {
+          alert(`✅ Connected to Cloudflare ERP successfully! School: ${result.data.schoolName}`);
+        } else {
+          alert(`❌ Connection failed: ${result.error}`);
+        }
+      } catch (e) {
+        alert(`❌ Error testing connection: ${e.message}`);
+      }
+    }
+
+    async function saveConfig(e) {
+      e.preventDefault();
+      const payload = {
+        erpUrl: document.getElementById('cfgErpUrl').value,
+        schoolCode: document.getElementById('cfgSchoolCode').value,
+        apiSyncKey: document.getElementById('cfgSyncKey').value,
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert('✅ Configuration saved! Ready for sync.');
+        }
+      } catch (e) {
+        alert('Error saving config: ' + e.message);
+      }
+    }
+
+    // Init
+    loadStats();
+    loadStudents();
+  </script>
+</body>
+</html>
