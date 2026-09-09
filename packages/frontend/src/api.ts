@@ -12,7 +12,7 @@ import {
   SMSLogItem,
 } from './types';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
 export class ApiService {
   private static token: string | null = localStorage.getItem('anvimitra_token');
