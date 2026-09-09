@@ -196,4 +196,60 @@ export class ApiService {
   static async getSMSLogs() {
     return this.request<{ smsLogs: SMSLogItem[] }>('/notifications/sms-logs');
   }
+
+  // Student Management CRUD
+  static async getStudents(filters: { classId?: string; sectionId?: string; search?: string } = {}) {
+    const params = new URLSearchParams();
+    if (filters.classId) params.set('classId', filters.classId);
+    if (filters.sectionId) params.set('sectionId', filters.sectionId);
+    if (filters.search) params.set('search', filters.search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<{ students: any[] }>(`/students${query}`);
+  }
+
+  static async createStudent(data: any) {
+    return this.request<{ success: boolean; message: string; studentId: string }>('/students', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateStudent(id: string, data: any) {
+    return this.request<{ success: boolean; message: string }>(`/students/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteStudent(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/students/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Faculty & Staff CRUD
+  static async getTeachers() {
+    return this.request<{ staff: any[] }>('/teachers');
+  }
+
+  static async createTeacher(data: any) {
+    return this.request<{ success: boolean; message: string; staffId: string }>('/teachers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateTeacher(id: string, data: any) {
+    return this.request<{ success: boolean; message: string }>(`/teachers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteTeacher(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/teachers/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
+

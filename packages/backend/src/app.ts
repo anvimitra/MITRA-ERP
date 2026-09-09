@@ -8,6 +8,8 @@ import { examRoutes } from './routes/exams.js';
 import { feeRoutes } from './routes/fees.js';
 import { syncRoutes } from './routes/sync.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { studentRoutes } from './routes/students.js';
+import { teacherRoutes } from './routes/teachers.js';
 
 export const app = new Hono();
 
@@ -40,3 +42,5 @@ app.route('/api/exams', examRoutes);
 app.route('/api/fees', feeRoutes);
 app.route('/api/sync', syncRoutes);
 app.route('/api/notifications', notificationRoutes);
+app.route('/api/students', studentRoutes);
+app.route('/api/teachers', teacherRoutes);

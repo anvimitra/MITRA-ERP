@@ -9,13 +9,13 @@ import { AccountantPortal } from './portals/AccountantPortal';
 import { ParentPortal } from './portals/ParentPortal';
 import { MobileAppSimulator } from './components/MobileAppSimulator';
 import { ReportCardModal } from './components/ReportCardModal';
-import { Smartphone, Sparkles, School as SchoolIcon, ShieldCheck, LogIn } from 'lucide-react';
+import { Smartphone, School as SchoolIcon, ShieldCheck, LogIn, Key, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [school, setSchool] = useState<School | null>(null);
   const [linkedStudents, setLinkedStudents] = useState<any[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('stu-rahul-01');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -23,12 +23,13 @@ export const App: React.FC = () => {
   const [reportCardData, setReportCardData] = useState<ReportCardData | null>(null);
 
   // Login form state
-  const [email, setEmail] = useState('principal@dps.edu');
+  const [email, setEmail] = useState('principal@lskacademy.edu');
   const [password, setPassword] = useState('principal123');
-  const [loginSchoolCode, setLoginSchoolCode] = useState('DPS01');
+  const [loginSchoolCode, setLoginSchoolCode] = useState('LSK01');
   const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Check auth session
+  // Check existing session
   useEffect(() => {
     const initAuth = async () => {
       const token = ApiService.getToken();
@@ -43,10 +44,8 @@ export const App: React.FC = () => {
           }
         } catch (err) {
           ApiService.setToken(null);
+          setUser(null);
         }
-      } else {
-        // Auto-login as Principal by default for instant demo
-        quickLogin('principal@dps.edu', 'principal123');
       }
       setLoading(false);
     };
@@ -57,6 +56,7 @@ export const App: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoggingIn(true);
+    setLoginError(null);
     try {
       const res = await ApiService.login(email, password, loginSchoolCode);
       setUser(res.user);
@@ -66,31 +66,17 @@ export const App: React.FC = () => {
         setSelectedStudentId(res.linkedStudents[0].id);
       }
     } catch (err: any) {
-      alert('Login error: ' + err.message);
+      setLoginError(err.message || 'Invalid credentials');
     } finally {
       setLoggingIn(false);
     }
   };
 
-  const quickLogin = async (loginEmail: string, loginPass: string) => {
-    setLoggingIn(true);
-    try {
-      const res = await ApiService.login(loginEmail, loginPass);
-      setUser(res.user);
-      setSchool(res.school);
-      setLinkedStudents(res.linkedStudents || []);
-      if (res.linkedStudents?.length > 0) {
-        setSelectedStudentId(res.linkedStudents[0].id);
-      } else if (loginEmail.includes('priya')) {
-        setSelectedStudentId('stu-priya-02');
-      } else {
-        setSelectedStudentId('stu-rahul-01');
-      }
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoggingIn(false);
-    }
+  const handleFillCredentials = (fillEmail: string, fillPass: string, fillCode: string) => {
+    setEmail(fillEmail);
+    setPassword(fillPass);
+    setLoginSchoolCode(fillCode);
+    setLoginError(null);
   };
 
   const handleLogout = () => {
@@ -101,12 +87,13 @@ export const App: React.FC = () => {
 
   const handleOpenQuickReportCard = async () => {
     try {
+      if (!selectedStudentId) return;
       const res = await ApiService.getReportCard(selectedStudentId, 'exam-sa1-term1');
       if (res.reportCard) {
         setReportCardData(res.reportCard);
       }
     } catch (e: any) {
-      alert('Error: ' + e.message);
+      alert('Error loading report card: ' + e.message);
     }
   };
 
@@ -114,114 +101,114 @@ export const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white text-xs">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <span className="font-bold text-sm tracking-wide">Initializing ANVIMITRA-ERP Edge...</span>
+        <span className="font-bold text-sm tracking-wide">Connecting to ANVIMITRA-ERP Cloud Core...</span>
       </div>
     );
   }
 
-  // Not logged in -> Show Login Page with 1-click role presets
+  // Not logged in -> Show Professional Secure Login Page
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10">
           <div className="text-center mb-6">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center mx-auto text-white shadow-xl shadow-blue-500/25 mb-3 font-black text-2xl">
               <SchoolIcon size={28} />
             </div>
             <h1 className="text-2xl font-black tracking-tight">ANVIMITRA-ERP</h1>
             <p className="text-xs text-slate-400 mt-1">
-              Cloudflare Multi-Tenant School ERP & Secondary Desktop Storage System
+              Multi-Tenant Cloud ERP & Academic Management System
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4 text-xs">
+          {loginError && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+              ⚠️ {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-3.5 text-xs">
             <div>
-              <label className="block font-bold text-slate-400 mb-1">Email Address</label>
+              <label className="block font-bold text-slate-400 mb-1">School Identification Code</label>
               <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                type="text"
+                placeholder="e.g. LSK01 or DPS01"
+                value={loginSchoolCode}
+                onChange={(e) => setLoginSchoolCode(e.target.value.toUpperCase())}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono uppercase focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-400 mb-1">Password</label>
+              <label className="block font-bold text-slate-400 mb-1">Official Email Address</label>
+              <input
+                type="email"
+                required
+                placeholder="principal@lskacademy.edu"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-400 mb-1">Security Password</label>
               <input
                 type="password"
                 required
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-400 mb-1">School Code (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. DPS01"
-                value={loginSchoolCode}
-                onChange={(e) => setLoginSchoolCode(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono uppercase focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
             <button
               type="submit"
               disabled={loggingIn}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
             >
               <LogIn size={15} />
-              <span>{loggingIn ? 'Authenticating...' : 'Sign In to Portal'}</span>
+              <span>{loggingIn ? 'Authenticating with School Core...' : 'Secure Sign In'}</span>
             </button>
           </form>
 
-          {/* 1-Click Role Switcher Presets */}
-          <div className="mt-6 pt-6 border-t border-slate-800 text-xs">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">
-              1-Click Demo Personas:
+          {/* Quick-fill helper for registered demo accounts */}
+          <div className="mt-6 pt-5 border-t border-slate-800 text-xs">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">
+              Select Demo Credentials to Fill:
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
               <button
-                onClick={() => quickLogin('superadmin@anvimitra.com', 'admin123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-purple-950/40 border border-slate-800 text-left font-semibold text-purple-400 text-[11px] transition"
+                type="button"
+                onClick={() => handleFillCredentials('principal@lskacademy.edu', 'principal123', 'LSK01')}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 text-left font-semibold text-indigo-400 transition"
+              >
+                🏫 LSK Principal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillCredentials('teacher1@lskacademy.edu', 'teacher123', 'LSK01')}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-blue-950/40 border border-slate-800 text-left font-semibold text-blue-400 transition"
+              >
+                👩‍🏫 LSK Class Teacher
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillCredentials('accountant@lskacademy.edu', 'staff123', 'LSK01')}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 text-left font-semibold text-emerald-400 transition"
+              >
+                💳 LSK Accountant
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillCredentials('superadmin@anvimitra.com', 'admin123', '')}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-purple-950/40 border border-slate-800 text-left font-semibold text-purple-400 transition"
               >
                 👑 Super Admin
-              </button>
-              <button
-                onClick={() => quickLogin('principal@dps.edu', 'principal123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 text-left font-semibold text-indigo-400 text-[11px] transition"
-              >
-                🏫 Principal
-              </button>
-              <button
-                onClick={() => quickLogin('sharma@dps.edu', 'teacher123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-blue-950/40 border border-slate-800 text-left font-semibold text-blue-400 text-[11px] transition"
-              >
-                👩‍🏫 Class Teacher (10-A)
-              </button>
-              <button
-                onClick={() => quickLogin('accountant@dps.edu', 'staff123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 text-left font-semibold text-emerald-400 text-[11px] transition"
-              >
-                💳 Accountant
-              </button>
-              <button
-                onClick={() => quickLogin('parent.rahul@gmail.com', 'parent123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-amber-950/40 border border-slate-800 text-left font-semibold text-amber-400 text-[11px] transition"
-              >
-                👨‍👧 Parent (App Active)
-              </button>
-              <button
-                onClick={() => quickLogin('parent.priya@gmail.com', 'parent123')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-rose-950/40 border border-slate-800 text-left font-semibold text-rose-400 text-[11px] transition"
-              >
-                ✉️ Parent (SMS Fallback)
               </button>
             </div>
           </div>
@@ -232,19 +219,18 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Top Navbar */}
+      {/* Top Professional Navbar */}
       <Navbar
         user={user}
         school={school}
         onLogout={handleLogout}
-        onSwitchPersona={quickLogin}
         linkedStudents={linkedStudents}
         selectedStudentId={selectedStudentId}
         onSelectStudent={setSelectedStudentId}
       />
 
-      {/* Main Content Rendered based on Role */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
+      {/* Main Content Rendered strictly based on Authenticated Role */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {user.role === 'super_admin' && <SuperAdminPortal />}
         {user.role === 'principal' && <PrincipalPortal />}
         {user.role === 'teacher' && <TeacherPortal user={user} />}
