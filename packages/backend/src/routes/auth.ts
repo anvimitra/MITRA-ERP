@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
-import { comparePassword, generateToken, verifyToken } from '../services/auth.js';
+import { comparePassword, generateToken, verifyToken, hashPassword } from '../services/auth.js';
 
 export const authRoutes = new Hono();
 
@@ -142,4 +142,47 @@ authRoutes.get('/me', async (c) => {
     school,
     linkedStudents,
   });
+});
+
+// Change Password for currently logged-in user (Super Admin, Principal, etc.)
+authRoutes.post('/change-password', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const token = authHeader.substring(7);
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+
+  const body = await c.req.json();
+  const { currentPassword, newPassword } = body;
+
+  if (!currentPassword || !newPassword) {
+    return c.json({ error: 'Current password and new password are required' }, 400);
+  }
+
+  if (newPassword.length < 6) {
+    return c.json({ error: 'New password must be at least 6 characters long' }, 400);
+  }
+
+  const user = db.select().from(schema.users).where(eq(schema.users.id, decoded.userId)).get();
+  if (!user) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  const isCurrentValid = comparePassword(currentPassword, user.passwordHash);
+  if (!isCurrentValid) {
+    return c.json({ error: 'Incorrect current password' }, 400);
+  }
+
+  const newHash = hashPassword(newPassword);
+  db.update(schema.users)
+    .set({ passwordHash: newHash })
+    .where(eq(schema.users.id, user.id))
+    .run();
+
+  return c.json({ success: true, message: 'Password updated successfully!' });
 });

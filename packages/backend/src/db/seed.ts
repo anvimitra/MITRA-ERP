@@ -165,23 +165,52 @@ export async function seedDatabase() {
     },
   ]).onConflictDoNothing().run();
 
-  // 3. Classes and Sections
+  // 3. Classes and Sections (Grades 1 to 12 for all schools)
+  const schoolIds = [dpsId, stxId, lskId];
+  const allGeneratedClasses: Array<{ id: string; schoolId: string; name: string; gradeLevel: number }> = [];
+  const allGeneratedSections: Array<{ id: string; schoolId: string; classId: string; name: string }> = [];
+
   const class10Id = 'class-10';
   const class9Id = 'class-9';
   const sec10AId = 'sec-10-a';
   const sec10BId = 'sec-10-b';
   const sec9AId = 'sec-9-a';
 
-  db.insert(schema.classes).values([
+  // Seed baseline DPS IDs for test suite & sample students
+  allGeneratedClasses.push(
     { id: class10Id, schoolId: dpsId, name: 'Class 10', gradeLevel: 10 },
-    { id: class9Id, schoolId: dpsId, name: 'Class 9', gradeLevel: 9 },
-  ]).onConflictDoNothing().run();
-
-  db.insert(schema.sections).values([
+    { id: class9Id, schoolId: dpsId, name: 'Class 9', gradeLevel: 9 }
+  );
+  allGeneratedSections.push(
     { id: sec10AId, schoolId: dpsId, classId: class10Id, name: 'A' },
     { id: sec10BId, schoolId: dpsId, classId: class10Id, name: 'B' },
-    { id: sec9AId, schoolId: dpsId, classId: class9Id, name: 'A' },
-  ]).onConflictDoNothing().run();
+    { id: sec9AId, schoolId: dpsId, classId: class9Id, name: 'A' }
+  );
+
+  // Generate Classes 1 to 12 for all schools
+  schoolIds.forEach((schId) => {
+    for (let g = 1; g <= 12; g++) {
+      if (schId === dpsId && (g === 9 || g === 10)) {
+        continue;
+      }
+      const cId = `class-${schId}-${g}`;
+      const cName = g === 11 ? 'Class 11 (Sci/Comm)' : g === 12 ? 'Class 12 (Sci/Comm)' : `Class ${g}`;
+      allGeneratedClasses.push({
+        id: cId,
+        schoolId: schId,
+        name: cName,
+        gradeLevel: g,
+      });
+
+      allGeneratedSections.push(
+        { id: `sec-${cId}-a`, schoolId: schId, classId: cId, name: 'A' },
+        { id: `sec-${cId}-b`, schoolId: schId, classId: cId, name: 'B' }
+      );
+    }
+  });
+
+  db.insert(schema.classes).values(allGeneratedClasses).onConflictDoNothing().run();
+  db.insert(schema.sections).values(allGeneratedSections).onConflictDoNothing().run();
 
   // 4. Subjects
   const subMath = 'sub-math';

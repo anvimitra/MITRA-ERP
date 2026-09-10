@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { School, SMSLogItem } from '../types';
 import { ApiService } from '../api';
-import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw } from 'lucide-react';
+import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X } from 'lucide-react';
 
 export const SuperAdminPortal: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [showPassModal, setShowPassModal] = useState(false);
   const [smsLogs, setSmsLogs] = useState<SMSLogItem[]>([]);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passLoading, setPassLoading] = useState(false);
 
   // Add school form state
   const [name, setName] = useState('');
@@ -59,6 +66,48 @@ export const SuperAdminPortal: React.FC = () => {
     }
   };
 
+  const handleDeleteSchool = async (schoolId: string, schoolName: string) => {
+    if (!confirm(`Are you sure you want to permanently remove '${schoolName}'? This will delete the school tenant from the platform.`)) {
+      return;
+    }
+    try {
+      await ApiService.deleteSchool(schoolId);
+      alert(`✅ School '${schoolName}' removed successfully.`);
+      loadData();
+    } catch (err: any) {
+      alert('Error removing school: ' + err.message);
+    }
+  };
+
+  const handleUpdateSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSchool) return;
+    try {
+      await ApiService.updateSchool(editingSchool.id, editingSchool);
+      alert('✅ School details updated successfully by Super Admin!');
+      setEditingSchool(null);
+      loadData();
+    } catch (err: any) {
+      alert('Error updating school: ' + err.message);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassLoading(true);
+    try {
+      await ApiService.changePassword(currentPassword, newPassword);
+      alert('✅ Password updated successfully!');
+      setShowPassModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      alert('Error changing password: ' + err.message);
+    } finally {
+      setPassLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Top Banner */}
@@ -73,13 +122,22 @@ export const SuperAdminPortal: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-600/30 transition"
-        >
-          <Plus size={18} />
-          <span>Register New School</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowPassModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-bold text-xs border border-purple-700/60 shadow transition"
+          >
+            <Lock size={15} />
+            <span>Change My Password</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-600/30 transition"
+          >
+            <Plus size={18} />
+            <span>Register New School</span>
+          </button>
+        </div>
       </div>
 
       {/* Cloudflare Edge Telemetry Cards */}
@@ -181,12 +239,27 @@ export const SuperAdminPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* PC Sync Key Info */}
-              <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                <span className="flex items-center gap-1 text-slate-600">
-                  <Key size={12} className="text-amber-500" /> PC Secondary Sync Key Available
+              {/* Management Controls for Super Admin */}
+              <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setEditingSchool({ ...s })}
+                    className="px-2.5 py-1 bg-white border border-slate-300 hover:border-purple-400 rounded-lg text-xs font-bold text-slate-700 hover:text-purple-700 transition flex items-center gap-1 shadow-sm"
+                  >
+                    <Edit size={12} />
+                    <span>Edit School</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSchool(s.id, s.name)}
+                    className="px-2.5 py-1 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg text-xs font-bold text-rose-600 transition flex items-center gap-1 shadow-sm"
+                  >
+                    <Trash2 size={12} />
+                    <span>Remove</span>
+                  </button>
+                </div>
+                <span className="text-[10px] text-purple-600 font-bold flex items-center gap-1 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                  <Key size={11} className="text-amber-500" /> PC Sync Key
                 </span>
-                <span className="text-purple-600 font-semibold">Ready for .EXE Agent</span>
               </div>
             </div>
           ))}
@@ -342,6 +415,195 @@ export const SuperAdminPortal: React.FC = () => {
                   className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold text-white shadow transition"
                 >
                   Provision School
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT SCHOOL ================= */}
+      {editingSchool && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Edit School Identity</h3>
+                <p className="text-xs text-slate-500">Super Admin master institutional overrides</p>
+              </div>
+              <button
+                onClick={() => setEditingSchool(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSchool} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">School Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingSchool.name}
+                  onChange={(e) => setEditingSchool({ ...editingSchool, name: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">School Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingSchool.code}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, code: e.target.value.toUpperCase() })}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Custom Domain</label>
+                  <input
+                    type="text"
+                    value={editingSchool.domain || ''}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, domain: e.target.value })}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Official Email</label>
+                  <input
+                    type="email"
+                    value={editingSchool.email || ''}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, email: e.target.value })}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={editingSchool.phone || ''}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, phone: e.target.value })}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Campus Address</label>
+                <input
+                  type="text"
+                  value={editingSchool.address || ''}
+                  onChange={(e) => setEditingSchool({ ...editingSchool, address: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Primary Theme Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={editingSchool.primaryColor || '#1e40af'}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
+                    className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={editingSchool.primaryColor || '#1e40af'}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingSchool(null)}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow transition"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CHANGE SUPER ADMIN PASSWORD ================= */}
+      {showPassModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Change Super Admin Password</h3>
+                  <p className="text-xs text-slate-500">Update your platform master access key</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPassModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Current Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter current password (e.g. admin123)"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">New Password *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder="Enter new password (min 6 characters)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowPassModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passLoading}
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow transition"
+                >
+                  {passLoading ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
             </form>

@@ -91,6 +91,11 @@ export const AccountantPortal: React.FC = () => {
       return;
     }
 
+    if (paymentMode === 'upi') {
+      alert('⚠️ UPI / QR Payment Gateway is currently under development (Coming Soon). Please collect fee via Cash, Cheque, or Bank Transfer.');
+      return;
+    }
+
     try {
       const res = await ApiService.collectFee({
         studentId: selectedStudentId,
@@ -266,7 +271,7 @@ export const AccountantPortal: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
               <div className="text-xs font-bold text-slate-400 uppercase">Collection Status</div>
               <div className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">Operational</div>
-              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Cash, UPI & Bank Deposit</p>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Cash, Cheque & Bank Deposit (UPI Coming Soon)</p>
             </div>
           </div>
 
@@ -446,10 +451,10 @@ export const AccountantPortal: React.FC = () => {
                     onChange={(e) => setPaymentMode(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 font-bold"
                   >
-                    <option value="cash">Cash Counter</option>
-                    <option value="upi">UPI / QR Transfer</option>
-                    <option value="online">Net Banking / Card</option>
-                    <option value="cheque">Cheque Deposit</option>
+                    <option value="cash">Cash Counter (Office Desk)</option>
+                    <option value="upi" disabled>UPI / QR (Coming Soon)</option>
+                    <option value="online">Bank Transfer / NEFT / IMPS</option>
+                    <option value="cheque">Cheque Deposit / Demand Draft</option>
                   </select>
                 </div>
               </div>

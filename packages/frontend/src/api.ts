@@ -77,7 +77,15 @@ export class ApiService {
     }>('/auth/me');
   }
 
-  // Schools (Super Admin)
+  // Auth
+  static async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  // Schools (Super Admin & Institution management)
   static async getSchools() {
     return this.request<{ schools: School[] }>('/schools');
   }
@@ -86,6 +94,19 @@ export class ApiService {
     return this.request<{ schoolId: string; apiSyncKey: string }>('/schools', {
       method: 'POST',
       body: JSON.stringify(schoolData),
+    });
+  }
+
+  static async updateSchool(schoolId: string, data: Partial<School>) {
+    return this.request<{ success: boolean; message: string }>(`/schools/${schoolId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteSchool(schoolId: string) {
+    return this.request<{ success: boolean; message: string }>(`/schools/${schoolId}`, {
+      method: 'DELETE',
     });
   }
 

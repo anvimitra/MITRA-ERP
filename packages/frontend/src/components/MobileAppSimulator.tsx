@@ -41,14 +41,14 @@ export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onO
           </div>
           <span className="text-slate-500">|</span>
           <a
-            href="https://github.com/anvimitra/MITRA-ERP/releases/latest/download/LSK-Academy-Mobile.apk"
+            href="https://github.com/anvimitra/MITRA-ERP/releases/latest/download/MITRA-ERP.apk"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-xl text-xs shadow transition"
-            title="Download latest compiled APK build with auto-update"
+            title="Download latest compiled MITRA-ERP APK build with auto-update"
           >
             <Download size={13} />
-            <span>Download APK (Auto-Update)</span>
+            <span>Download MITRA-ERP APK</span>
           </a>
           <button
             onClick={onClose}

@@ -116,3 +116,93 @@ schoolRoutes.post('/', async (c) => {
     apiSyncKey,
   }, 201);
 });
+
+// Update School Details (Super Admin has full access, Principal can only update operational fields)
+schoolRoutes.put('/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+  const schoolId = c.req.param('id');
+  const existing = db.select().from(schema.schools).where(eq(schema.schools.id, schoolId)).get();
+  if (!existing) {
+    return c.json({ error: 'School not found' }, 404);
+  }
+
+  const body = await c.req.json();
+
+  // If user is principal, restrict changing core details
+  if (user.role === 'principal') {
+    if (user.schoolId !== schoolId) {
+      return c.json({ error: 'Forbidden: Access to another school is restricted' }, 403);
+    }
+    if (
+      (body.code && body.code.toUpperCase() !== existing.code) ||
+      (body.name && body.name !== existing.name) ||
+      (body.domain && body.domain !== existing.domain)
+    ) {
+      return c.json({
+        error: 'Security Policy: Core institutional details (School Name, Code, Domain) can only be changed by Super Admin.',
+      }, 403);
+    }
+
+    // Principal can only update phone, address, and theme
+    db.update(schema.schools)
+      .set({
+        phone: body.phone !== undefined ? body.phone : existing.phone,
+        address: body.address !== undefined ? body.address : existing.address,
+        primaryColor: body.primaryColor || existing.primaryColor,
+        secondaryColor: body.secondaryColor || existing.secondaryColor,
+        logoUrl: body.logoUrl || existing.logoUrl,
+      })
+      .where(eq(schema.schools.id, schoolId))
+      .run();
+
+    return c.json({ success: true, message: 'School preferences updated successfully' });
+  }
+
+  // Super Admin has full power to edit all fields
+  if (user.role === 'super_admin') {
+    db.update(schema.schools)
+      .set({
+        name: body.name || existing.name,
+        code: body.code ? body.code.toUpperCase() : existing.code,
+        domain: body.domain !== undefined ? body.domain : existing.domain,
+        phone: body.phone !== undefined ? body.phone : existing.phone,
+        email: body.email !== undefined ? body.email : existing.email,
+        address: body.address !== undefined ? body.address : existing.address,
+        primaryColor: body.primaryColor || existing.primaryColor,
+        secondaryColor: body.secondaryColor || existing.secondaryColor,
+        logoUrl: body.logoUrl || existing.logoUrl,
+        isActive: body.isActive !== undefined ? body.isActive : existing.isActive,
+      })
+      .where(eq(schema.schools.id, schoolId))
+      .run();
+
+    return c.json({ success: true, message: 'School details updated successfully by Super Admin' });
+  }
+
+  return c.json({ error: 'Forbidden' }, 403);
+});
+
+// Super Admin: Delete / Remove a school
+schoolRoutes.delete('/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin permission required to delete schools' }, 403);
+  }
+
+  const schoolId = c.req.param('id');
+  const existing = db.select().from(schema.schools).where(eq(schema.schools.id, schoolId)).get();
+  if (!existing) {
+    return c.json({ error: 'School not found' }, 404);
+  }
+
+  // Delete school record
+  db.delete(schema.schools).where(eq(schema.schools.id, schoolId)).run();
+
+  return c.json({ success: true, message: `School '${existing.name}' (${existing.code}) has been removed.` });
+});

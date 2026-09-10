@@ -79,6 +79,7 @@ export const PrincipalPortal: React.FC = () => {
 
   // Staff Form
   const [showStaffModal, setShowStaffModal] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [staffForm, setStaffForm] = useState({
     name: '',
     email: '',
@@ -245,12 +246,36 @@ export const PrincipalPortal: React.FC = () => {
   };
 
   // --- Staff Handlers ---
+  const handleOpenEditStaff = (st: any) => {
+    setEditingStaffId(st.id);
+    setStaffForm({
+      name: st.name || '',
+      email: st.email || '',
+      phone: st.phone || '',
+      role: st.role || 'teacher',
+      password: '',
+    });
+    setShowStaffModal(true);
+  };
+
+  const handleOpenAddStaff = () => {
+    setEditingStaffId(null);
+    setStaffForm({ name: '', email: '', phone: '', role: 'teacher', password: '' });
+    setShowStaffModal(true);
+  };
+
   const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createTeacher(staffForm);
-      alert('✅ Faculty/Staff member registered successfully!');
+      if (editingStaffId) {
+        await ApiService.updateTeacher(editingStaffId, staffForm);
+        alert('✅ Faculty/Staff member updated successfully!');
+      } else {
+        await ApiService.createTeacher(staffForm);
+        alert('✅ Faculty/Staff member registered successfully!');
+      }
       setShowStaffModal(false);
+      setEditingStaffId(null);
       setStaffForm({ name: '', email: '', phone: '', role: 'teacher', password: '' });
       const res = await ApiService.getTeachers();
       setStaffList(res.staff || []);
@@ -1076,7 +1101,7 @@ export const PrincipalPortal: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setShowStaffModal(true)}
+                onClick={handleOpenAddStaff}
                 className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition"
               >
                 <UserPlus size={16} />
@@ -1127,16 +1152,22 @@ export const PrincipalPortal: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {st.role !== 'principal' && st.isActive ? (
+                        <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => handleDeactivateStaff(st.id, st.name)}
-                            className="text-[11px] font-bold text-rose-600 hover:text-rose-800 p-1"
+                            onClick={() => handleOpenEditStaff(st)}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 p-1"
                           >
-                            Deactivate
+                            Edit
                           </button>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                          {st.role !== 'principal' && st.isActive ? (
+                            <button
+                              onClick={() => handleDeactivateStaff(st.id, st.name)}
+                              className="text-[11px] font-bold text-rose-600 hover:text-rose-800 p-1"
+                            >
+                              Deactivate
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1195,22 +1226,42 @@ export const PrincipalPortal: React.FC = () => {
         {/* ================= MODULE 9: SCHOOL SETTINGS ================= */}
         {activeTab === 'settings' && (
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-              <Settings className="text-slate-600" size={24} /> Institutional Profile & Affiliation Parameters
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Settings className="text-slate-600" size={24} /> Institutional Profile & Affiliation Parameters
+              </h2>
+              <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs rounded-full flex items-center gap-1.5">
+                <ShieldAlert size={14} className="text-amber-600" />
+                <span>Super Admin Protected</span>
+              </span>
+            </div>
+
+            {/* Core Details Policy Alert */}
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start gap-3 text-xs text-amber-950">
+              <ShieldAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-sm text-amber-900">Institutional Identity Security Policy</span>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Core institutional parameters (Legal Name, School Tenant Code, CBSE Affiliation Number, and Custom Domain) are governed at the platform level and can only be modified by the <strong>Super Administrator</strong> from the master control plane.
+                </p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-slate-400 font-bold block mb-1">Institution Legal Name</span>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Institution Legal Name (Locked)</span>
                 <span className="text-sm font-black text-slate-900">LSK ACADEMY</span>
+                <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">Super Admin Managed</span>
               </div>
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-slate-400 font-bold block mb-1">School Code / Tenant ID</span>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">School Code / Tenant ID (Locked)</span>
                 <span className="text-sm font-black text-slate-900 font-mono">LSK01</span>
+                <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">Fixed</span>
               </div>
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-slate-400 font-bold block mb-1">Board Affiliation Number</span>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Board Affiliation Number (Locked)</span>
                 <span className="text-sm font-black text-slate-900 font-mono">CBSE-2130099</span>
+                <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">CBSE</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <span className="text-slate-400 font-bold block mb-1">Campus Physical Address</span>
@@ -1521,14 +1572,23 @@ export const PrincipalPortal: React.FC = () => {
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
             <button
-              onClick={() => setShowStaffModal(false)}
+              onClick={() => {
+                setShowStaffModal(false);
+                setEditingStaffId(null);
+              }}
               className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1 rounded-xl hover:bg-slate-100"
             >
               <X size={20} />
             </button>
 
-            <h3 className="text-xl font-black text-slate-900 mb-1">Register Faculty / Staff</h3>
-            <p className="text-xs text-slate-500 mb-5">Create an authenticated institutional login account.</p>
+            <h3 className="text-xl font-black text-slate-900 mb-1">
+              {editingStaffId ? 'Edit Faculty / Staff' : 'Register Faculty / Staff'}
+            </h3>
+            <p className="text-xs text-slate-500 mb-5">
+              {editingStaffId
+                ? 'Update institutional profile, role assignments, or security credentials.'
+                : 'Create an authenticated institutional login account.'}
+            </p>
 
             <form onSubmit={handleSaveStaff} className="space-y-3.5 text-xs">
               <div>
@@ -1560,11 +1620,17 @@ export const PrincipalPortal: React.FC = () => {
                 <input
                   type="email"
                   required
+                  disabled={!!editingStaffId}
                   placeholder="teacher@school.edu"
                   value={staffForm.email}
                   onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono ${
+                    editingStaffId ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
                 />
+                {editingStaffId && (
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Login ID cannot be changed</span>
+                )}
               </div>
 
               <div>
@@ -1579,11 +1645,13 @@ export const PrincipalPortal: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Account Password *</label>
+                <label className="block font-bold text-slate-700 mb-1">
+                  {editingStaffId ? 'New Password (Leave blank to keep unchanged)' : 'Account Password *'}
+                </label>
                 <input
                   type="password"
-                  required
-                  placeholder="Minimum 6 characters"
+                  required={!editingStaffId}
+                  placeholder={editingStaffId ? 'Leave blank to keep current' : 'Minimum 6 characters'}
                   value={staffForm.password}
                   onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
@@ -1593,7 +1661,10 @@ export const PrincipalPortal: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setShowStaffModal(false)}
+                  onClick={() => {
+                    setShowStaffModal(false);
+                    setEditingStaffId(null);
+                  }}
                   className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold"
                 >
                   Cancel
@@ -1602,7 +1673,7 @@ export const PrincipalPortal: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-600/30 transition"
                 >
-                  Register Staff
+                  {editingStaffId ? 'Save Changes' : 'Register Staff'}
                 </button>
               </div>
             </form>
