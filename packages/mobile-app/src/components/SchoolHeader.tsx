@@ -6,18 +6,22 @@ interface Props {
   school: School;
   user: User | null;
   unreadCount: number;
+  hasUpdate?: boolean;
   onOpenNotifications: () => void;
   onOpenLogin: () => void;
   onLogout: () => void;
+  onCheckUpdate?: () => void;
 }
 
 export const SchoolHeader: React.FC<Props> = ({
   school,
   user,
   unreadCount,
+  hasUpdate,
   onOpenNotifications,
   onOpenLogin,
   onLogout,
+  onCheckUpdate,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-r from-purple-700 via-purple-800 to-indigo-900 text-white shadow-lg pt-safe">
@@ -53,6 +57,19 @@ export const SchoolHeader: React.FC<Props> = ({
 
         {/* Action icons */}
         <div className="flex items-center space-x-2">
+          {onCheckUpdate && (
+            <button
+              onClick={onCheckUpdate}
+              className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20 transition active:scale-95 text-white"
+              title="Check for App Updates"
+            >
+              <RefreshCw className={`w-4 h-4 text-purple-200 ${hasUpdate ? 'text-amber-300 animate-spin' : ''}`} />
+              {hasUpdate && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping"></span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={onOpenNotifications}
             className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20 transition active:scale-95 text-white"

@@ -10,6 +10,7 @@ import { syncRoutes } from './routes/sync.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { studentRoutes } from './routes/students.js';
 import { teacherRoutes } from './routes/teachers.js';
+import { appUpdateRoutes } from './routes/app-update.js';
 
 export const app = new Hono();
 
@@ -44,3 +45,4 @@ app.route('/api/sync', syncRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/students', studentRoutes);
 app.route('/api/teachers', teacherRoutes);
+app.route('/api/app', appUpdateRoutes);

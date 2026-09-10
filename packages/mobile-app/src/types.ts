@@ -85,3 +85,15 @@ export interface NotificationItem {
   timestamp: string;
   read: boolean;
 }
+
+export interface AppUpdateInfo {
+  appName: string;
+  version: string;
+  versionCode: number;
+  minSupportedVersion: string;
+  latestApkUrl: string;
+  releaseNotes: string;
+  publishedAt: string;
+  isMandatory: boolean;
+  autoUpdateSupported: boolean;
+}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { School, User } from '../types';
-import { Bell, Calendar, Award, Receipt, Shield, CheckCircle2, ChevronRight, Smartphone, X } from 'lucide-react';
+import { Bell, Calendar, Award, Receipt, Shield, CheckCircle2, ChevronRight, Smartphone, X, Download } from 'lucide-react';
 
 interface Props {
   school: School | null;
@@ -39,9 +39,20 @@ export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onO
               <option value="STX02">STX02 (St. Xavier)</option>
             </select>
           </div>
+          <span className="text-slate-500">|</span>
+          <a
+            href="https://github.com/anvimitra/MITRA-ERP/releases/latest/download/LSK-Academy-Mobile.apk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-xl text-xs shadow transition"
+            title="Download latest compiled APK build with auto-update"
+          >
+            <Download size={13} />
+            <span>Download APK (Auto-Update)</span>
+          </a>
           <button
             onClick={onClose}
-            className="ml-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="ml-2 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <X size={18} />
           </button>

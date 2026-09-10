@@ -1,6 +1,6 @@
 import React from 'react';
 import { Student, AttendanceRecord, FeeItem, ExamReport } from '../types';
-import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw } from 'lucide-react';
 import { TabType } from './BottomNavBar';
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   fees: FeeItem[];
   latestReport: ExamReport;
   onChangeTab: (tab: TabType) => void;
+  onOpenIdCard?: () => void;
+  onCheckUpdate?: () => void;
 }
 
 export const ParentView: React.FC<Props> = ({
@@ -17,6 +19,8 @@ export const ParentView: React.FC<Props> = ({
   fees,
   latestReport,
   onChangeTab,
+  onOpenIdCard,
+  onCheckUpdate,
 }) => {
   const todayRecord = attendance[0];
   const pendingFee = fees.find((f) => f.status === 'pending');
@@ -57,6 +61,25 @@ export const ParentView: React.FC<Props> = ({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Quick ID Card & Auto-Update Actions in Card */}
+        <div className="mt-3 pt-3 border-t border-purple-800/80 flex items-center justify-between">
+          <button
+            onClick={onOpenIdCard}
+            className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 active:scale-95 text-purple-950 text-xs font-black rounded-xl shadow-md transition flex items-center space-x-1.5"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Digital ID Card</span>
+          </button>
+
+          <button
+            onClick={onCheckUpdate}
+            className="text-[10px] text-purple-200 hover:text-white flex items-center space-x-1 bg-purple-950/60 px-2.5 py-1.5 rounded-xl border border-purple-800"
+          >
+            <RefreshCw className="w-3 h-3 text-emerald-400" />
+            <span>Auto-Update: v1.2</span>
+          </button>
         </div>
       </div>
 

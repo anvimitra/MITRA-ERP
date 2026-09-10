@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -304,3 +304,48 @@ export async function submitClassAttendance(
     markedCount: records.length,
   };
 }
+
+export const CURRENT_APP_VERSION = '1.2.0';
+export const CURRENT_BUILD_NUMBER = 102;
+
+// Check for live updates from backend server
+export async function checkAppUpdate(): Promise<AppUpdateInfo | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/app/version`);
+    if (res.ok) {
+      const data: AppUpdateInfo = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn('Unable to reach app update server:', err);
+  }
+  return null;
+}
+
+// Fetch live school notices from backend
+export async function fetchLiveNotices(token?: string): Promise<NotificationItem[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/notices`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.notices) && data.notices.length > 0) {
+        return data.notices.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          channel: 'APP_PUSH_NOTIFICATION',
+          timestamp: new Date(n.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+          read: n.isRead === 1,
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Live notices offline, fallback to cached notices', err);
+  }
+  return MOCK_NOTIFICATIONS;
+}
+

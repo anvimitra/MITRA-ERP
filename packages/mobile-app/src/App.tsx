@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { School, User, Student, AttendanceRecord, FeeItem, NotificationItem } from './types';
+import { School, User, Student, AttendanceRecord, FeeItem, NotificationItem, AppUpdateInfo } from './types';
 import {
   LSK_SCHOOL_DEFAULT,
   DEFAULT_STUDENT,
@@ -9,6 +9,8 @@ import {
   MOCK_REPORTS,
   MOCK_NOTIFICATIONS,
   fetchSchoolByCode,
+  checkAppUpdate,
+  fetchLiveNotices,
 } from './api';
 import { SchoolHeader } from './components/SchoolHeader';
 import { BottomNavBar, TabType } from './components/BottomNavBar';
@@ -20,6 +22,8 @@ import { ReportCardView } from './components/ReportCardView';
 import { FeesView } from './components/FeesView';
 import { NotificationsView } from './components/NotificationsView';
 import { LoginModal } from './components/LoginModal';
+import { AutoUpdateBanner } from './components/AutoUpdateBanner';
+import { DigitalIdCardModal } from './components/DigitalIdCardModal';
 
 export const App: React.FC = () => {
   const [school, setSchool] = useState<School>(LSK_SCHOOL_DEFAULT);
@@ -38,15 +42,55 @@ export const App: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [showIdCard, setShowIdCard] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-    // Attempt to load fresh school branding on load
+    // 1. Attempt to load fresh school branding on load
     fetchSchoolByCode('LSK01').then((res) => {
       if (res) setSchool(res);
     });
+
+    // 2. Real-time Auto-Update Detection
+    checkAppUpdate().then((info) => {
+      if (info) {
+        setUpdateInfo(info);
+        setShowUpdateBanner(true);
+      }
+    });
+
+    // 3. Fetch live notices/circulars
+    fetchLiveNotices().then((liveNotices) => {
+      if (liveNotices && liveNotices.length > 0) {
+        setNotifications(liveNotices);
+      }
+    });
+
+    // 4. Background polling for updates every 3 minutes
+    const updateTimer = setInterval(() => {
+      checkAppUpdate().then((info) => {
+        if (info) {
+          setUpdateInfo(info);
+          setShowUpdateBanner(true);
+        }
+      });
+    }, 3 * 60 * 1000);
+
+    return () => clearInterval(updateTimer);
   }, []);
+
+  const handleManualCheckUpdate = async () => {
+    const info = await checkAppUpdate();
+    if (info) {
+      setUpdateInfo(info);
+      setShowUpdateBanner(true);
+    } else {
+      alert('✓ Your Mobile App is already running the latest version (v1.2.0)!');
+    }
+  };
 
   const handleLoginSuccess = (newUser: User, newSchool: School) => {
     setUser(newUser);
@@ -85,13 +129,23 @@ export const App: React.FC = () => {
           school={school}
           user={user}
           unreadCount={unreadCount}
+          hasUpdate={!!updateInfo}
           onOpenNotifications={() => setShowNotifications(true)}
           onOpenLogin={() => setShowLogin(true)}
           onLogout={handleLogout}
+          onCheckUpdate={handleManualCheckUpdate}
         />
 
         {/* Dynamic Main Body Content */}
         <main className="flex-1 p-4 overflow-y-auto no-scrollbar">
+          {/* Real-Time Auto-Update Alert Banner */}
+          {showUpdateBanner && updateInfo && (
+            <AutoUpdateBanner
+              updateInfo={updateInfo}
+              onDismiss={() => setShowUpdateBanner(false)}
+            />
+          )}
+
           {showNotifications ? (
             <div className="space-y-3">
               <button
@@ -111,6 +165,8 @@ export const App: React.FC = () => {
                   fees={MOCK_FEES}
                   latestReport={MOCK_REPORTS['sa1']}
                   onChangeTab={setActiveTab}
+                  onOpenIdCard={() => setShowIdCard(true)}
+                  onCheckUpdate={handleManualCheckUpdate}
                 />
               )}
 
@@ -153,6 +209,15 @@ export const App: React.FC = () => {
             currentSchool={school}
             onClose={() => setShowLogin(false)}
             onLoginSuccess={handleLoginSuccess}
+          />
+        )}
+
+        {/* Digital Student Identity Card Modal */}
+        {showIdCard && (
+          <DigitalIdCardModal
+            student={student}
+            school={school}
+            onClose={() => setShowIdCard(false)}
           />
         )}
       </div>
