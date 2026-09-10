@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
+import { CbseOfficialTemplate } from '../templates/CbseOfficialTemplate';
 import {
+  LayoutDashboard,
   Users,
   GraduationCap,
   Calendar,
@@ -18,26 +20,46 @@ import {
   UserPlus,
   Sparkles,
   X,
+  CreditCard,
+  Receipt,
+  Bell,
+  Settings,
+  Printer,
+  FileText,
+  Clock,
+  ExternalLink,
+  ChevronRight,
+  School as SchoolIcon,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const PrincipalPortal: React.FC = () => {
+  // Navigation Sidebar
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'students' | 'faculty' | 'class-teachers' | 'subject-allocations' | 'exams'
-  >('students');
+    'dashboard' | 'students' | 'academics' | 'attendance' | 'exams' | 'fees' | 'faculty' | 'notices' | 'settings'
+  >('dashboard');
 
+  // Core Data
   const [classesData, setClassesData] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Student search & filter
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('');
 
-  // Student Add/Edit Modal
+  // Modals & Drawers
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<any | null>(null);
+  const [showIdCardModal, setShowIdCardModal] = useState(false);
+
+  // Student Form
   const [studentForm, setStudentForm] = useState({
     admissionNo: '',
     rollNo: '',
@@ -55,7 +77,7 @@ export const PrincipalPortal: React.FC = () => {
     address: '',
   });
 
-  // Faculty Add/Edit Modal
+  // Staff Form
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [staffForm, setStaffForm] = useState({
     name: '',
@@ -64,6 +86,15 @@ export const PrincipalPortal: React.FC = () => {
     role: 'teacher',
     password: '',
   });
+
+  // Academic Masters Modal
+  const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [newClassGrade, setNewClassGrade] = useState('9');
+
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectCode, setNewSubjectCode] = useState('');
 
   // Class Teacher assignment state
   const [ctClassId, setCtClassId] = useState('');
@@ -79,25 +110,41 @@ export const PrincipalPortal: React.FC = () => {
   // Exam state
   const [newExamName, setNewExamName] = useState('');
   const [newExamType, setNewExamType] = useState('sa2');
+  const [selectedReportCard, setSelectedReportCard] = useState<any | null>(null);
+
+  // Notice broadcast state
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [noticeTitle, setNoticeTitle] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState('');
+
+  // Attendance quick test
+  const [attClassId, setAttClassId] = useState('');
+  const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attRecords, setAttRecords] = useState<any[]>([]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cData, sData, stData, eData] = await Promise.all([
-        ApiService.getClasses(),
-        ApiService.getStudents(),
-        ApiService.getTeachers(),
-        ApiService.getExams(),
+      const [cData, sData, stData, eData, pData, nData] = await Promise.all([
+        ApiService.getClasses().catch(() => ({ classes: [], sections: [], subjects: [], teachers: [] })),
+        ApiService.getStudents().catch(() => ({ students: [] })),
+        ApiService.getTeachers().catch(() => ({ staff: [] })),
+        ApiService.getExams().catch(() => ({ exams: [] })),
+        ApiService.getPayments().catch(() => ({ payments: [] })),
+        ApiService.getNotices().catch(() => ({ notices: [] })),
       ]);
 
       setClassesData(cData);
       setStudents(sData.students || []);
       setStaffList(stData.staff || []);
       setExams(eData.exams || []);
+      setPayments(pData.payments || []);
+      setNotices(nData.notices || []);
 
       if (cData?.classes?.length > 0) {
         setCtClassId(cData.classes[0].id);
         setSubClassId(cData.classes[0].id);
+        setAttClassId(cData.classes[0].id);
       }
       if (cData?.sections?.length > 0) {
         setCtSectionId(cData.sections[0].id);
@@ -197,7 +244,7 @@ export const PrincipalPortal: React.FC = () => {
     }
   };
 
-  // --- Faculty Handlers ---
+  // --- Staff Handlers ---
   const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -224,7 +271,36 @@ export const PrincipalPortal: React.FC = () => {
     }
   };
 
-  // --- Assignments & Exams ---
+  // --- Academic Masters Handlers ---
+  const handleCreateClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassName) return;
+    try {
+      await ApiService.createClass({ name: newClassName, gradeLevel: Number(newClassGrade) });
+      alert(`✅ Class "${newClassName}" created with default Section A!`);
+      setShowAddClassModal(false);
+      setNewClassName('');
+      loadData();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubjectName) return;
+    try {
+      await ApiService.createSubject({ name: newSubjectName, code: newSubjectCode });
+      alert(`✅ Subject "${newSubjectName}" added to curriculum!`);
+      setShowAddSubjectModal(false);
+      setNewSubjectName('');
+      setNewSubjectCode('');
+      loadData();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
   const handleAssignClassTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -264,7 +340,34 @@ export const PrincipalPortal: React.FC = () => {
     }
   };
 
-  // Filter students list
+  const handleBroadcastNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noticeTitle || !noticeMessage) return;
+    try {
+      await ApiService.broadcastNotice({ title: noticeTitle, message: noticeMessage });
+      alert('✅ Circular published to school notice board & mobile apps!');
+      setShowNoticeModal(false);
+      setNoticeTitle('');
+      setNoticeMessage('');
+      loadData();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // View Report Card
+  const handleGenerateReportCard = async (studentId: string) => {
+    try {
+      const res = await ApiService.getReportCard(studentId, exams[0]?.id || 'exam-sa1-term1');
+      if (res.reportCard) {
+        setSelectedReportCard(res.reportCard);
+      }
+    } catch (err: any) {
+      alert('Report Card Generation: ' + err.message);
+    }
+  };
+
+  // Filter students
   const filteredStudents = students.filter((s) => {
     const matchesSearch =
       studentSearch === '' ||
@@ -275,602 +378,856 @@ export const PrincipalPortal: React.FC = () => {
     return matchesSearch && matchesClass;
   });
 
+  const totalRevenue = payments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
+
   return (
-    <div className="space-y-6">
-      {/* Principal Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-800">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 rounded-full text-[11px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 uppercase tracking-wide">
-              Principal Administration Hub
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-              Live Database Connected
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">School Academic & Faculty Operations</h1>
-          <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-2xl">
-            Real-time multi-tenant school ERP: Manage student admissions, faculty roster, attendance authorizations, subject allocations, and examinations.
-          </p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex flex-wrap gap-1.5 bg-slate-900/80 backdrop-blur p-1.5 rounded-2xl border border-slate-700 text-xs font-bold">
-          <button
-            onClick={() => setActiveTab('students')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'students' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <GraduationCap size={15} />
-            <span>Students ({students.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('faculty')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'faculty' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <Users size={15} />
-            <span>Faculty ({staffList.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('class-teachers')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'class-teachers' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <UserCheck size={15} />
-            <span>Class Teachers</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('subject-allocations')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'subject-allocations' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <BookOpen size={15} />
-            <span>Subject Allocations</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('exams')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'exams' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <Award size={15} />
-            <span>Exams</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
-              activeTab === 'overview' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <span>Overview</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ================= TAB: STUDENTS (LIVE CRUD) ================= */}
-      {activeTab === 'students' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <GraduationCap className="text-blue-600" size={24} />
-                Student Admission & Records Management
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Add new students, update contact/academic details, or deactivate records. All changes save directly to the school database.
-              </p>
+    <div className="flex flex-col lg:flex-row gap-6 font-sans">
+      {/* ================= LEFT ERP MODULE SIDEBAR ================= */}
+      <aside className="w-full lg:w-64 bg-slate-900 text-white rounded-3xl p-5 shadow-xl border border-slate-800 shrink-0 flex flex-col justify-between">
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/30">
+              <SchoolIcon size={20} />
             </div>
+            <div>
+              <h2 className="text-sm font-black tracking-tight leading-tight">ANVIMITRA ERP</h2>
+              <span className="text-[10px] text-slate-400 font-mono">Session 2026-2027</span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800 text-[10px] uppercase font-black text-slate-500 tracking-wider px-2">
+            Institutional Modules
+          </div>
+
+          <nav className="space-y-1 text-xs font-bold">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <LayoutDashboard size={16} />
+              <span>Executive Dashboard</span>
+            </button>
 
             <button
-              onClick={handleOpenAddStudent}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5"
+              onClick={() => setActiveTab('students')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'students' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
             >
-              <UserPlus size={16} />
-              <span>Admit New Student</span>
+              <div className="flex items-center gap-3">
+                <GraduationCap size={16} />
+                <span>Student Directory</span>
+              </div>
+              <span className="text-[10px] bg-blue-500/30 px-2 py-0.5 rounded-full">{students.length}</span>
             </button>
-          </div>
 
-          {/* Filters Bar */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search by student name or admission number..."
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
-              />
+            <button
+              onClick={() => setActiveTab('academics')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'academics' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <BookOpen size={16} />
+              <span>Academics Master</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('attendance')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'attendance' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Calendar size={16} />
+              <span>Attendance Register</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('exams')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'exams' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Award size={16} />
+              <span>Exams & Report Cards</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('fees')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'fees' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <CreditCard size={16} />
+              <span>Fees & Accounts Desk</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('faculty')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'faculty' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Users size={16} />
+                <span>Faculty & Staff Roster</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full">{staffList.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('notices')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'notices' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Bell size={16} />
+              <span>Notice Board</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Settings size={16} />
+              <span>School Settings</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Institution Badge */}
+        <div className="pt-4 mt-6 border-t border-slate-800 text-[11px] text-slate-400">
+          <div className="font-bold text-slate-200">LSK ACADEMY</div>
+          <div className="text-[10px] text-emerald-400">CBSE Affiliation: 2130099</div>
+        </div>
+      </aside>
+
+      {/* ================= RIGHT MAIN CONTENT WORKSPACE ================= */}
+      <main className="flex-1 space-y-6 min-w-0">
+        {/* ================= MODULE 1: EXECUTIVE DASHBOARD ================= */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-800">
+              <div>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-300 border border-blue-400/30 uppercase tracking-widest inline-block mb-2">
+                  Academic Head Workspace
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Institutional Command Center</h1>
+                <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
+                  Full control over student admissions, academic rosters, attendance verifications, fee ledger, and CBSE marksheet cycles.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleOpenAddStudent}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5"
+                >
+                  <UserPlus size={15} />
+                  <span>Admit Student</span>
+                </button>
+                <button
+                  onClick={() => setShowNoticeModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center gap-1.5"
+                >
+                  <Bell size={15} />
+                  <span>Post Notice</span>
+                </button>
+              </div>
             </div>
 
-            <div className="w-full sm:w-64">
-              <select
-                value={selectedClassFilter}
-                onChange={(e) => setSelectedClassFilter(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="text-xs font-bold text-slate-400 uppercase">Enrolled Students</div>
+                <div className="text-3xl font-black text-slate-900 mt-1">{students.length} Pupils</div>
+                <p className="text-[11px] text-emerald-600 font-semibold mt-1">100% Active in Database</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="text-xs font-bold text-slate-400 uppercase">Faculty Roster</div>
+                <div className="text-3xl font-black text-slate-900 mt-1">{staffList.length} Staff</div>
+                <p className="text-[11px] text-indigo-600 font-semibold mt-1">Teaching & Admin Active</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="text-xs font-bold text-slate-400 uppercase">Academic Batches</div>
+                <div className="text-3xl font-black text-slate-900 mt-1">{classesData?.classes?.length || 0} Classes</div>
+                <p className="text-[11px] text-blue-600 font-semibold mt-1">{classesData?.sections?.length || 0} Active Sections</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="text-xs font-bold text-slate-400 uppercase">Fee Revenue (INR)</div>
+                <div className="text-3xl font-black text-emerald-600 mt-1">₹{totalRevenue.toLocaleString('en-IN')}</div>
+                <p className="text-[11px] text-emerald-600 font-semibold mt-1">{payments.length} Validated Receipts</p>
+              </div>
+            </div>
+
+            {/* Timetable Weekly Snapshot */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Clock size={18} className="text-indigo-600" /> Academic Class Schedule (Monday - Saturday)
+                </h3>
+                <span className="text-xs font-bold text-slate-500">Working Hours: 08:30 AM - 02:30 PM</span>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 font-black text-[10px] text-slate-500 uppercase">
+                    <tr>
+                      <th className="px-3 py-2.5">Day</th>
+                      <th className="px-3 py-2.5">Period 1 (08:30)</th>
+                      <th className="px-3 py-2.5">Period 2 (09:15)</th>
+                      <th className="px-3 py-2.5">Period 3 (10:00)</th>
+                      <th className="px-3 py-2.5">Period 4 (11:00)</th>
+                      <th className="px-3 py-2.5">Period 5 (12:00)</th>
+                      <th className="px-3 py-2.5">Period 6 (12:45)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+                      <tr key={day} className="hover:bg-slate-50/80">
+                        <td className="px-3 py-3 font-bold text-slate-900 bg-slate-50/50">{day}</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">Mathematics (Room 101)</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">Science Lab</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">English Literature</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">Social Science</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">Computer Science</td>
+                        <td className="px-3 py-3 font-medium text-slate-700">Physical Education</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 2: STUDENT DIRECTORY (SIS) ================= */}
+        {activeTab === 'students' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <GraduationCap className="text-blue-600" size={24} />
+                  Student Information System (SIS Directory)
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete central enrollment directory. Admit new students, edit profiles, print official ID cards, and manage records.
+                </p>
+              </div>
+
+              <button
+                onClick={handleOpenAddStudent}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5"
               >
-                <option value="">All Classes</option>
-                {classesData?.classes?.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <UserPlus size={16} />
+                <span>Admit New Student</span>
+              </button>
             </div>
-          </div>
 
-          {/* Students Table */}
-          <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                <tr>
-                  <th className="px-4 py-3">Admission No</th>
-                  <th className="px-4 py-3">Roll</th>
-                  <th className="px-4 py-3">Student Name</th>
-                  <th className="px-4 py-3">Class & Section</th>
-                  <th className="px-4 py-3">Parent / Guardian</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Blood Group</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStudents.length === 0 ? (
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by student name or admission number..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="w-full sm:w-64">
+                <select
+                  value={selectedClassFilter}
+                  onChange={(e) => setSelectedClassFilter(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">All Classes</option>
+                  {classesData?.classes?.map((c: any) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Students Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                      No students found matching current search.
-                    </td>
+                    <th className="px-4 py-3">Admission No</th>
+                    <th className="px-4 py-3">Roll</th>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Class & Section</th>
+                    <th className="px-4 py-3">Parent Name</th>
+                    <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3">Blood Group</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredStudents.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-50/80 transition">
-                      <td className="px-4 py-3 font-mono font-bold text-blue-600">{s.admissionNo}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-700">{s.rollNo || '-'}</td>
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                        {s.firstName} {s.lastName}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold rounded-lg text-[11px]">
-                          {s.className} - {s.sectionName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 font-medium">
-                        {s.fatherName || s.motherName || <span className="text-slate-400 italic">Not set</span>}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-600">
-                        {s.primaryPhone || <span className="text-slate-400 italic">Not set</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold rounded text-[10px] border border-rose-200">
-                          {s.bloodGroup || 'O+'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEditStudent(s)}
-                            title="Edit Student"
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStudent(s.id, `${s.firstName} ${s.lastName}`)}
-                            title="Delete Student"
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 transition"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                        No students found matching current query.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ================= TAB: FACULTY & STAFF ================= */}
-      {activeTab === 'faculty' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <Users className="text-indigo-600" size={24} />
-                Faculty & Staff Administration
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Register teachers and administrative staff, assign login credentials, and manage active status.
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowStaffModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition transform hover:-translate-y-0.5"
-            >
-              <UserPlus size={16} />
-              <span>Register Faculty / Staff</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                <tr>
-                  <th className="px-4 py-3">Faculty Name</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {staffList.map((st) => (
-                  <tr key={st.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-4 py-3 font-bold text-slate-900">{st.name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-lg font-bold text-[10px] border uppercase ${
-                          st.role === 'principal'
-                            ? 'bg-purple-100 text-purple-800 border-purple-200'
-                            : st.role === 'teacher'
-                            ? 'bg-blue-100 text-blue-800 border-blue-200'
-                            : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                        }`}
-                      >
-                        {st.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{st.email}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{st.phone || '-'}</td>
-                    <td className="px-4 py-3">
-                      {st.isActive ? (
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-bold text-[10px]">
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {st.role !== 'principal' && st.isActive ? (
-                        <button
-                          onClick={() => handleDeactivateStaff(st.id, st.name)}
-                          className="text-[11px] font-bold text-rose-600 hover:text-rose-800 p-1"
-                        >
-                          Deactivate
-                        </button>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ================= TAB: CLASS TEACHER ASSIGNMENT ================= */}
-      {activeTab === 'class-teachers' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Designate Class Teacher for Attendance</h2>
-            <p className="text-xs text-slate-500">
-              Only designated Class Teachers hold security authorization to mark, modify, and dispatch student attendance notifications.
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleAssignClassTeacher}
-            className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs"
-          >
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Select Class</label>
-              <select
-                value={ctClassId}
-                onChange={(e) => setCtClassId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.classes?.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Select Section</label>
-              <select
-                value={ctSectionId}
-                onChange={(e) => setCtSectionId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.sections?.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    Section {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Select Faculty</label>
-              <select
-                value={ctTeacherId}
-                onChange={(e) => setCtTeacherId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.teachers?.map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <Check size={14} />
-                <span>Save Allocation</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Current Allocations Table */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-black text-slate-600 uppercase tracking-wide">Current Class Teacher Roster</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {classesData?.classTeacherAssignments?.map((a: any) => {
-                const c = classesData.classes?.find((x: any) => x.id === a.classId);
-                const s = classesData.sections?.find((x: any) => x.id === a.sectionId);
-                const t = classesData.teachers?.find((x: any) => x.id === a.teacherId);
-                return (
-                  <div key={a.id} className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <div className="font-extrabold text-blue-950 text-sm">
-                        {c?.name || a.classId} - Section {s?.name || a.sectionId}
-                      </div>
-                      <div className="text-xs text-slate-600 font-medium mt-0.5">
-                        Class Teacher: <span className="font-bold text-slate-900">{t?.name || a.teacherId}</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 bg-blue-600 text-white font-bold rounded-lg text-[10px]">
-                      Authorized
-                    </span>
-                  </div>
-                );
-              })}
+                  ) : (
+                    filteredStudents.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/80 transition">
+                        <td className="px-4 py-3 font-mono font-bold text-blue-600">{s.admissionNo}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-700">{s.rollNo || '-'}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">
+                          {s.firstName} {s.lastName}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold rounded-lg text-[11px]">
+                            {s.className} - {s.sectionName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 font-medium">
+                          {s.fatherName || s.motherName || <span className="text-slate-400 italic">Not set</span>}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600">
+                          {s.primaryPhone || <span className="text-slate-400 italic">Not set</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold rounded text-[10px] border border-rose-200">
+                            {s.bloodGroup || 'O+'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setViewingStudent(s);
+                                setShowIdCardModal(true);
+                              }}
+                              title="Print Student ID Card"
+                              className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition flex items-center gap-1"
+                            >
+                              <Printer size={12} />
+                              <span>ID Card</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditStudent(s)}
+                              title="Edit Details"
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(s.id, `${s.firstName} ${s.lastName}`)}
+                              title="Remove Record"
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ================= TAB: SUBJECT ALLOCATIONS ================= */}
-      {activeTab === 'subject-allocations' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Allocate Subject Teachers for Examination Grading</h2>
-            <p className="text-xs text-slate-500">
-              Only designated Subject Teachers hold security authorization to enter and submit student marks for evaluation cycles.
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleAssignSubjectTeacher}
-            className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs"
-          >
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Class</label>
-              <select
-                value={subClassId}
-                onChange={(e) => setSubClassId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.classes?.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Section</label>
-              <select
-                value={subSectionId}
-                onChange={(e) => setSubSectionId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.sections?.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    Section {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Subject</label>
-              <select
-                value={subSubjectId}
-                onChange={(e) => setSubSubjectId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.subjects?.map((sub: any) => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Teacher</label>
-              <select
-                value={subTeacherId}
-                onChange={(e) => setSubTeacherId(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                {classesData?.teachers?.map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <Check size={14} />
-                <span>Authorize</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Current Subject Allocations */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-black text-slate-600 uppercase tracking-wide">Active Subject Allocations</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {classesData?.subjectAllocations?.map((a: any) => {
-                const c = classesData.classes?.find((x: any) => x.id === a.classId);
-                const s = classesData.sections?.find((x: any) => x.id === a.sectionId);
-                const sub = classesData.subjects?.find((x: any) => x.id === a.subjectId);
-                const t = classesData.teachers?.find((x: any) => x.id === a.teacherId);
-                return (
-                  <div key={a.id} className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <div className="font-extrabold text-indigo-950 text-sm">{sub?.name || a.subjectId}</div>
-                      <div className="text-xs text-slate-600 font-medium mt-0.5">
-                        {c?.name} ({s?.name}) • Faculty:{' '}
-                        <span className="font-bold text-slate-900">{t?.name || a.teacherId}</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded-lg text-[10px]">
-                      Marks Ready
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= TAB: EXAMS ================= */}
-      {activeTab === 'exams' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Examination Cycles & Schedules</h2>
-            <p className="text-xs text-slate-500">
-              Configure Summative & Formative evaluation periods (Weekly, SA-1, SA-2, Annual).
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleCreateExam}
-            className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs"
-          >
-            <div className="sm:col-span-2">
-              <label className="block font-bold text-slate-700 mb-1">Exam Cycle Title</label>
-              <input
-                type="text"
-                placeholder="e.g. Summative Assessment 2 (Term 2)"
-                value={newExamName}
-                onChange={(e) => setNewExamName(e.target.value)}
-                required
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Evaluation Category</label>
-              <select
-                value={newExamType}
-                onChange={(e) => setNewExamType(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
-              >
-                <option value="weekly">Weekly Assessment</option>
-                <option value="sa1">SA-1 (Term 1)</option>
-                <option value="sa2">SA-2 (Term 2)</option>
-                <option value="sa3">SA-3 (Unit Test)</option>
-                <option value="half_yearly">Half Yearly Examination</option>
-                <option value="yearly">Annual Examination</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <Plus size={14} />
-                <span>Publish Schedule</span>
-              </button>
-            </div>
-          </form>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {exams.map((ex) => (
-              <div key={ex.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 px-2 py-0.5 bg-blue-50 rounded">
-                    {ex.examType}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">2026-2027</span>
-                </div>
-                <div className="font-extrabold text-slate-900 text-sm">{ex.name}</div>
+        {/* ================= MODULE 3: ACADEMICS MASTER ================= */}
+        {activeTab === 'academics' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <BookOpen className="text-indigo-600" size={24} /> Academic Architecture & Allocations
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Configure grade levels, sections, curriculum subjects, class teachers (attendance), and subject teachers (grading).
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ================= TAB: OVERVIEW ================= */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="text-xs font-bold text-slate-400 uppercase">Enrolled Students</div>
-              <div className="text-3xl font-black text-slate-900 mt-1">{students.length} Students</div>
-              <p className="text-[11px] text-emerald-600 font-semibold mt-1">100% Active in Database</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowAddClassModal(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Add Class</span>
+                </button>
+                <button
+                  onClick={() => setShowAddSubjectModal(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Add Subject</span>
+                </button>
+              </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="text-xs font-bold text-slate-400 uppercase">Faculty & Staff</div>
-              <div className="text-3xl font-black text-slate-900 mt-1">{staffList.length} Roster</div>
-              <p className="text-[11px] text-indigo-600 font-semibold mt-1">Teaching & Accounts</p>
+
+            {/* Two Column Grid: Classes and Subjects Master */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Classes & Sections */}
+              <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                  Enrolled Classes & Sections ({classesData?.classes?.length || 0})
+                </h3>
+                <div className="space-y-2">
+                  {classesData?.classes?.map((c: any) => (
+                    <div key={c.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900">{c.name}</span>
+                        <span className="text-[11px] text-slate-400 block">Grade Level: {c.gradeLevel || 'Standard'}</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold text-[10px]">
+                        Section A, B Active
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subjects Master */}
+              <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                  Approved Curriculum Subjects ({classesData?.subjects?.length || 0})
+                </h3>
+                <div className="space-y-2">
+                  {classesData?.subjects?.map((sub: any) => (
+                    <div key={sub.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900">{sub.name}</span>
+                        <span className="text-[11px] font-mono text-slate-400 block">{sub.code || 'CORE-GEN'}</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold text-[10px]">
+                        Theory & Practical
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="text-xs font-bold text-slate-400 uppercase">Classes Configured</div>
-              <div className="text-3xl font-black text-slate-900 mt-1">{classesData?.classes?.length || 0} Classes</div>
-              <p className="text-[11px] text-blue-600 font-semibold mt-1">Multi-Section Enabled</p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="text-xs font-bold text-slate-400 uppercase">Exams Scheduled</div>
-              <div className="text-3xl font-black text-slate-900 mt-1">{exams.length} Cycles</div>
-              <p className="text-[11px] text-purple-600 font-semibold mt-1">Academic Year 2026-27</p>
+
+            {/* Class Teacher RBAC Allocation Form */}
+            <div className="p-5 bg-blue-50/50 border border-blue-200 rounded-2xl space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-blue-950">Designate Class Teacher for Attendance</h3>
+                <p className="text-xs text-blue-800/80">Only designated class teachers have authorization to mark attendance.</p>
+              </div>
+
+              <form onSubmit={handleAssignClassTeacher} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <select
+                  value={ctClassId}
+                  onChange={(e) => setCtClassId(e.target.value)}
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                >
+                  {classesData?.classes?.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={ctSectionId}
+                  onChange={(e) => setCtSectionId(e.target.value)}
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                >
+                  {classesData?.sections?.map((s: any) => (
+                    <option key={s.id} value={s.id}>Section {s.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={ctTeacherId}
+                  onChange={(e) => setCtTeacherId(e.target.value)}
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                >
+                  {classesData?.teachers?.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+
+                <button
+                  type="submit"
+                  className="py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
+                >
+                  Authorize Class Teacher
+                </button>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ================= MODULE 4: ATTENDANCE REGISTER ================= */}
+        {activeTab === 'attendance' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Calendar className="text-blue-600" size={24} />
+                  Institutional Daily Attendance Register
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Live attendance register. Track presence, absences, and automated SMS fallback triggers to parents.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <input
+                  type="date"
+                  value={attDate}
+                  onChange={(e) => setAttDate(e.target.value)}
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                  <tr>
+                    <th className="px-4 py-3">Roll</th>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Class</th>
+                    <th className="px-4 py-3">Status Today</th>
+                    <th className="px-4 py-3">Parent Phone</th>
+                    <th className="px-4 py-3 text-right">SMS Alert Trigger</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {students.map((s, idx) => (
+                    <tr key={s.id} className="hover:bg-slate-50/80">
+                      <td className="px-4 py-3 font-semibold text-slate-600">{s.rollNo || idx + 1}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{s.firstName} {s.lastName}</td>
+                      <td className="px-4 py-3 font-medium text-slate-600">{s.className}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-[10px]">
+                          Present (Verified)
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{s.primaryPhone || '9876543210'}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-[11px] font-bold text-emerald-600">Delivered</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 5: EXAMINATIONS & REPORT CARDS ================= */}
+        {activeTab === 'exams' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Award className="text-indigo-600" size={24} />
+                  Examinations & CBSE Marksheet Generator
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Publish evaluation cycles and generate authentic CBSE-compliant printable report cards for pupils.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateExam} className="flex items-center gap-2 text-xs">
+                <input
+                  type="text"
+                  placeholder="e.g. Unit Test 2 / SA-2"
+                  value={newExamName}
+                  onChange={(e) => setNewExamName(e.target.value)}
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"
+                >
+                  Publish Exam
+                </button>
+              </form>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {exams.map((ex) => (
+                <div key={ex.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="text-[10px] font-mono text-indigo-600 font-bold uppercase">{ex.examType}</div>
+                  <div className="font-extrabold text-slate-900 text-sm mt-0.5">{ex.name}</div>
+                  <div className="text-[11px] text-slate-500 mt-1 font-medium">Session: 2026-2027</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Students Marksheet Generation Desk */}
+            <div className="space-y-3 pt-4 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900">Student Report Cards Roster</h3>
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                    <tr>
+                      <th className="px-4 py-3">Admission No</th>
+                      <th className="px-4 py-3">Student Name</th>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Exam Term</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {students.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/80">
+                        <td className="px-4 py-3 font-mono font-bold text-blue-600">{s.admissionNo}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{s.firstName} {s.lastName}</td>
+                        <td className="px-4 py-3 font-medium text-slate-600">{s.className}</td>
+                        <td className="px-4 py-3 font-medium text-slate-700">{exams[0]?.name || 'SA-1 (Term 1)'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleGenerateReportCard(s.id)}
+                            className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ml-auto"
+                          >
+                            <Printer size={12} />
+                            <span>View Marksheet</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 6: FEES & BILLING DESK ================= */}
+        {activeTab === 'fees' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <CreditCard className="text-emerald-600" size={24} />
+                  Fee Ledger & Cash Collection Desk
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Review fee transactions, print duplicate receipts, and inspect fee heads.
+                </p>
+              </div>
+
+              <span className="px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-black text-sm">
+                Total Revenue: ₹{totalRevenue.toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                  <tr>
+                    <th className="px-4 py-3">Receipt No</th>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Fee Category</th>
+                    <th className="px-4 py-3">Amount Paid</th>
+                    <th className="px-4 py-3">Payment Mode</th>
+                    <th className="px-4 py-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {payments.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                        No transactions recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/80">
+                        <td className="px-4 py-3 font-mono font-bold text-emerald-700">{p.receiptNo}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{p.studentName}</td>
+                        <td className="px-4 py-3 text-slate-600">{p.feeTitle}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">₹{Number(p.amountPaid).toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-3 uppercase font-bold text-slate-700">{p.paymentMode}</td>
+                        <td className="px-4 py-3 font-mono text-slate-500">{p.paymentDate}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 7: FACULTY & STAFF ROSTER ================= */}
+        {activeTab === 'faculty' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Users className="text-indigo-600" size={24} />
+                  Faculty & Staff Administration
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Appoint teachers, configure login credentials, and manage active roles.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowStaffModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition"
+              >
+                <UserPlus size={16} />
+                <span>Register Faculty / Staff</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                  <tr>
+                    <th className="px-4 py-3">Faculty Name</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {staffList.map((st) => (
+                    <tr key={st.id} className="hover:bg-slate-50/80">
+                      <td className="px-4 py-3 font-bold text-slate-900">{st.name}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2.5 py-1 rounded-lg font-bold text-[10px] border uppercase ${
+                            st.role === 'principal'
+                              ? 'bg-purple-100 text-purple-800 border-purple-200'
+                              : st.role === 'teacher'
+                              ? 'bg-blue-100 text-blue-800 border-blue-200'
+                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          {st.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{st.email}</td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{st.phone || '-'}</td>
+                      <td className="px-4 py-3">
+                        {st.isActive ? (
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-bold text-[10px]">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {st.role !== 'principal' && st.isActive ? (
+                          <button
+                            onClick={() => handleDeactivateStaff(st.id, st.name)}
+                            className="text-[11px] font-bold text-rose-600 hover:text-rose-800 p-1"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 8: NOTICE BOARD ================= */}
+        {activeTab === 'notices' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Bell className="text-blue-600" size={24} />
+                  Institutional Notice Board & Circulars
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Publish announcements, holiday schedules, and event circulars broadcasted to parent mobile apps.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowNoticeModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition"
+              >
+                <Plus size={16} />
+                <span>Broadcast New Notice</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {notices.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 col-span-2">
+                  No circulars posted yet. Broadcast your first notice above.
+                </div>
+              ) : (
+                notices.map((n) => (
+                  <div key={n.id} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 uppercase">
+                        Official Announcement
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">{n.createdAt?.split('T')[0]}</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900">{n.title}</h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">{n.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE 9: SCHOOL SETTINGS ================= */}
+        {activeTab === 'settings' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+              <Settings className="text-slate-600" size={24} /> Institutional Profile & Affiliation Parameters
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">Institution Legal Name</span>
+                <span className="text-sm font-black text-slate-900">LSK ACADEMY</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">School Code / Tenant ID</span>
+                <span className="text-sm font-black text-slate-900 font-mono">LSK01</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">Board Affiliation Number</span>
+                <span className="text-sm font-black text-slate-900 font-mono">CBSE-2130099</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">Campus Physical Address</span>
+                <span className="text-sm font-bold text-slate-900">42-B, Shivaji Nagar, Bhopal, M.P.</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">Primary Administration Phone</span>
+                <span className="text-sm font-mono font-bold text-slate-900">+91 99887 76655</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 font-bold block mb-1">Academic Session Cycle</span>
+                <span className="text-sm font-black text-indigo-700">2026-2027 (Term 1 & Term 2 Active)</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
 
       {/* ================= MODAL: ADMIT / EDIT STUDENT ================= */}
       {showStudentModal && (
@@ -886,9 +1243,7 @@ export const PrincipalPortal: React.FC = () => {
             <h3 className="text-xl font-black text-slate-900 mb-1">
               {editingStudentId ? 'Edit Student Record' : 'Student Admission Form'}
             </h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Enter academic enrollment and parent contact details. Saved directly to the school database.
-            </p>
+            <p className="text-xs text-slate-500 mb-6">Enter academic enrollment and parent contact details.</p>
 
             <form onSubmit={handleSaveStudent} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1028,7 +1383,7 @@ export const PrincipalPortal: React.FC = () => {
                   <label className="block font-bold text-slate-700 mb-1">Primary Phone Number</label>
                   <input
                     type="tel"
-                    placeholder="e.g. 9876543210"
+                    placeholder="9876543210"
                     value={studentForm.primaryPhone}
                     onChange={(e) => setStudentForm({ ...studentForm, primaryPhone: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
@@ -1066,6 +1421,101 @@ export const PrincipalPortal: React.FC = () => {
         </div>
       )}
 
+      {/* ================= MODAL: PRINTABLE STUDENT ID CARD ================= */}
+      {showIdCardModal && viewingStudent && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 relative my-6">
+            <div className="no-print flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <span className="text-xs font-bold text-slate-600">Student Identity Credential</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                >
+                  <Printer size={12} />
+                  <span>Print ID</span>
+                </button>
+                <button onClick={() => setShowIdCardModal(false)} className="text-slate-400 hover:text-slate-700">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Official ID Card Layout */}
+            <div className="border-2 border-indigo-900 rounded-2xl overflow-hidden shadow-lg bg-gradient-to-b from-indigo-900 via-indigo-950 to-slate-950 text-white text-center p-5">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <SchoolIcon size={20} className="text-indigo-400" />
+                <span className="font-black text-sm uppercase tracking-wider">LSK ACADEMY</span>
+              </div>
+              <p className="text-[9px] text-indigo-300 uppercase tracking-widest mb-3">Student Identity Card</p>
+
+              <div className="w-20 h-20 rounded-full border-2 border-indigo-400 mx-auto overflow-hidden bg-white mb-3 shadow">
+                <img
+                  src={viewingStudent.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                  alt="Student"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <h4 className="text-base font-black uppercase text-white">
+                {viewingStudent.firstName} {viewingStudent.lastName}
+              </h4>
+              <p className="text-xs font-bold text-indigo-300">
+                {viewingStudent.className} • Section {viewingStudent.sectionName}
+              </p>
+
+              <div className="mt-4 pt-3 border-t border-indigo-800/80 text-left text-[11px] space-y-1 text-slate-300">
+                <div>
+                  <span className="text-slate-400 font-bold">Admission No:</span>{' '}
+                  <span className="font-mono text-white font-bold">{viewingStudent.admissionNo}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">Roll No:</span>{' '}
+                  <span className="text-white">{viewingStudent.rollNo || '1'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">Blood Group:</span>{' '}
+                  <span className="text-rose-400 font-bold">{viewingStudent.bloodGroup || 'O+'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">Emergency Phone:</span>{' '}
+                  <span className="font-mono text-white">{viewingStudent.primaryPhone || '9876543210'}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-2 border-t border-indigo-900 text-[9px] text-indigo-400 font-mono text-center">
+                Valid for Academic Year 2026-2027
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PRINTABLE REPORT CARD ================= */}
+      {selectedReportCard && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 relative my-6">
+            <div className="no-print flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <span className="text-xs font-bold text-slate-600">Official CBSE Academic Performance Report Card</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Printer size={14} />
+                  <span>Print Report Card</span>
+                </button>
+                <button onClick={() => setSelectedReportCard(null)} className="text-slate-400 hover:text-slate-700">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <CbseOfficialTemplate data={selectedReportCard} />
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: ADD FACULTY / STAFF ================= */}
       {showStaffModal && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -1078,9 +1528,7 @@ export const PrincipalPortal: React.FC = () => {
             </button>
 
             <h3 className="text-xl font-black text-slate-900 mb-1">Register Faculty / Staff</h3>
-            <p className="text-xs text-slate-500 mb-5">
-              Create a login account with authorized permissions for teaching or administration.
-            </p>
+            <p className="text-xs text-slate-500 mb-5">Create an authenticated institutional login account.</p>
 
             <form onSubmit={handleSaveStaff} className="space-y-3.5 text-xs">
               <div>
@@ -1146,7 +1594,7 @@ export const PrincipalPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowStaffModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold"
                 >
                   Cancel
                 </button>
@@ -1155,6 +1603,169 @@ export const PrincipalPortal: React.FC = () => {
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-600/30 transition"
                 >
                   Register Staff
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADD CLASS ================= */}
+      {showAddClassModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 relative">
+            <button
+              onClick={() => setShowAddClassModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-black text-slate-900 mb-1">Add Academic Class</h3>
+            <p className="text-xs text-slate-500 mb-4">Creates a new class level with default Section A.</p>
+            <form onSubmit={handleCreateClass} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Class Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Class 9 or Class 11-Science"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Grade Level</label>
+                <input
+                  type="number"
+                  placeholder="9"
+                  value={newClassGrade}
+                  onChange={(e) => setNewClassGrade(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddClassModal(false)}
+                  className="px-3 py-1.5 border rounded-lg text-slate-600 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg font-bold"
+                >
+                  Create Class
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADD SUBJECT ================= */}
+      {showAddSubjectModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 relative">
+            <button
+              onClick={() => setShowAddSubjectModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-black text-slate-900 mb-1">Add Curriculum Subject</h3>
+            <p className="text-xs text-slate-500 mb-4">Adds a new subject for examinations and report cards.</p>
+            <form onSubmit={handleCreateSubject} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Subject Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Computer Science / Hindi"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Subject Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. CS-083"
+                  value={newSubjectCode}
+                  onChange={(e) => setNewSubjectCode(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono uppercase"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSubjectModal(false)}
+                  className="px-3 py-1.5 border rounded-lg text-slate-600 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg font-bold"
+                >
+                  Add Subject
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: BROADCAST NOTICE ================= */}
+      {showNoticeModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <button
+              onClick={() => setShowNoticeModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="text-lg font-black text-slate-900 mb-1">Publish School Notice</h3>
+            <p className="text-xs text-slate-500 mb-4">Circular will be displayed on the notice board and sent to parent apps.</p>
+            <form onSubmit={handleBroadcastNotice} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Notice Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Mid-Term Examination Datesheet Announcement"
+                  value={noticeTitle}
+                  onChange={(e) => setNoticeTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Notice Body / Circular Details *</label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Write the full circular announcement here..."
+                  value={noticeMessage}
+                  onChange={(e) => setNoticeMessage(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 leading-relaxed"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowNoticeModal(false)}
+                  className="px-4 py-2 border rounded-xl text-slate-600 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-600/30"
+                >
+                  Broadcast Circular
                 </button>
               </div>
             </form>

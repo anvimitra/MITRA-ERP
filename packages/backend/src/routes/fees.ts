@@ -197,3 +197,32 @@ feeRoutes.post('/send-reminder', async (c) => {
     dispatchResult,
   });
 });
+
+// GET /api/fees/payments - List all fee collection transactions
+feeRoutes.get('/payments', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const payments = db
+    .select()
+    .from(schema.feePayments)
+    .where(eq(schema.feePayments.schoolId, user.schoolId))
+    .all();
+
+  const students = db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all();
+  const structures = db.select().from(schema.feeStructures).where(eq(schema.feeStructures.schoolId, user.schoolId)).all();
+
+  const studentMap = new Map(students.map((s: any) => [s.id, `${s.firstName} ${s.lastName || ''}`.trim()]));
+  const structMap = new Map(structures.map((st: any) => [st.id, st.title]));
+
+  const enriched = payments.map((p: any) => ({
+    ...p,
+    studentName: studentMap.get(p.studentId) || 'Student',
+    feeTitle: structMap.get(p.feeStructureId) || 'Tuition Fee',
+  }));
+
+  return c.json({ payments: enriched.reverse() });
+});
+

@@ -251,5 +251,45 @@ export class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Academic Masters: Classes, Sections, Subjects
+  static async createClass(data: { name: string; gradeLevel?: number }) {
+    return this.request<{ success: boolean; message: string; id: string }>('/classes/class', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async createSection(data: { classId: string; name: string }) {
+    return this.request<{ success: boolean; message: string; id: string }>('/classes/section', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async createSubject(data: { name: string; code?: string }) {
+    return this.request<{ success: boolean; message: string; id: string }>('/classes/subject', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Fee Collection Transactions
+  static async getPayments() {
+    return this.request<{ payments: any[] }>('/fees/payments');
+  }
+
+  // Notice Board / Circulars
+  static async getNotices() {
+    return this.request<{ notices: any[] }>('/notifications/notices');
+  }
+
+  static async broadcastNotice(data: { title: string; message: string }) {
+    return this.request<{ success: boolean; message: string }>('/notifications/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
+
 

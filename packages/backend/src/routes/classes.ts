@@ -163,3 +163,82 @@ classRoutes.post('/subject-allocation', async (c) => {
 
   return c.json({ success: true, message: 'Subject allocated successfully' });
 });
+
+// Create a new Class (Principal or SuperAdmin)
+classRoutes.post('/class', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can create classes' }, 403);
+  }
+
+  const { name, gradeLevel } = await c.req.json();
+  if (!name) return c.json({ error: 'Class name is required' }, 400);
+
+  const id = `class-${Date.now().toString().slice(-4)}`;
+  db.insert(schema.classes).values({
+    id,
+    schoolId: user.schoolId,
+    name,
+    gradeLevel: gradeLevel ? Number(gradeLevel) : null,
+  }).run();
+
+  // Create default Section A for this new class
+  const secId = `sec-${id}-a`;
+  db.insert(schema.sections).values({
+    id: secId,
+    schoolId: user.schoolId,
+    classId: id,
+    name: 'A',
+  }).run();
+
+  return c.json({ success: true, message: 'Class created successfully', id });
+});
+
+// Create a new Section (Principal or SuperAdmin)
+classRoutes.post('/section', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can create sections' }, 403);
+  }
+
+  const { classId, name } = await c.req.json();
+  if (!classId || !name) return c.json({ error: 'Class and Section name are required' }, 400);
+
+  const id = `sec-${Date.now().toString().slice(-4)}`;
+  db.insert(schema.sections).values({
+    id,
+    schoolId: user.schoolId,
+    classId,
+    name,
+  }).run();
+
+  return c.json({ success: true, message: 'Section created successfully', id });
+});
+
+// Create a new Subject (Principal or SuperAdmin)
+classRoutes.post('/subject', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can create subjects' }, 403);
+  }
+
+  const { name, code } = await c.req.json();
+  if (!name) return c.json({ error: 'Subject name is required' }, 400);
+
+  const id = `sub-${Date.now().toString().slice(-4)}`;
+  db.insert(schema.subjects).values({
+    id,
+    schoolId: user.schoolId,
+    name,
+    code: code || null,
+  }).run();
+
+  return c.json({ success: true, message: 'Subject created successfully', id });
+});
+

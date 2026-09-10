@@ -55,3 +55,51 @@ notificationRoutes.get('/sms-logs', async (c) => {
 
   return c.json({ smsLogs: logs });
 });
+
+// GET /api/notifications/notices - Get all school circulars/notices
+notificationRoutes.get('/notices', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  // Return notifications of type 'announcement' or general circulars
+  const notices = db
+    .select()
+    .from(schema.notifications)
+    .where(and(eq(schema.notifications.schoolId, user.schoolId), eq(schema.notifications.type, 'announcement')))
+    .orderBy(desc(schema.notifications.createdAt))
+    .all();
+
+  return c.json({ notices });
+});
+
+// POST /api/notifications/broadcast - Publish circular/announcement
+notificationRoutes.post('/broadcast', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can broadcast circulars' }, 403);
+  }
+
+  const { title, message } = await c.req.json();
+  if (!title || !message) return c.json({ error: 'Title and message are required' }, 400);
+
+  const id = `notif-${Date.now()}`;
+  db.insert(schema.notifications).values({
+    id,
+    schoolId: user.schoolId,
+    userId: user.userId,
+    title,
+    message,
+    type: 'announcement',
+    isRead: 0,
+    sentViaApp: 1,
+    sentViaSms: 0,
+    createdAt: new Date().toISOString(),
+  }).run();
+
+  return c.json({ success: true, message: 'Circular broadcasted successfully' });
+});
+
