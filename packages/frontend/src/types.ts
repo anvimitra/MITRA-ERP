@@ -19,6 +19,7 @@ export interface School {
   website?: string;
   establishedYear?: string;
   tagline?: string;
+  apiSyncKey?: string;
   studentCount?: number;
   teacherCount?: number;
 }

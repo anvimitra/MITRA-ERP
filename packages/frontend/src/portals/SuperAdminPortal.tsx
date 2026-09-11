@@ -316,9 +316,19 @@ export const SuperAdminPortal: React.FC = () => {
                     <span>Remove</span>
                   </button>
                 </div>
-                <span className="text-[10px] text-purple-600 font-bold flex items-center gap-1 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                  <Key size={11} className="text-amber-500" /> PC Sync Key
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const key = s.apiSyncKey || 'ANVI_SYNC_DPS01_SECRET_KEY_9988';
+                    navigator.clipboard.writeText(key);
+                    alert(`📋 School PC Sync Key Copied!\n\nSchool: ${s.name} (${s.code})\nSync Key: ${key}\n\nPaste this key into the Local Storage Connector at http://localhost:5432`);
+                  }}
+                  className="text-[10px] text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-lg border border-purple-200 transition shadow-sm"
+                  title="Click to copy PC Sync Key for Local Storage Connector"
+                >
+                  <Key size={11} className="text-amber-500" />
+                  <span>PC Sync Key: {s.apiSyncKey ? s.apiSyncKey.substring(0, 16) + '...' : 'Copy Key'}</span>
+                </button>
               </div>
             </div>
           ))}

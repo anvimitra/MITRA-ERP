@@ -1,12 +1,25 @@
 @echo off
-title LSK Academy Secondary DB Sync Agent (.EXE)
+title MITRA-ERP Local Storage PC Sync Connector
 echo ============================================================
-echo   STARTING LSK ACADEMY SECONDARY DATABASE SYNC AGENT (.EXE)
+echo   STARTING MITRA-ERP LOCAL STORAGE PC SYNC CONNECTOR
 echo ============================================================
-cd /d "%~dp0packages\desktop-sync-agent\bin"
-if exist LSK-Academy-Sync-Agent.exe (
-    LSK-Academy-Sync-Agent.exe
+echo.
+echo [*] Target Directory: %~dp0packages\desktop-sync-agent
+cd /d "%~dp0packages\desktop-sync-agent"
+
+if not exist "local-storage" mkdir "local-storage"
+
+if exist "bin\ANVIMITRA-Sync-Agent.exe" (
+    echo [*] Starting Standalone Sync Agent (.EXE)...
+    start http://localhost:5432
+    "bin\ANVIMITRA-Sync-Agent.exe"
+) else if exist "bin\LSK-Academy-Sync-Agent.exe" (
+    echo [*] Starting Standalone Sync Agent (.EXE)...
+    start http://localhost:5432
+    "bin\LSK-Academy-Sync-Agent.exe"
 ) else (
-    echo [ERROR] LSK-Academy-Sync-Agent.exe not found!
+    echo [*] Starting via Node.js runtime...
+    start http://localhost:5432
+    node src\index.js
 )
 pause
