@@ -21,6 +21,14 @@ schoolRoutes.get('/branding/:codeOrDomain', async (c) => {
       phone: schema.schools.phone,
       email: schema.schools.email,
       address: schema.schools.address,
+      affiliationNo: schema.schools.affiliationNo,
+      principalName: schema.schools.principalName,
+      city: schema.schools.city,
+      state: schema.schools.state,
+      pincode: schema.schools.pincode,
+      website: schema.schools.website,
+      establishedYear: schema.schools.establishedYear,
+      tagline: schema.schools.tagline,
     })
     .from(schema.schools)
     .where(eq(schema.schools.code, query))
@@ -79,7 +87,25 @@ schoolRoutes.post('/', async (c) => {
   }
 
   const body = await c.req.json();
-  const { name, code, domain, logoUrl, primaryColor, secondaryColor, phone, email, address } = body;
+  const {
+    name,
+    code,
+    domain,
+    logoUrl,
+    primaryColor,
+    secondaryColor,
+    phone,
+    email,
+    address,
+    affiliationNo,
+    principalName,
+    city,
+    state,
+    pincode,
+    website,
+    establishedYear,
+    tagline,
+  } = body;
 
   if (!name || !code) {
     return c.json({ error: 'School name and unique code are required' }, 400);
@@ -105,6 +131,14 @@ schoolRoutes.post('/', async (c) => {
     phone,
     email,
     address,
+    affiliationNo: affiliationNo || '',
+    principalName: principalName || '',
+    city: city || '',
+    state: state || '',
+    pincode: pincode || '',
+    website: website || '',
+    establishedYear: establishedYear || '',
+    tagline: tagline || '',
     apiSyncKey,
     isActive: 1,
     createdAt: now,
@@ -140,10 +174,11 @@ schoolRoutes.put('/:id', async (c) => {
     if (
       (body.code && body.code.toUpperCase() !== existing.code) ||
       (body.name && body.name !== existing.name) ||
-      (body.domain && body.domain !== existing.domain)
+      (body.domain && body.domain !== existing.domain) ||
+      (body.affiliationNo && body.affiliationNo !== existing.affiliationNo)
     ) {
       return c.json({
-        error: 'Security Policy: Core institutional details (School Name, Code, Domain) can only be changed by Super Admin.',
+        error: 'Security Policy: Core institutional details (School Name, Code, Domain, Affiliation) can only be changed by Super Admin.',
       }, 403);
     }
 
@@ -152,6 +187,11 @@ schoolRoutes.put('/:id', async (c) => {
       .set({
         phone: body.phone !== undefined ? body.phone : existing.phone,
         address: body.address !== undefined ? body.address : existing.address,
+        city: body.city !== undefined ? body.city : existing.city,
+        state: body.state !== undefined ? body.state : existing.state,
+        pincode: body.pincode !== undefined ? body.pincode : existing.pincode,
+        website: body.website !== undefined ? body.website : existing.website,
+        tagline: body.tagline !== undefined ? body.tagline : existing.tagline,
         primaryColor: body.primaryColor || existing.primaryColor,
         secondaryColor: body.secondaryColor || existing.secondaryColor,
         logoUrl: body.logoUrl || existing.logoUrl,
@@ -172,6 +212,14 @@ schoolRoutes.put('/:id', async (c) => {
         phone: body.phone !== undefined ? body.phone : existing.phone,
         email: body.email !== undefined ? body.email : existing.email,
         address: body.address !== undefined ? body.address : existing.address,
+        affiliationNo: body.affiliationNo !== undefined ? body.affiliationNo : existing.affiliationNo,
+        principalName: body.principalName !== undefined ? body.principalName : existing.principalName,
+        city: body.city !== undefined ? body.city : existing.city,
+        state: body.state !== undefined ? body.state : existing.state,
+        pincode: body.pincode !== undefined ? body.pincode : existing.pincode,
+        website: body.website !== undefined ? body.website : existing.website,
+        establishedYear: body.establishedYear !== undefined ? body.establishedYear : existing.establishedYear,
+        tagline: body.tagline !== undefined ? body.tagline : existing.tagline,
         primaryColor: body.primaryColor || existing.primaryColor,
         secondaryColor: body.secondaryColor || existing.secondaryColor,
         logoUrl: body.logoUrl || existing.logoUrl,
@@ -180,7 +228,7 @@ schoolRoutes.put('/:id', async (c) => {
       .where(eq(schema.schools.id, schoolId))
       .run();
 
-    return c.json({ success: true, message: 'School details updated successfully by Super Admin' });
+    return c.json({ success: true, message: 'School profile and details updated successfully by Super Admin' });
   }
 
   return c.json({ error: 'Forbidden' }, 403);

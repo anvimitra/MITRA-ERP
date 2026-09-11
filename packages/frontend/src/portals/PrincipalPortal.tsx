@@ -901,7 +901,7 @@ export const PrincipalPortal: React.FC = () => {
                   Institutional Daily Attendance Register
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Live attendance register. Track presence, absences, and automated SMS fallback triggers to parents.
+                  Live attendance register. Track presence, absences, and instant In-App Push notifications to parents.
                 </p>
               </div>
 
@@ -924,7 +924,7 @@ export const PrincipalPortal: React.FC = () => {
                     <th className="px-4 py-3">Class</th>
                     <th className="px-4 py-3">Status Today</th>
                     <th className="px-4 py-3">Parent Phone</th>
-                    <th className="px-4 py-3 text-right">SMS Alert Trigger</th>
+                    <th className="px-4 py-3 text-right">In-App Alert Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

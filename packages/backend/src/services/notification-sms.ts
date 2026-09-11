@@ -47,12 +47,11 @@ export async function dispatchStudentNotification({
       .get();
   }
 
-  const isAppActive = parentUser && parentUser.appInstalled === 1;
-  const now = new Date().toISOString();
+  // In-App Notification Dispatch (SMS service deactivated per requirements)
   const notifId = crypto.randomUUID();
+  const now = new Date().toISOString();
 
-  if (isAppActive && parent.userId) {
-    // Parent is active on mobile app -> Dispatch in-app push notification
+  if (parent.userId) {
     db.insert(schema.notifications).values({
       id: notifId,
       schoolId,
@@ -65,52 +64,13 @@ export async function dispatchStudentNotification({
       sentViaSms: 0,
       createdAt: now,
     }).run();
-
-    return {
-      success: true,
-      channel: 'APP_PUSH_NOTIFICATION',
-      recipientPhone: parent.primaryPhone,
-      message,
-      notificationId: notifId,
-    };
-  } else {
-    // Parent is NOT active on app -> Automatic SMS Fallback triggered!
-    const smsLogId = crypto.randomUUID();
-
-    // Log notification in db (linked to parent userId if exists)
-    if (parent.userId) {
-      db.insert(schema.notifications).values({
-        id: notifId,
-        schoolId,
-        userId: parent.userId,
-        title,
-        message,
-        type,
-        isRead: 0,
-        sentViaApp: 0,
-        sentViaSms: 1,
-        createdAt: now,
-      }).run();
-    }
-
-    // Record in sms_logs
-    db.insert(schema.smsLogs).values({
-      id: smsLogId,
-      schoolId,
-      studentId,
-      phoneNumber: parent.primaryPhone,
-      messageText: `[ANVIMITRA-ERP] ${title}: ${message}`,
-      triggerReason: 'parent_inactive_on_app',
-      status: 'delivered', // simulated carrier delivery
-      sentAt: now,
-    }).run();
-
-    return {
-      success: true,
-      channel: 'AUTOMATED_SMS_FALLBACK',
-      recipientPhone: parent.primaryPhone,
-      smsLogId,
-      message: `[ANVIMITRA-ERP] ${title}: ${message}`,
-    };
   }
+
+  return {
+    success: true,
+    channel: 'APP_PUSH_NOTIFICATION',
+    recipientPhone: parent.primaryPhone,
+    message,
+    notificationId: notifId,
+  };
 }

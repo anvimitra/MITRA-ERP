@@ -32,24 +32,13 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
     }
   };
 
-  const handleQuickPersona = async (roleEmail: string) => {
-    setLoading(true);
-    try {
-      const res = await loginUser(roleEmail, 'dummy123', 'LSK01');
-      onLoginSuccess(res.user, res.school);
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div>
-            <h3 className="font-extrabold text-base text-slate-900">ERP Persona Login</h3>
-            <p className="text-xs text-slate-500">Sign in to LSK Academy or switch role</p>
+            <h3 className="font-extrabold text-base text-slate-900">MITRA-ERP Institutional Sign In</h3>
+            <p className="text-xs text-slate-500">Sign in with your registered school credentials</p>
           </div>
           <button
             onClick={onClose}
@@ -65,65 +54,7 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
           </div>
         )}
 
-        {/* 1-Click Demo Personas */}
-        <div>
-          <label className="text-[10px] font-black uppercase text-slate-400 block mb-1.5 tracking-wider">
-            1-Click Instant Persona Sign-In
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleQuickPersona('parent.aryan@gmail.com')}
-              className="p-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition flex items-center space-x-2"
-            >
-              <Users className="w-4 h-4 text-purple-700 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-purple-950">Parent (Aryan)</p>
-                <p className="text-[10px] text-purple-600">App Active User</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleQuickPersona('parent.zara@gmail.com')}
-              className="p-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition flex items-center space-x-2"
-            >
-              <Users className="w-4 h-4 text-amber-700 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-amber-950">Parent (Zara)</p>
-                <p className="text-[10px] text-amber-600">SMS Fallback Target</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleQuickPersona('rani@lskacademy.edu')}
-              className="p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-left transition flex items-center space-x-2"
-            >
-              <UserCheck className="w-4 h-4 text-indigo-700 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-indigo-950">Teacher (Rani)</p>
-                <p className="text-[10px] text-indigo-600">Class 8-A Teacher</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleQuickPersona('principal@lskacademy.edu')}
-              className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left transition flex items-center space-x-2"
-            >
-              <Shield className="w-4 h-4 text-emerald-700 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-emerald-950">Principal</p>
-                <p className="text-[10px] text-emerald-600">Executive Desk</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-slate-200"></div>
-          <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-slate-400">or sign in with credentials</span>
-          <div className="flex-grow border-t border-slate-200"></div>
-        </div>
-
-        {/* Manual Credentials Form */}
+        {/* Credentials Form */}
         <form onSubmit={handleManualLogin} className="space-y-3">
           <div>
             <label className="text-[11px] font-bold text-slate-600 block mb-1">School Tenant Code</label>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { School, User, Student, AttendanceRecord, FeeItem, NotificationItem, AppUpdateInfo } from './types';
+import { School, User, Student, AttendanceRecord, FeeItem, NotificationItem, AppUpdateInfo, ExamReport } from './types';
 import {
   LSK_SCHOOL_DEFAULT,
   DEFAULT_STUDENT,
@@ -11,6 +11,13 @@ import {
   fetchSchoolByCode,
   checkAppUpdate,
   fetchLiveNotices,
+  fetchMe,
+  fetchLiveStudents,
+  fetchLiveClasses,
+  fetchStudentAttendanceHistory,
+  fetchStudentFeesLedger,
+  fetchStudentExamReport,
+  setMobileToken,
 } from './api';
 import { SchoolHeader } from './components/SchoolHeader';
 import { BottomNavBar, TabType } from './components/BottomNavBar';
@@ -38,6 +45,12 @@ export const App: React.FC = () => {
   });
 
   const [student, setStudent] = useState<Student>(DEFAULT_STUDENT);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  const [fees, setFees] = useState<FeeItem[]>(MOCK_FEES);
+  const [latestReport, setLatestReport] = useState<ExamReport>(MOCK_REPORTS['sa1']);
+  const [enrolledStudentsCount, setEnrolledStudentsCount] = useState<number>(0);
+  const [classesCount, setClassesCount] = useState<number>(12);
+
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showLogin, setShowLogin] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -48,10 +61,55 @@ export const App: React.FC = () => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const refreshUserData = async (currentUser: User, currentStudent?: Student) => {
+    try {
+      if (currentUser.role === 'principal' || currentUser.role === 'teacher') {
+        const [stuList, classesData] = await Promise.all([
+          fetchLiveStudents(),
+          fetchLiveClasses(),
+        ]);
+        setEnrolledStudentsCount(stuList?.length || 0);
+        setClassesCount(classesData?.classes?.length || 12);
+      }
+
+      const stu = currentStudent || student;
+      if (stu?.id) {
+        const [att, f, rep] = await Promise.all([
+          fetchStudentAttendanceHistory(stu.id),
+          fetchStudentFeesLedger(stu.id),
+          fetchStudentExamReport(stu.id),
+        ]);
+        if (att && att.length > 0) setAttendance(att);
+        if (f && f.length > 0) setFees(f);
+        if (rep) setLatestReport(rep);
+      }
+    } catch (err) {
+      console.warn('Live data sync offline, kept cached state', err);
+    }
+  };
+
   useEffect(() => {
-    // 1. Attempt to load fresh school branding on load
-    fetchSchoolByCode('LSK01').then((res) => {
-      if (res) setSchool(res);
+    // 1. Verify existing session with ERP
+    fetchMe().then(async (res) => {
+      if (res && res.user) {
+        setUser(res.user);
+        if (res.school) setSchool(res.school);
+        if (res.linkedStudents && res.linkedStudents.length > 0) {
+          setStudent(res.linkedStudents[0]);
+          refreshUserData(res.user, res.linkedStudents[0]);
+        } else {
+          const liveStus = await fetchLiveStudents();
+          if (liveStus.length > 0) {
+            setStudent(liveStus[0]);
+            refreshUserData(res.user, liveStus[0]);
+          }
+        }
+      } else {
+        // Fallback load school branding
+        fetchSchoolByCode('LSK01').then((s) => {
+          if (s) setSchool(s);
+        });
+      }
     });
 
     // 2. Real-time Auto-Update Detection
@@ -62,7 +120,7 @@ export const App: React.FC = () => {
       }
     });
 
-    // 3. Fetch live notices/circulars
+    // 3. Fetch live notices/circulars from ERP
     fetchLiveNotices().then((liveNotices) => {
       if (liveNotices && liveNotices.length > 0) {
         setNotifications(liveNotices);
@@ -92,27 +150,33 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleLoginSuccess = (newUser: User, newSchool: School) => {
+  const handleLoginSuccess = async (newUser: User, newSchool: School, linkedStudents?: any[]) => {
     setUser(newUser);
     setSchool(newSchool);
+
+    if (linkedStudents && linkedStudents.length > 0) {
+      setStudent(linkedStudents[0]);
+      refreshUserData(newUser, linkedStudents[0]);
+    } else {
+      const liveStudents = await fetchLiveStudents();
+      if (liveStudents.length > 0) {
+        setStudent(liveStudents[0]);
+        refreshUserData(newUser, liveStudents[0]);
+      }
+    }
 
     if (newUser.role === 'teacher') {
       setActiveTab('teacher');
     } else if (newUser.role === 'principal') {
       setActiveTab('principal');
     } else {
-      // If logging in as Zara's parent
-      if (newUser.email.includes('zara')) {
-        const zaraStu = DEFAULT_STUDENTS_LIST.find((s) => s.id === 'lsk-stu-zara-02');
-        if (zaraStu) setStudent(zaraStu);
-      } else {
-        setStudent(DEFAULT_STUDENT);
-      }
       setActiveTab('home');
     }
   };
 
   const handleLogout = () => {
+    setMobileToken(null);
+    setUser(null);
     setShowLogin(true);
   };
 
@@ -161,9 +225,9 @@ export const App: React.FC = () => {
               {activeTab === 'home' && (
                 <ParentView
                   student={student}
-                  attendance={MOCK_ATTENDANCE}
-                  fees={MOCK_FEES}
-                  latestReport={MOCK_REPORTS['sa1']}
+                  attendance={attendance}
+                  fees={fees}
+                  latestReport={latestReport}
                   onChangeTab={setActiveTab}
                   onOpenIdCard={() => setShowIdCard(true)}
                   onCheckUpdate={handleManualCheckUpdate}
@@ -171,7 +235,7 @@ export const App: React.FC = () => {
               )}
 
               {activeTab === 'attendance' && (
-                <AttendanceView student={student} attendance={MOCK_ATTENDANCE} />
+                <AttendanceView student={student} attendance={attendance} />
               )}
 
               {activeTab === 'report' && (
@@ -187,7 +251,12 @@ export const App: React.FC = () => {
               )}
 
               {activeTab === 'principal' && user?.role === 'principal' && (
-                <PrincipalView principal={user} school={school} />
+                <PrincipalView
+                  principal={user}
+                  school={school}
+                  studentCount={enrolledStudentsCount}
+                  classCount={classesCount}
+                />
               )}
             </>
           )}

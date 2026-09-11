@@ -97,7 +97,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
       );
 
       setAttDispatchResult(res.alertDispatches || []);
-      alert('✅ Attendance submitted! Parent alerts & SMS fallback dispatched.');
+      alert('✅ Attendance submitted! Parent in-app push notifications dispatched.');
     } catch (err: any) {
       alert('Error marking attendance: ' + err.message);
     } finally {
@@ -238,7 +238,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Daily Attendance Entry • Class 10 (Section A)</h2>
                   <p className="text-xs text-slate-500">
-                    Mark presence or absence. Parents receive immediate Push Notification, or Automated Text SMS if inactive on app.
+                    Mark presence or absence. Parents receive instant In-App Push Notifications.
                   </p>
                 </div>
 
@@ -365,8 +365,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
               {attDispatchResult && attDispatchResult.length > 0 && (
                 <div className="mt-4 p-5 rounded-2xl bg-slate-900 text-white space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                    <MessageSquare size={14} className="text-amber-400" /> Automated Parent Notification & Fallback
-                    SMS Dispatch Log
+                    <MessageSquare size={14} className="text-blue-400" /> Automated Parent In-App Notification Dispatch Log
                   </h3>
                   <div className="space-y-2 text-xs">
                     {attDispatchResult.map((res, i) => (
@@ -378,19 +377,13 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                           <strong className="text-white">{res.studentName}</strong> was marked{' '}
                           <span className="text-rose-400 font-bold uppercase">{res.status}</span>.
                           <div className="text-[11px] text-slate-400 mt-0.5">
-                            Channel: {res.dispatchResult?.channel} • Recipient: {res.dispatchResult?.recipientPhone}
+                            Channel: In-App Push Notification • Recipient: {res.dispatchResult?.recipientPhone}
                           </div>
                         </div>
 
-                        {res.dispatchResult?.channel === 'AUTOMATED_SMS_FALLBACK' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30 flex items-center gap-1">
-                            ⚡ Automated Text SMS Sent (Parent Inactive on App)
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                            📲 Push Notification Sent to Mobile App
-                          </span>
-                        )}
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                          📲 In-App Push Delivered
+                        </span>
                       </div>
                     ))}
                   </div>

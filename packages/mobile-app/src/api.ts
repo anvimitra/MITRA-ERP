@@ -1,6 +1,36 @@
 import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+// Dynamic API Base URL detection
+export function getApiBaseUrl(): string {
+  const customUrl = localStorage.getItem('anvimitra_api_url');
+  if (customUrl) return customUrl;
+
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:4000/api';
+    }
+    return 'https://anvimitra-erp.onrender.com/api';
+  }
+
+  return 'http://localhost:4000/api';
+}
+
+export function getMobileToken(): string | null {
+  return localStorage.getItem('anvimitra_mobile_token');
+}
+
+export function setMobileToken(token: string | null) {
+  if (token) {
+    localStorage.setItem('anvimitra_mobile_token', token);
+  } else {
+    localStorage.removeItem('anvimitra_mobile_token');
+  }
+}
 
 // Default LSK Academy School Data
 export const LSK_SCHOOL_DEFAULT: School = {
@@ -14,6 +44,11 @@ export const LSK_SCHOOL_DEFAULT: School = {
   phone: '+91 99887 76655',
   email: 'info@lskacademy.edu',
   address: '42-B, Shivaji Nagar, Bhopal, M.P.',
+  affiliationNo: 'CBSE/AFF/1032890',
+  principalName: 'Dr. Meena Joshi',
+  city: 'Bhopal',
+  state: 'Madhya Pradesh',
+  pincode: '462016',
 };
 
 export const DEFAULT_STUDENT: Student = {
@@ -197,139 +232,228 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
   },
 ];
 
-// API Methods with server connectivity and offline fallback
+// Helper for authenticated requests
+async function authFetch(endpoint: string, options: RequestInit = {}) {
+  const token = getMobileToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return fetch(`${getApiBaseUrl()}${endpoint}`, {
+    ...options,
+    headers,
+  });
+}
+
+// 1. Fetch School Details & Branding
 export async function fetchSchoolByCode(schoolCode: string): Promise<School> {
   try {
-    const res = await fetch(`${API_BASE_URL}/schools/branding/${schoolCode}`);
+    const res = await fetch(`${getApiBaseUrl()}/schools/branding/${schoolCode}`);
     if (res.ok) {
       const data = await res.json();
       return data.school;
     }
   } catch (err) {
-    console.warn('API fetchSchoolByCode offline, using local profile', err);
+    console.warn('API fetchSchoolByCode offline, using fallback', err);
   }
   return LSK_SCHOOL_DEFAULT;
 }
 
-export async function loginUser(email: string, password: string, schoolCode: string): Promise<{ token: string; user: User; school: School }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, schoolCode }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data;
-    }
-  } catch (err) {
-    console.warn('API login offline, using mock authentication', err);
+// 2. Real Login to ERP with credentials
+export async function loginUser(
+  email: string,
+  password: string,
+  schoolCode: string
+): Promise<{ token: string; user: User; school: School; linkedStudents?: any[] }> {
+  const res = await fetch(`${getApiBaseUrl()}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, schoolCode }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Authentication failed. Please check credentials and school code.');
   }
 
-  // Fallback demo logins:
-  if (email.includes('teacher') || email.includes('rani')) {
-    return {
-      token: 'demo-teacher-jwt',
-      school: LSK_SCHOOL_DEFAULT,
-      user: {
-        id: 'user-teacher-rani-lsk',
-        schoolId: 'school-lsk-01',
-        role: 'teacher',
-        name: 'Mrs. Rani Dubey (Class 8-A Teacher)',
-        email: 'rani@lskacademy.edu',
-        phone: '+91 99887 00002',
-        appInstalled: 1,
-      },
-    };
+  if (data.token) {
+    setMobileToken(data.token);
   }
-
-  if (email.includes('principal')) {
-    return {
-      token: 'demo-principal-jwt',
-      school: LSK_SCHOOL_DEFAULT,
-      user: {
-        id: 'user-principal-lsk',
-        schoolId: 'school-lsk-01',
-        role: 'principal',
-        name: 'Dr. Meena Joshi (Principal)',
-        email: 'principal@lskacademy.edu',
-        phone: '+91 99887 00001',
-        appInstalled: 1,
-      },
-    };
-  }
-
-  // Default to Parent
-  return {
-    token: 'demo-parent-jwt',
-    school: LSK_SCHOOL_DEFAULT,
-    user: {
-      id: 'user-parent-aryan-lsk',
-      schoolId: 'school-lsk-01',
-      role: 'parent',
-      name: 'Rohit Mishra (Aryan\'s Father)',
-      email: 'parent.aryan@gmail.com',
-      phone: '+91 98333 44556',
-      appInstalled: 1,
-    },
-  };
+  return data;
 }
 
-export async function submitClassAttendance(
-  classId: string,
-  sectionId: string,
-  date: string,
-  records: Array<{ studentId: string; status: string; remarks?: string }>,
-  token?: string
-) {
+// 3. Verify Active Session (/api/auth/me)
+export async function fetchMe(): Promise<{ user: User; school: School; linkedStudents?: any[] } | null> {
+  const token = getMobileToken();
+  if (!token) return null;
+
   try {
-    const res = await fetch(`${API_BASE_URL}/attendance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({ classId, sectionId, date, records }),
-    });
+    const res = await authFetch('/auth/me');
     if (res.ok) {
       return await res.json();
+    } else {
+      setMobileToken(null);
     }
-  } catch (err) {
-    console.warn('submitClassAttendance API offline, recorded locally', err);
-  }
-
-  return {
-    success: true,
-    message: 'Attendance saved successfully (SMS fallback auto-triggered for absent inactive parents)',
-    markedCount: records.length,
-  };
-}
-
-export const CURRENT_APP_VERSION = '1.2.0';
-export const CURRENT_BUILD_NUMBER = 102;
-
-// Check for live updates from backend server
-export async function checkAppUpdate(): Promise<AppUpdateInfo | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/app/version`);
-    if (res.ok) {
-      const data: AppUpdateInfo = await res.json();
-      return data;
-    }
-  } catch (err) {
-    console.warn('Unable to reach app update server:', err);
+  } catch {
+    // Keep cached session if offline
   }
   return null;
 }
 
-// Fetch live school notices from backend
-export async function fetchLiveNotices(token?: string): Promise<NotificationItem[]> {
+// 4. Fetch Live Students from ERP
+export async function fetchLiveStudents(): Promise<Student[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/notifications/notices`, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    });
+    const res = await authFetch('/students');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.students) && data.students.length > 0) {
+        return data.students.map((s: any) => ({
+          id: s.id,
+          admissionNo: s.admissionNo,
+          rollNo: s.rollNo,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          className: s.className || `Class ${s.gradeLevel || 8}`,
+          sectionName: s.sectionName || 'A',
+          bloodGroup: s.bloodGroup || 'B+',
+          photoUrl: s.photoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          fatherName: s.fatherName || 'Father',
+          motherName: s.motherName || 'Mother',
+          parentPhone: s.primaryPhone || '',
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Live students offline:', err);
+  }
+  return DEFAULT_STUDENTS_LIST;
+}
+
+// 5. Fetch Live Classes (Classes 1-12 & Sections A & B)
+export async function fetchLiveClasses(): Promise<any> {
+  try {
+    const res = await authFetch('/classes');
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Live classes offline:', err);
+  }
+  return { classes: [], sections: [], subjects: [], teachers: [] };
+}
+
+// 6. Fetch Student Attendance from ERP
+export async function fetchStudentAttendanceHistory(studentId: string): Promise<AttendanceRecord[]> {
+  try {
+    const res = await authFetch(`/attendance/student/${studentId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.records) && data.records.length > 0) {
+        return data.records.map((r: any) => ({
+          id: r.id,
+          date: r.date,
+          status: r.status,
+          remarks: r.remarks || '',
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Student attendance offline:', err);
+  }
+  return MOCK_ATTENDANCE;
+}
+
+// 7. Fetch Student Fees from ERP
+export async function fetchStudentFeesLedger(studentId: string): Promise<FeeItem[]> {
+  try {
+    const res = await authFetch(`/fees/student/${studentId}`);
+    if (res.ok) {
+      const data = await res.json();
+      const items: FeeItem[] = [];
+
+      if (Array.isArray(data.classFees)) {
+        for (const cf of data.classFees) {
+          const isPaid = (data.payments || []).some((p: any) => p.feeStructureId === cf.id);
+          items.push({
+            id: cf.id,
+            title: cf.title,
+            amount: cf.amount,
+            dueDate: cf.dueDate || '2026-09-30',
+            status: isPaid ? 'paid' : 'pending',
+          });
+        }
+      }
+
+      if (items.length > 0) return items;
+    }
+  } catch (err) {
+    console.warn('Student fees offline:', err);
+  }
+  return MOCK_FEES;
+}
+
+// 8. Fetch Student Report Card from ERP
+export async function fetchStudentExamReport(studentId: string, examId: string = 'exam-sa1-term1'): Promise<ExamReport | null> {
+  try {
+    const res = await authFetch(`/exams/report-card/${studentId}/${examId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.reportCard) {
+        const rc = data.reportCard;
+        return {
+          examId: rc.examId,
+          examName: rc.examName,
+          examType: rc.examType,
+          academicYear: rc.academicYear,
+          totalMarks: rc.totalMarksObtained,
+          maxTotalMarks: rc.totalMaxMarks,
+          percentage: rc.percentage,
+          overallGrade: rc.overallGrade,
+          resultStatus: rc.resultStatus,
+          subjects: (rc.subjects || []).map((sub: any) => ({
+            subjectName: sub.subjectName,
+            subjectCode: sub.subjectCode,
+            marksObtained: sub.totalObtained,
+            maxMarks: sub.maxMarks,
+            grade: sub.grade,
+            remarks: sub.remarks || '',
+          })),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Student report card offline:', err);
+  }
+  return MOCK_REPORTS.sa1;
+}
+
+// 9. Submit Class Attendance to ERP
+export async function submitClassAttendance(
+  classId: string,
+  sectionId: string,
+  date: string,
+  records: Array<{ studentId: string; status: string; remarks?: string }>
+) {
+  const res = await authFetch('/attendance/mark', {
+    method: 'POST',
+    body: JSON.stringify({ classId, sectionId, date, records }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to submit attendance to ERP server.');
+  }
+
+  return data;
+}
+
+// 10. Fetch Live Notices & Circulars from ERP
+export async function fetchLiveNotices(): Promise<NotificationItem[]> {
+  try {
+    const res = await authFetch('/notifications/notices');
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.notices) && data.notices.length > 0) {
@@ -347,5 +471,36 @@ export async function fetchLiveNotices(token?: string): Promise<NotificationItem
     console.warn('Live notices offline, fallback to cached notices', err);
   }
   return MOCK_NOTIFICATIONS;
+}
+
+// 11. Broadcast Notice / Circular to School
+export async function broadcastLiveNotice(title: string, message: string) {
+  const res = await authFetch('/notifications/notices', {
+    method: 'POST',
+    body: JSON.stringify({ title, message, targetRole: 'all' }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to broadcast notice.');
+  }
+  return data;
+}
+
+// Version & Auto-Update
+export const CURRENT_APP_VERSION = '1.2.0';
+export const CURRENT_BUILD_NUMBER = 102;
+
+export async function checkAppUpdate(): Promise<AppUpdateInfo | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/app/version`);
+    if (res.ok) {
+      const data: AppUpdateInfo = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn('Unable to reach app update server:', err);
+  }
+  return null;
 }
 

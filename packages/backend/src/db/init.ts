@@ -31,6 +31,14 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       phone TEXT,
       email TEXT,
       address TEXT,
+      affiliation_no TEXT,
+      principal_name TEXT,
+      city TEXT,
+      state TEXT,
+      pincode TEXT,
+      website TEXT,
+      established_year TEXT,
+      tagline TEXT,
       api_sync_key TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL
@@ -215,6 +223,25 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       status TEXT NOT NULL
     );
   `);
+
+  // Auto-migrate school profile columns if upgrading an existing SQLite DB
+  const schoolProfileCols = [
+    'affiliation_no',
+    'principal_name',
+    'city',
+    'state',
+    'pincode',
+    'website',
+    'established_year',
+    'tagline',
+  ];
+  for (const col of schoolProfileCols) {
+    try {
+      sqlite.exec(`ALTER TABLE schools ADD COLUMN ${col} TEXT;`);
+    } catch {
+      // Column already exists
+    }
+  }
 
   globalDbInstance = sqlite;
   return sqlite;

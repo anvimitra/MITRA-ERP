@@ -8,9 +8,17 @@ export interface School {
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
-  phone: string;
-  email: string;
-  address: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  affiliationNo?: string;
+  principalName?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  website?: string;
+  establishedYear?: string;
+  tagline?: string;
 }
 
 export interface User {

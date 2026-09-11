@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Student } from '../types';
-import { DEFAULT_STUDENTS_LIST, submitClassAttendance } from '../api';
-import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck } from 'lucide-react';
+import { DEFAULT_STUDENTS_LIST, submitClassAttendance, fetchLiveStudents, fetchLiveClasses } from '../api';
+import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck, RefreshCw } from 'lucide-react';
 
 interface Props {
   teacher: User;
@@ -9,24 +9,70 @@ interface Props {
 
 export const TeacherView: React.FC<Props> = ({ teacher }) => {
   const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'marks'>('attendance');
-  const [selectedDate, setSelectedDate] = useState('2026-09-08');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [classList, setClassList] = useState<any[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [students, setStudents] = useState<
     Array<Student & { status: 'present' | 'absent' | 'late'; marks?: number; remarks?: string }>
-  >(
-    DEFAULT_STUDENTS_LIST.map((s) => ({
-      ...s,
-      status: s.id === 'lsk-stu-zara-02' ? 'absent' : 'present',
-      marks: s.id === 'lsk-stu-aryan-01' ? 96 : s.id === 'lsk-stu-zara-02' ? 79 : 85,
-    }))
-  );
-
+  >([]);
+  const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [smsTriggered, setSmsTriggered] = useState(false);
 
   // Marks Entry state
   const [selectedExam, setSelectedExam] = useState('lsk-exam-sa1');
-  const [selectedSubject, setSelectedSubject] = useState('lsk-sub-math');
+  const [selectedSubject, setSelectedSubject] = useState('Mathematics');
+
+  useEffect(() => {
+    loadClassData();
+  }, []);
+
+  const loadClassData = async () => {
+    setLoading(true);
+    try {
+      const [classesData, studentsData] = await Promise.all([
+        fetchLiveClasses(),
+        fetchLiveStudents(),
+      ]);
+
+      if (classesData?.classes?.length > 0) {
+        setClassList(classesData.classes);
+        setSelectedClassId(classesData.classes[0].id);
+        if (classesData.sections?.length > 0) {
+          setSelectedSectionId(classesData.sections[0].id);
+        }
+      }
+
+      if (studentsData?.length > 0) {
+        setStudents(
+          studentsData.map((s) => ({
+            ...s,
+            status: 'present',
+            marks: 85,
+          }))
+        );
+      } else {
+        setStudents(
+          DEFAULT_STUDENTS_LIST.map((s) => ({
+            ...s,
+            status: 'present',
+            marks: 85,
+          }))
+        );
+      }
+    } catch {
+      setStudents(
+        DEFAULT_STUDENTS_LIST.map((s) => ({
+          ...s,
+          status: 'present',
+          marks: 85,
+        }))
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleStatus = (id: string, newStatus: 'present' | 'absent' | 'late') => {
     setStudents((prev) =>
@@ -43,7 +89,6 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
   const handleSubmitAttendance = async () => {
     setIsSubmitting(true);
     setFeedback(null);
-    setSmsTriggered(false);
 
     try {
       const records = students.map((s) => ({
@@ -52,19 +97,11 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
         remarks: s.status === 'late' ? 'Marked late' : undefined,
       }));
 
-      await submitClassAttendance('lsk-class-8', 'lsk-sec-8-a', selectedDate, records);
+      await submitClassAttendance(selectedClassId || 'class-1', selectedSectionId || 'sec-a', selectedDate, records);
 
-      const hasAbsent = students.some((s) => s.status === 'absent');
-      if (hasAbsent) {
-        setSmsTriggered(true);
-        setFeedback(
-          'Attendance recorded! Parents notified via App Push. Note: Zara Shaikh’s parent is inactive on App → Automated Text SMS Fallback sent successfully!'
-        );
-      } else {
-        setFeedback('All students marked present! Push notifications dispatched.');
-      }
-    } catch {
-      setFeedback('Error recording attendance. Saved to local queue.');
+      setFeedback('✅ Attendance recorded successfully! Instant In-App Notifications dispatched to all parents.');
+    } catch (err: any) {
+      setFeedback(err.message || 'Error recording attendance.');
     } finally {
       setIsSubmitting(false);
     }
@@ -113,13 +150,7 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
       </div>
 
       {feedback && (
-        <div
-          className={`p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 ${
-            smsTriggered
-              ? 'bg-amber-50 text-amber-900 border border-amber-300'
-              : 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-          }`}
-        >
+        <div className="p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 bg-emerald-50 text-emerald-900 border border-emerald-300">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <div>{feedback}</div>
         </div>
@@ -128,17 +159,35 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
       {/* ATTENDANCE MODE */}
       {activeSubTab === 'attendance' && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
-              <h3 className="font-bold text-sm text-slate-800">Class 8-A Roll Call</h3>
-              <p className="text-xs text-slate-500">Tap status button to toggle</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-slate-800">Class Roll Call</h3>
+                {loading && <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin" />}
+              </div>
+              <p className="text-xs text-slate-500">Tap status button to toggle presence</p>
             </div>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
-            />
+            <div className="flex items-center gap-2">
+              {classList.length > 0 && (
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
+                >
+                  {classList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

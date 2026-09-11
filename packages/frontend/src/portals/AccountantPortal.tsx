@@ -187,7 +187,7 @@ export const AccountantPortal: React.FC = () => {
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Fee Management & Billing Desk</h1>
           <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
-            Accept fee payments, generate authenticated dual-copy receipts, configure fee heads, and track defaulter dues with automated SMS reminders.
+            Accept fee payments, generate authenticated dual-copy receipts, configure fee heads, and track defaulter dues with instant in-app payment notifications.
           </p>
         </div>
 

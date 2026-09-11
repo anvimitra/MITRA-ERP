@@ -11,6 +11,14 @@ export interface School {
   phone?: string;
   email?: string;
   address?: string;
+  affiliationNo?: string;
+  principalName?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  website?: string;
+  establishedYear?: string;
+  tagline?: string;
   studentCount?: number;
   teacherCount?: number;
 }

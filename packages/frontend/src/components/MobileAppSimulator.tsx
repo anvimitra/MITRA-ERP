@@ -168,9 +168,9 @@ export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onO
                 </div>
               </div>
 
-              {/* Automated SMS Fallback Note for Parent */}
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[10px] text-amber-900">
-                <strong>💡 Automatic Text SMS Integration:</strong> If you log out or uninstall this mobile app, our Cloudflare ERP automatically switches to SMS Fallback, sending instant SMS alerts to your registered mobile number!
+              {/* In-App Notifications Note for Parent */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-[10px] text-blue-900">
+                <strong>🔔 Real-Time App Notifications:</strong> Daily attendance, CBSE exam marks, fee receipts, and school broadcast circulars are delivered directly to this mobile app in real time!
               </div>
             </div>
 

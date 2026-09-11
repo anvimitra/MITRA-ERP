@@ -79,8 +79,8 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
                   📱 Mobile App Connected
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                  ✉️ SMS Fallback Mode Active
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  🔔 In-App Notifications Active
                 </span>
               )}
             </div>
@@ -329,25 +329,19 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
         </div>
       )}
 
-      {/* Tab 4: Notifications & SMS Alerts */}
+      {/* Tab 4: In-App Notifications */}
       {activeTab === 'notifications' && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-          <h2 className="text-base font-bold text-slate-900">Parent Notification Feed & SMS Dispatch History</h2>
+          <h2 className="text-base font-bold text-slate-900">Parent Notification Feed & Alert History</h2>
           <div className="space-y-3">
             {notifications.map((n) => (
               <div key={n.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-slate-900 text-sm">{n.title}</h3>
-                    {n.sentViaApp === 1 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Delivered to App
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                        Delivered via Text SMS (App Inactive)
-                      </span>
-                    )}
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      In-App Push Delivered
+                    </span>
                   </div>
                   <p className="text-xs text-slate-600 mt-1">{n.message}</p>
                 </div>

@@ -23,9 +23,9 @@ export const App: React.FC = () => {
   const [reportCardData, setReportCardData] = useState<ReportCardData | null>(null);
 
   // Login form state
-  const [email, setEmail] = useState('principal@lskacademy.edu');
-  const [password, setPassword] = useState('principal123');
-  const [loginSchoolCode, setLoginSchoolCode] = useState('LSK01');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginSchoolCode, setLoginSchoolCode] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -70,13 +70,6 @@ export const App: React.FC = () => {
     } finally {
       setLoggingIn(false);
     }
-  };
-
-  const handleFillCredentials = (fillEmail: string, fillPass: string, fillCode: string) => {
-    setEmail(fillEmail);
-    setPassword(fillPass);
-    setLoginSchoolCode(fillCode);
-    setLoginError(null);
   };
 
   const handleLogout = () => {
@@ -175,43 +168,6 @@ export const App: React.FC = () => {
               <span>{loggingIn ? 'Authenticating with School Core...' : 'Secure Sign In'}</span>
             </button>
           </form>
-
-          {/* Quick-fill helper for registered demo accounts */}
-          <div className="mt-6 pt-5 border-t border-slate-800 text-xs">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">
-              Select Demo Credentials to Fill:
-            </span>
-            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('principal@lskacademy.edu', 'principal123', 'LSK01')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 text-left font-semibold text-indigo-400 transition"
-              >
-                🏫 LSK Principal
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('teacher1@lskacademy.edu', 'teacher123', 'LSK01')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-blue-950/40 border border-slate-800 text-left font-semibold text-blue-400 transition"
-              >
-                👩‍🏫 LSK Class Teacher
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('accountant@lskacademy.edu', 'staff123', 'LSK01')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 text-left font-semibold text-emerald-400 transition"
-              >
-                💳 LSK Accountant
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillCredentials('superadmin@anvimitra.com', 'admin123', '')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-purple-950/40 border border-slate-800 text-left font-semibold text-purple-400 transition"
-              >
-                👑 Super Admin
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );

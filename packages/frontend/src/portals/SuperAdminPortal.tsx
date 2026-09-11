@@ -24,6 +24,15 @@ export const SuperAdminPortal: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [affiliationNo, setAffiliationNo] = useState('');
+  const [principalName, setPrincipalName] = useState('');
+  const [city, setCity] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [website, setWebsite] = useState('');
+  const [establishedYear, setEstablishedYear] = useState('');
+  const [tagline, setTagline] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -54,12 +63,33 @@ export const SuperAdminPortal: React.FC = () => {
         phone,
         email,
         address,
+        affiliationNo,
+        principalName,
+        city,
+        state: stateName,
+        pincode,
+        website,
+        establishedYear,
+        tagline,
+        logoUrl,
       });
-      alert('✅ New School Tenant created successfully!');
+      alert('✅ New School Tenant created successfully with full profile!');
       setShowAddModal(false);
       setName('');
       setCode('');
       setDomain('');
+      setPhone('');
+      setEmail('');
+      setAddress('');
+      setAffiliationNo('');
+      setPrincipalName('');
+      setCity('');
+      setStateName('');
+      setPincode('');
+      setWebsite('');
+      setEstablishedYear('');
+      setTagline('');
+      setLogoUrl('');
       loadData();
     } catch (err: any) {
       alert('Error creating school: ' + err.message);
@@ -118,7 +148,7 @@ export const SuperAdminPortal: React.FC = () => {
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight">ANVIMITRA-ERP Super Admin</h1>
           <p className="text-slate-300 text-sm mt-1 max-w-xl">
-            Manage educational institutions, monitor Cloudflare edge deployment health, global automated SMS delivery gateway, and multi-tenant security isolation.
+            Manage educational institutions, school profiles, monitor Cloudflare edge deployment health, instant In-App notifications, and multi-tenant security isolation.
           </p>
         </div>
 
@@ -173,11 +203,11 @@ export const SuperAdminPortal: React.FC = () => {
 
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Automated Fallback SMS</span>
-            <MessageSquare size={18} className="text-amber-500" />
+            <span className="text-xs font-bold uppercase tracking-wider">In-App Notification Dispatch</span>
+            <MessageSquare size={18} className="text-indigo-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900">99.8%</div>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1">Fast2SMS / MSG91 Gateway Active</p>
+          <div className="text-2xl font-black text-slate-900">100%</div>
+          <p className="text-[11px] text-emerald-600 font-semibold mt-1">Instant App Push Active</p>
         </div>
       </div>
 
@@ -213,7 +243,16 @@ export const SuperAdminPortal: React.FC = () => {
                       </span>
                       <span>•</span>
                       <span>{s.domain || `${s.code.toLowerCase()}.anvimitra.com`}</span>
+                      {s.establishedYear && (
+                        <>
+                          <span>•</span>
+                          <span>Est. {s.establishedYear}</span>
+                        </>
+                      )}
                     </div>
+                    {s.tagline && (
+                      <p className="text-[11px] text-slate-500 italic mt-0.5">"{s.tagline}"</p>
+                    )}
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -221,14 +260,34 @@ export const SuperAdminPortal: React.FC = () => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-200 text-xs">
+              {/* Institutional Profile Details */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-slate-200 text-xs bg-white/70 p-2.5 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Affiliation No</span>
+                  <span className="font-bold text-slate-800 text-[11px]">{s.affiliationNo || 'CBSE-REG'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Principal</span>
+                  <span className="font-bold text-slate-800 text-[11px] truncate block">{s.principalName || 'Not Assigned'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">City & State</span>
+                  <span className="font-bold text-slate-800 text-[11px]">{[s.city, s.state].filter(Boolean).join(', ') || 'India'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Website</span>
+                  <span className="font-bold text-purple-700 text-[11px] truncate block">{s.website || '-'}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-slate-200 text-xs">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Students</span>
-                  <span className="font-bold text-slate-800">{s.studentCount || 4} Enrolled</span>
+                  <span className="font-bold text-slate-800">{s.studentCount || 0} Enrolled</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Faculty</span>
-                  <span className="font-bold text-slate-800">{s.teacherCount || 2} Teachers</span>
+                  <span className="font-bold text-slate-800">{s.teacherCount || 0} Teachers</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Brand Color</span>
@@ -266,11 +325,11 @@ export const SuperAdminPortal: React.FC = () => {
         </div>
       </div>
 
-      {/* Global Automated Fallback SMS Logs */}
+      {/* Global In-App Push Notification Logs */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900 mb-1">Automated SMS Fallback Audit Log</h2>
+        <h2 className="text-lg font-bold text-slate-900 mb-1">In-App Push Notification Delivery Log</h2>
         <p className="text-xs text-slate-500 mb-4">
-          Shows text SMS messages automatically sent to parents who do NOT have the mobile app installed or active
+          Shows direct in-app notifications and alerts broadcasted to students, parents, and faculty across mobile apps
         </p>
 
         <div className="overflow-x-auto">
@@ -278,10 +337,10 @@ export const SuperAdminPortal: React.FC = () => {
             <thead className="bg-slate-100 text-slate-600 uppercase text-[10px] font-bold">
               <tr>
                 <th className="py-2.5 px-3">Timestamp</th>
-                <th className="py-2.5 px-3">Parent Phone</th>
+                <th className="py-2.5 px-3">Recipient / Phone</th>
                 <th className="py-2.5 px-3">Trigger Reason</th>
-                <th className="py-2.5 px-3">Message Content</th>
-                <th className="py-2.5 px-3">Carrier Status</th>
+                <th className="py-2.5 px-3">Notification Content</th>
+                <th className="py-2.5 px-3">Channel / Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -293,14 +352,14 @@ export const SuperAdminPortal: React.FC = () => {
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-800">{log.phoneNumber}</td>
                     <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
                         {log.triggerReason}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 max-w-md truncate">{log.messageText}</td>
                     <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        {log.status.toUpperCase()}
+                        IN-APP PUSH
                       </span>
                     </td>
                   </tr>
@@ -308,7 +367,7 @@ export const SuperAdminPortal: React.FC = () => {
               ) : (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-slate-400">
-                    No SMS logs recorded yet.
+                    No in-app notifications recorded yet.
                   </td>
                 </tr>
               )}
@@ -320,89 +379,232 @@ export const SuperAdminPortal: React.FC = () => {
       {/* Add School Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-1">Create New School Tenant</h3>
-            <p className="text-xs text-slate-500 mb-6">Generates separate tenant isolation, branding, and local PC sync API credentials.</p>
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-2xl w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900">Create New School Tenant</h3>
+                <p className="text-xs text-slate-500">Super Admin Master Institutional Registration & Profile Provisioning</p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
             <form onSubmit={handleCreateSchool} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">School Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Modern Cambridge School"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                />
-              </div>
+              {/* Section 1: Core Institutional Identity */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-purple-700 uppercase tracking-wider block">
+                  1. Institutional Identity & Leadership
+                </span>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">School Code (Unique)</label>
+                  <label className="block font-bold text-slate-700 mb-1">School Full Name *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. MCS01"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    placeholder="e.g. Delhi Public Academy / St. Xavier's High School"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Custom Domain</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. mcs.anvimitra.com"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Code (Unique) *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. DPA01"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board No</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CBSE/AFF/2026/019"
+                      value={affiliationNo}
+                      onChange={(e) => setAffiliationNo(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Established Year</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2005"
+                      value={establishedYear}
+                      onChange={(e) => setEstablishedYear(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal / Head of Institution Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Dr. Anand Sharma, M.Sc, B.Ed"
+                      value={principalName}
+                      onChange={(e) => setPrincipalName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Motto / Tagline</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Service Before Self • Excellence in Education"
+                      value={tagline}
+                      onChange={(e) => setTagline(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Section 2: Contact & Location */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-indigo-700 uppercase tracking-wider block">
+                  2. Campus Contact, Web & Location
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Official Email</label>
+                    <input
+                      type="email"
+                      placeholder="admin@school.edu"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Official Website</label>
+                    <input
+                      type="text"
+                      placeholder="https://myschool.edu.in"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Custom Subdomain</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. dpa.anvimitra.com"
+                      value={domain}
+                      onChange={(e) => setDomain(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Logo URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Primary Theme Color</label>
+                  <label className="block font-bold text-slate-700 mb-1">Campus Full Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Sector 12, Institutional Area, Knowledge Park"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Jaipur"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rajasthan"
+                      value={stateName}
+                      onChange={(e) => setStateName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 302001"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Theme Branding */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                  3. Theme & Mobile App Branding
+                </span>
+
+                <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={primaryColor}
                       onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer"
+                      className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer"
                     />
                     <input
                       type="text"
                       value={primaryColor}
                       onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                      className="w-32 bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    placeholder="+91 98765 43210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
-                  />
+                  <span className="text-[11px] text-slate-500">
+                    Determines header, navigation, and mobile app theme tint for this institution.
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Campus Address</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Knowledge Park, Sector 62, Noida"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3">
+              <div className="pt-3 flex gap-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -412,9 +614,9 @@ export const SuperAdminPortal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold text-white shadow transition"
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 transition"
                 >
-                  Provision School
+                  Provision School Tenant
                 </button>
               </div>
             </form>
@@ -425,104 +627,223 @@ export const SuperAdminPortal: React.FC = () => {
       {/* ================= MODAL: EDIT SCHOOL ================= */}
       {editingSchool && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-2xl w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Edit School Identity</h3>
-                <p className="text-xs text-slate-500">Super Admin master institutional overrides</p>
+                <h3 className="text-xl font-extrabold text-slate-900">Edit School Identity & Profile</h3>
+                <p className="text-xs text-slate-500">Super Admin Master Institutional Overrides & Profile Configuration</p>
               </div>
               <button
                 onClick={() => setEditingSchool(null)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleUpdateSchool} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">School Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={editingSchool.name}
-                  onChange={(e) => setEditingSchool({ ...editingSchool, name: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                />
-              </div>
+              {/* Section 1: Core Institutional Identity */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-purple-700 uppercase tracking-wider block">
+                  1. Institutional Identity & Leadership
+                </span>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">School Code *</label>
+                  <label className="block font-bold text-slate-700 mb-1">School Full Name *</label>
                   <input
                     type="text"
                     required
-                    value={editingSchool.code}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, code: e.target.value.toUpperCase() })}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold"
+                    value={editingSchool.name}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, name: e.target.value })}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingSchool.code}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, code: e.target.value.toUpperCase() })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board No</label>
+                    <input
+                      type="text"
+                      value={editingSchool.affiliationNo || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, affiliationNo: e.target.value })}
+                      placeholder="e.g. CBSE/AFF/2026/019"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Established Year</label>
+                    <input
+                      type="text"
+                      value={editingSchool.establishedYear || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, establishedYear: e.target.value })}
+                      placeholder="e.g. 2005"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal / Head of Institution Name</label>
+                    <input
+                      type="text"
+                      value={editingSchool.principalName || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, principalName: e.target.value })}
+                      placeholder="e.g. Dr. Anand Sharma, M.Sc, B.Ed"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Motto / Tagline</label>
+                    <input
+                      type="text"
+                      value={editingSchool.tagline || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, tagline: e.target.value })}
+                      placeholder="e.g. Service Before Self • Excellence in Education"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Contact, Web & Location */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-indigo-700 uppercase tracking-wider block">
+                  2. Campus Contact, Web & Location
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Official Email</label>
+                    <input
+                      type="email"
+                      value={editingSchool.email || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, email: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
+                    <input
+                      type="text"
+                      value={editingSchool.phone || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, phone: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Official Website</label>
+                    <input
+                      type="text"
+                      value={editingSchool.website || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, website: e.target.value })}
+                      placeholder="https://myschool.edu.in"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Custom Domain / Subdomain</label>
+                    <input
+                      type="text"
+                      value={editingSchool.domain || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, domain: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">School Logo URL</label>
+                    <input
+                      type="url"
+                      value={editingSchool.logoUrl || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, logoUrl: e.target.value })}
+                      placeholder="https://example.com/logo.png"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Custom Domain</label>
+                  <label className="block font-bold text-slate-700 mb-1">Campus Address</label>
                   <input
                     type="text"
-                    value={editingSchool.domain || ''}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, domain: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    value={editingSchool.address || ''}
+                    onChange={(e) => setEditingSchool({ ...editingSchool, address: e.target.value })}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
                   />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editingSchool.city || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, city: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editingSchool.state || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, state: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      value={editingSchool.pincode || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, pincode: e.target.value })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Official Email</label>
-                  <input
-                    type="email"
-                    value={editingSchool.email || ''}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, email: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={editingSchool.phone || ''}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, phone: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
-                  />
-                </div>
-              </div>
+              {/* Section 3: Theme Branding */}
+              <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                  3. Theme & Mobile App Branding
+                </span>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Campus Address</label>
-                <input
-                  type="text"
-                  value={editingSchool.address || ''}
-                  onChange={(e) => setEditingSchool({ ...editingSchool, address: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Primary Theme Color</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={editingSchool.primaryColor || '#1e40af'}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
-                    className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={editingSchool.primaryColor || '#1e40af'}
-                    onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
-                  />
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={editingSchool.primaryColor || '#1e40af'}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
+                      className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={editingSchool.primaryColor || '#1e40af'}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, primaryColor: e.target.value })}
+                      className="w-32 bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Determines header, navigation, and mobile app theme tint for this institution.
+                  </span>
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-3 border-t border-slate-100">
+              <div className="pt-3 flex gap-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingSchool(null)}
@@ -532,9 +853,9 @@ export const SuperAdminPortal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow transition"
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 transition"
                 >
-                  Save Changes
+                  Save Institutional Profile
                 </button>
               </div>
             </form>
