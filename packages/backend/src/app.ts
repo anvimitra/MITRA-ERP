@@ -11,6 +11,8 @@ import { notificationRoutes } from './routes/notifications.js';
 import { studentRoutes } from './routes/students.js';
 import { teacherRoutes } from './routes/teachers.js';
 import { appUpdateRoutes } from './routes/app-update.js';
+import { timetableRoutes } from './routes/timetable.js';
+import { studentLogRoutes } from './routes/student-logs.js';
 
 export const app = new Hono();
 
@@ -46,3 +48,5 @@ app.route('/api/notifications', notificationRoutes);
 app.route('/api/students', studentRoutes);
 app.route('/api/teachers', teacherRoutes);
 app.route('/api/app', appUpdateRoutes);
+app.route('/api/timetable', timetableRoutes);
+app.route('/api/student-logs', studentLogRoutes);

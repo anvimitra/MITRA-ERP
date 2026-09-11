@@ -79,6 +79,31 @@ function initLocalDatabase(customPath) {
       receipt_no TEXT,
       status TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS local_timetable (
+      id TEXT PRIMARY KEY,
+      class_id TEXT,
+      section_id TEXT,
+      day_of_week TEXT,
+      period_number INTEGER,
+      start_time TEXT,
+      end_time TEXT,
+      subject_id TEXT,
+      teacher_id TEXT,
+      room_number TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_student_logs (
+      id TEXT PRIMARY KEY,
+      student_id TEXT,
+      log_type TEXT,
+      title TEXT,
+      description TEXT,
+      action_taken TEXT,
+      reported_by_user_id TEXT,
+      date TEXT,
+      notify_parent INTEGER
+    );
   `);
 
   console.log(`[Secondary PC Storage] Local SQLite initialized at: ${targetPath}`);

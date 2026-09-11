@@ -27,3 +27,5 @@ export const feePayments = createTable('fee_payments');
 export const notifications = createTable('notifications');
 export const smsLogs = createTable('sms_logs');
 export const syncLogs = createTable('sync_logs');
+export const timetablePeriods = createTable('timetable_periods');
+export const studentLogs = createTable('student_logs');

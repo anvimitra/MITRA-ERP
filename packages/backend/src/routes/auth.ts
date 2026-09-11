@@ -50,6 +50,7 @@ authRoutes.post('/login', async (c) => {
 
   // If role is parent, find linked students
   let linkedStudents: any[] = [];
+  let studentRecord: any = null;
   if (user.role === 'parent') {
     const parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
     if (parentRecord) {
@@ -58,6 +59,11 @@ authRoutes.post('/login', async (c) => {
         .from(schema.students)
         .where(eq(schema.students.parentId, parentRecord.id))
         .all();
+    }
+  } else if (user.role === 'student') {
+    studentRecord = db.select().from(schema.students).where(eq(schema.students.userId, user.id)).get();
+    if (!studentRecord && user.schoolId) {
+      studentRecord = db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).get();
     }
   }
 
@@ -91,6 +97,7 @@ authRoutes.post('/login', async (c) => {
         }
       : null,
     linkedStudents,
+    studentRecord,
   });
 });
 
@@ -118,6 +125,7 @@ authRoutes.get('/me', async (c) => {
   }
 
   let linkedStudents: any[] = [];
+  let studentRecord: any = null;
   if (user.role === 'parent') {
     const parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
     if (parentRecord) {
@@ -126,6 +134,11 @@ authRoutes.get('/me', async (c) => {
         .from(schema.students)
         .where(eq(schema.students.parentId, parentRecord.id))
         .all();
+    }
+  } else if (user.role === 'student') {
+    studentRecord = db.select().from(schema.students).where(eq(schema.students.userId, user.id)).get();
+    if (!studentRecord && user.schoolId) {
+      studentRecord = db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).get();
     }
   }
 
@@ -141,6 +154,7 @@ authRoutes.get('/me', async (c) => {
     },
     school,
     linkedStudents,
+    studentRecord,
   });
 });
 

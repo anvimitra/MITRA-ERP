@@ -7,6 +7,7 @@ import { PrincipalPortal } from './portals/PrincipalPortal';
 import { TeacherPortal } from './portals/TeacherPortal';
 import { AccountantPortal } from './portals/AccountantPortal';
 import { ParentPortal } from './portals/ParentPortal';
+import { StudentPortal } from './portals/StudentPortal';
 import { MobileAppSimulator } from './components/MobileAppSimulator';
 import { ReportCardModal } from './components/ReportCardModal';
 import { Smartphone, School as SchoolIcon, ShieldCheck, LogIn, Key, Sparkles } from 'lucide-react';
@@ -192,6 +193,7 @@ export const App: React.FC = () => {
         {user.role === 'teacher' && <TeacherPortal user={user} />}
         {user.role === 'accountant' && <AccountantPortal />}
         {user.role === 'parent' && <ParentPortal user={user} studentId={selectedStudentId} />}
+        {user.role === 'student' && <StudentPortal user={user} />}
       </main>
 
       {/* Floating Action: Open Mobile App Simulator */}

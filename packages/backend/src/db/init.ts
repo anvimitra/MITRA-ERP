@@ -222,6 +222,34 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       last_sync_timestamp TEXT NOT NULL,
       status TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS timetable_periods (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      class_id TEXT NOT NULL,
+      section_id TEXT NOT NULL,
+      day_of_week TEXT NOT NULL,
+      period_number INTEGER NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      subject_id TEXT NOT NULL,
+      teacher_id TEXT NOT NULL,
+      room_number TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS student_logs (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      log_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      action_taken TEXT,
+      reported_by_user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      notify_parent INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Auto-migrate school profile columns if upgrading an existing SQLite DB
@@ -238,6 +266,22 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
   for (const col of schoolProfileCols) {
     try {
       sqlite.exec(`ALTER TABLE schools ADD COLUMN ${col} TEXT;`);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Auto-migrate student profile columns (medical, emergency, caste category, user_id)
+  const studentProfileCols = [
+    'emergency_phone',
+    'medical_conditions',
+    'allergies',
+    'category',
+    'user_id',
+  ];
+  for (const col of studentProfileCols) {
+    try {
+      sqlite.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT;`);
     } catch {
       // Column already exists
     }

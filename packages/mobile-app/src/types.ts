@@ -44,13 +44,54 @@ export interface Student {
   fatherName?: string;
   motherName?: string;
   parentPhone?: string;
+  emergencyPhone?: string;
+  medicalConditions?: string;
+  allergies?: string;
+  category?: string;
 }
 
 export interface AttendanceRecord {
   id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'excused';
   remarks: string;
+}
+
+export interface TimetablePeriod {
+  id: string;
+  schoolId: string;
+  classId: string;
+  sectionId: string;
+  dayOfWeek: string;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+  subjectId: string;
+  subjectName?: string;
+  teacherId: string;
+  teacherName?: string;
+  roomNumber?: string;
+  className?: string;
+  sectionName?: string;
+}
+
+export interface StudentLog {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  studentName?: string;
+  rollNo?: number;
+  className?: string;
+  sectionName?: string;
+  logType: 'discipline' | 'award' | 'observation' | 'medical' | 'attendance';
+  title: string;
+  description: string;
+  actionTaken?: string;
+  reportedByUserId: string;
+  reportedByName?: string;
+  date: string;
+  notifyParent: number;
+  createdAt: string;
 }
 
 export interface SubjectMark {

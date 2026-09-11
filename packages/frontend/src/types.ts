@@ -87,6 +87,11 @@ export interface Student {
   dob?: string;
   bloodGroup?: string;
   photoUrl?: string;
+  emergencyPhone?: string;
+  medicalConditions?: string;
+  allergies?: string;
+  category?: string;
+  userId?: string;
 }
 
 export interface AttendanceRecord {
@@ -94,8 +99,46 @@ export interface AttendanceRecord {
   admissionNo: string;
   rollNo?: number;
   name: string;
-  status: 'present' | 'absent' | 'late' | 'half_day' | 'unmarked';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'excused' | 'unmarked';
   remarks?: string;
+}
+
+export interface TimetablePeriod {
+  id: string;
+  schoolId: string;
+  classId: string;
+  sectionId: string;
+  dayOfWeek: string;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+  subjectId: string;
+  subjectName?: string;
+  subjectCode?: string;
+  teacherId: string;
+  teacherName?: string;
+  roomNumber?: string;
+  className?: string;
+  sectionName?: string;
+}
+
+export interface StudentLog {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  studentName?: string;
+  rollNo?: number;
+  className?: string;
+  sectionName?: string;
+  logType: 'discipline' | 'award' | 'observation' | 'medical' | 'attendance';
+  title: string;
+  description: string;
+  actionTaken?: string;
+  reportedByUserId: string;
+  reportedByName?: string;
+  date: string;
+  notifyParent: number;
+  createdAt: string;
 }
 
 export interface Exam {

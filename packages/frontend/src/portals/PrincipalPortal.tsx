@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
 import { CbseOfficialTemplate } from '../templates/CbseOfficialTemplate';
+import { TimetablePeriod, StudentLog } from '../types';
 import {
   LayoutDashboard,
   Users,
@@ -37,7 +38,7 @@ import {
 export const PrincipalPortal: React.FC = () => {
   // Navigation Sidebar
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'students' | 'academics' | 'attendance' | 'exams' | 'fees' | 'faculty' | 'notices' | 'settings'
+    'dashboard' | 'students' | 'academics' | 'timetable' | 'attendance' | 'exams' | 'fees' | 'faculty' | 'discipline' | 'notices' | 'settings'
   >('dashboard');
 
   // Core Data
@@ -70,6 +71,10 @@ export const PrincipalPortal: React.FC = () => {
     gender: 'Male',
     dob: '2012-05-15',
     bloodGroup: 'B+',
+    emergencyPhone: '',
+    medicalConditions: '',
+    allergies: '',
+    category: 'General',
     fatherName: '',
     motherName: '',
     primaryPhone: '',
@@ -123,6 +128,135 @@ export const PrincipalPortal: React.FC = () => {
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
   const [attRecords, setAttRecords] = useState<any[]>([]);
 
+  // Timetable State
+  const [ttClassId, setTtClassId] = useState('');
+  const [ttSectionId, setTtSectionId] = useState('');
+  const [ttPeriods, setTtPeriods] = useState<TimetablePeriod[]>([]);
+  const [loadingTt, setLoadingTt] = useState(false);
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [periodForm, setPeriodForm] = useState({
+    id: '',
+    dayOfWeek: 'Monday',
+    periodNumber: 1,
+    startTime: '08:30',
+    endTime: '09:15',
+    subjectId: '',
+    teacherId: '',
+    roomNumber: 'Room 101',
+  });
+
+  // Discipline & Behavioral Desk State
+  const [schoolLogs, setSchoolLogs] = useState<StudentLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [logTypeFilter, setLogTypeFilter] = useState('all');
+  const [logSearch, setLogSearch] = useState('');
+  const [logForm, setLogForm] = useState({
+    studentId: '',
+    logType: 'award',
+    title: '',
+    description: '',
+    actionTaken: '',
+    date: new Date().toISOString().split('T')[0],
+    notifyParent: true,
+  });
+
+  const loadTimetableData = async (cId: string, sId: string) => {
+    if (!cId || !sId) return;
+    setLoadingTt(true);
+    try {
+      const res = await ApiService.getTimetableByClass(cId, sId);
+      setTtPeriods(res.periods || []);
+    } catch (err) {
+      console.error('Failed to load timetable:', err);
+    } finally {
+      setLoadingTt(false);
+    }
+  };
+
+  const loadSchoolLogsData = async () => {
+    setLoadingLogs(true);
+    try {
+      const res = await ApiService.getSchoolStudentLogs();
+      setSchoolLogs(res.logs || []);
+    } catch (err) {
+      console.error('Failed to load school student logs:', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleSavePeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ttClassId || !ttSectionId || !periodForm.subjectId || !periodForm.teacherId) {
+      alert('Please select both a subject and teacher');
+      return;
+    }
+    try {
+      await ApiService.saveTimetablePeriod({
+        classId: ttClassId,
+        sectionId: ttSectionId,
+        dayOfWeek: periodForm.dayOfWeek,
+        periodNumber: Number(periodForm.periodNumber),
+        startTime: periodForm.startTime,
+        endTime: periodForm.endTime,
+        subjectId: periodForm.subjectId,
+        teacherId: periodForm.teacherId,
+        roomNumber: periodForm.roomNumber,
+      });
+      alert('✅ Period schedule saved successfully!');
+      setShowPeriodModal(false);
+      loadTimetableData(ttClassId, ttSectionId);
+    } catch (err: any) {
+      alert('Error saving period: ' + err.message);
+    }
+  };
+
+  const handleDeletePeriod = async (id: string) => {
+    if (!confirm('Remove this period slot from timetable?')) return;
+    try {
+      await ApiService.deleteTimetablePeriod(id);
+      loadTimetableData(ttClassId, ttSectionId);
+    } catch (err: any) {
+      alert('Error deleting period: ' + err.message);
+    }
+  };
+
+  const handleSaveLog = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logForm.studentId || !logForm.title || !logForm.description) {
+      alert('Please select a student and provide a title & description');
+      return;
+    }
+    try {
+      await ApiService.createStudentLog(logForm);
+      alert('✅ Observation log saved and parent notified via in-app alert!');
+      setShowLogModal(false);
+      setLogForm({
+        studentId: '',
+        logType: 'award',
+        title: '',
+        description: '',
+        actionTaken: '',
+        date: new Date().toISOString().split('T')[0],
+        notifyParent: true,
+      });
+      loadSchoolLogsData();
+    } catch (err: any) {
+      alert('Error saving log: ' + err.message);
+    }
+  };
+
+  const handleDeleteLog = async (id: string) => {
+    if (!confirm('Delete this observation log?')) return;
+    try {
+      await ApiService.deleteStudentLog(id);
+      loadSchoolLogsData();
+    } catch (err: any) {
+      alert('Error deleting log: ' + err.message);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -161,6 +295,15 @@ export const PrincipalPortal: React.FC = () => {
       if (cData?.subjects?.length > 0) {
         setSubSubjectId(cData.subjects[0].id);
       }
+
+      if (cData?.classes?.length > 0 && cData?.sections?.length > 0) {
+        const firstClass = cData.classes[0].id;
+        const firstSec = cData.sections.find((s: any) => s.classId === firstClass)?.id || cData.sections[0].id;
+        setTtClassId(firstClass);
+        setTtSectionId(firstSec);
+        loadTimetableData(firstClass, firstSec);
+      }
+      loadSchoolLogsData();
     } catch (err) {
       console.error('Error loading principal data:', err);
     } finally {
@@ -185,6 +328,10 @@ export const PrincipalPortal: React.FC = () => {
       gender: 'Male',
       dob: '2012-05-15',
       bloodGroup: 'B+',
+      emergencyPhone: '',
+      medicalConditions: '',
+      allergies: '',
+      category: 'General',
       fatherName: '',
       motherName: '',
       primaryPhone: '',
@@ -206,6 +353,10 @@ export const PrincipalPortal: React.FC = () => {
       gender: s.gender || 'Male',
       dob: s.dob || '',
       bloodGroup: s.bloodGroup || 'B+',
+      emergencyPhone: s.emergencyPhone || '',
+      medicalConditions: s.medicalConditions || '',
+      allergies: s.allergies || '',
+      category: s.category || 'General',
       fatherName: s.fatherName || '',
       motherName: s.motherName || '',
       primaryPhone: s.primaryPhone || '',
@@ -459,6 +610,16 @@ export const PrincipalPortal: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setActiveTab('timetable')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'timetable' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Clock size={16} />
+              <span>Timetable Matrix</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('attendance')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
                 activeTab === 'attendance' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
@@ -499,6 +660,19 @@ export const PrincipalPortal: React.FC = () => {
                 <span>Faculty & Staff Roster</span>
               </div>
               <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full">{staffList.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('discipline')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'discipline' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <ShieldAlert size={16} />
+                <span>Conduct & Discipline Desk</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full">{schoolLogs.length}</span>
             </button>
 
             <button
@@ -1278,6 +1452,305 @@ export const PrincipalPortal: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* ================= MODULE: TIMETABLE MATRIX ================= */}
+        {activeTab === 'timetable' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Clock className="text-blue-600" size={24} /> Academic Period Matrix & Scheduling
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Design and manage weekly period timetables (Mon–Sat, Periods 1–8), faculty allocations, and classrooms
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Class & Section pickers */}
+                <select
+                  value={ttClassId}
+                  onChange={(e) => {
+                    const cId = e.target.value;
+                    setTtClassId(cId);
+                    const sec = classesData?.sections?.find((s: any) => s.classId === cId)?.id || classesData?.sections?.[0]?.id || '';
+                    setTtSectionId(sec);
+                    loadTimetableData(cId, sec);
+                  }}
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold"
+                >
+                  {classesData?.classes?.map((c: any) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={ttSectionId}
+                  onChange={(e) => {
+                    setTtSectionId(e.target.value);
+                    loadTimetableData(ttClassId, e.target.value);
+                  }}
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold"
+                >
+                  {classesData?.sections
+                    ?.filter((s: any) => s.classId === ttClassId)
+                    ?.map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        Section {s.name}
+                      </option>
+                    ))}
+                </select>
+
+                <button
+                  onClick={() => {
+                    setPeriodForm({
+                      id: '',
+                      dayOfWeek: 'Monday',
+                      periodNumber: 1,
+                      startTime: '08:30',
+                      endTime: '09:15',
+                      subjectId: classesData?.subjects?.[0]?.id || '',
+                      teacherId: staffList?.find((st: any) => st.role === 'teacher')?.id || '',
+                      roomNumber: 'Room 101',
+                    });
+                    setShowPeriodModal(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-2"
+                >
+                  <Plus size={15} />
+                  <span>Assign Period Slot</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Matrix Table */}
+            {loadingTt ? (
+              <div className="py-16 text-center text-slate-400 text-xs">Loading timetable matrix...</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse border border-slate-200 rounded-2xl overflow-hidden">
+                  <thead>
+                    <tr className="bg-slate-900 text-white font-black text-center">
+                      <th className="py-3 px-3 border border-slate-800 text-left w-24">Day</th>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
+                        <th key={p} className="py-3 px-2 border border-slate-800">
+                          <span className="block font-bold">Period {p}</span>
+                          <span className="text-[10px] text-slate-400 font-mono font-normal">
+                            {p === 1 ? '08:30-09:15' : p === 2 ? '09:15-10:00' : p === 3 ? '10:00-10:45' : p === 4 ? '10:45-11:30' : p === 5 ? '12:00-12:45' : p === 6 ? '12:45-01:30' : p === 7 ? '01:30-02:15' : '02:15-03:00'}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+                      <tr key={day} className="hover:bg-slate-50/80 transition">
+                        <td className="py-3 px-3 font-extrabold text-slate-900 bg-slate-100/70 border border-slate-200">
+                          {day}
+                        </td>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((pNum) => {
+                          const slot = ttPeriods.find(
+                            (p) => p.dayOfWeek.toLowerCase() === day.toLowerCase() && Number(p.periodNumber) === pNum
+                          );
+                          return (
+                            <td key={pNum} className="p-2 border border-slate-200 align-top min-w-[130px]">
+                              {slot ? (
+                                <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 text-slate-800 space-y-1 relative group">
+                                  <div className="font-extrabold text-xs text-blue-950 line-clamp-1">
+                                    {slot.subjectName || 'Subject'}
+                                  </div>
+                                  <div className="text-[11px] text-slate-600 line-clamp-1">
+                                    👤 {slot.teacherName || 'Faculty'}
+                                  </div>
+                                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-semibold">
+                                      {slot.roomNumber || 'R101'}
+                                    </span>
+                                    <button
+                                      onClick={() => handleDeletePeriod(slot.id)}
+                                      title="Delete Period"
+                                      className="text-rose-500 hover:text-rose-700 opacity-0 group-hover:opacity-100 transition"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setPeriodForm({
+                                      id: '',
+                                      dayOfWeek: day,
+                                      periodNumber: pNum,
+                                      startTime: pNum === 1 ? '08:30' : pNum === 2 ? '09:15' : pNum === 3 ? '10:00' : pNum === 4 ? '10:45' : pNum === 5 ? '12:00' : pNum === 6 ? '12:45' : pNum === 7 ? '01:30' : '02:15',
+                                      endTime: pNum === 1 ? '09:15' : pNum === 2 ? '10:00' : pNum === 3 ? '10:45' : pNum === 4 ? '11:30' : pNum === 5 ? '12:45' : pNum === 6 ? '01:30' : pNum === 7 ? '02:15' : '03:00',
+                                      subjectId: classesData?.subjects?.[0]?.id || '',
+                                      teacherId: staffList?.find((st: any) => st.role === 'teacher')?.id || '',
+                                      roomNumber: 'Room 101',
+                                    });
+                                    setShowPeriodModal(true);
+                                  }}
+                                  className="w-full h-16 border border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex items-center justify-center text-[10px] font-bold text-slate-400 hover:text-blue-600 hover:bg-blue-50/50 transition"
+                                >
+                                  + Add
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================= MODULE: CONDUCT & DISCIPLINE DESK ================= */}
+        {activeTab === 'discipline' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <ShieldAlert className="text-amber-500" size={24} /> Student Conduct, Discipline & Awards Desk
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  RosarioSIS & Frappe Education architecture: Document awards, commendations, medical room visits, and disciplinary logs
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setShowLogModal(true)}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  <span>Log New Observation / Incident</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap gap-1.5 text-xs font-bold">
+                {['all', 'award', 'discipline', 'observation', 'medical'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setLogTypeFilter(type)}
+                    className={`px-3 py-1.5 rounded-xl uppercase text-[10px] transition ${
+                      logTypeFilter === type
+                        ? 'bg-blue-600 text-white shadow-sm font-extrabold'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-full sm:w-64">
+                <input
+                  type="text"
+                  placeholder="Search student or title..."
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Logs List */}
+            {loadingLogs ? (
+              <div className="py-16 text-center text-slate-400 text-xs">Loading behavioral records...</div>
+            ) : (
+              <div className="space-y-3">
+                {schoolLogs
+                  .filter((l) => logTypeFilter === 'all' || l.logType === logTypeFilter)
+                  .filter((l) =>
+                    logSearch === '' ||
+                    l.title.toLowerCase().includes(logSearch.toLowerCase()) ||
+                    (l.studentName && l.studentName.toLowerCase().includes(logSearch.toLowerCase()))
+                  )
+                  .map((log) => {
+                    const isAward = log.logType === 'award';
+                    const isDiscipline = log.logType === 'discipline';
+                    const isMedical = log.logType === 'medical';
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-4 rounded-2xl border transition space-y-2 ${
+                          isAward
+                            ? 'bg-amber-50/40 border-amber-200'
+                            : isDiscipline
+                            ? 'bg-rose-50/30 border-rose-200'
+                            : isMedical
+                            ? 'bg-blue-50/30 border-blue-200'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                isAward
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  : isDiscipline
+                                  ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                  : isMedical
+                                  ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                  : 'bg-slate-200 text-slate-800'
+                              }`}
+                            >
+                              {log.logType}
+                            </span>
+                            <span className="font-extrabold text-sm text-slate-900">{log.studentName || 'Student'}</span>
+                            {log.admissionNo && (
+                              <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                {log.admissionNo}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-slate-400 font-bold">{log.date}</span>
+                            <button
+                              onClick={() => handleDeleteLog(log.id)}
+                              className="text-slate-400 hover:text-rose-600 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800">{log.title}</h4>
+                          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{log.description}</p>
+                        </div>
+
+                        {log.actionTaken && (
+                          <div className="p-2 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-700">
+                            <span className="font-bold text-slate-900">Corrective Action / Reward: </span>
+                            {log.actionTaken}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                          <span>Reported by: {log.reporterName || 'Faculty Member'}</span>
+                          {log.notifyParent === 1 && (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Parent Notified via Mobile App
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* ================= MODAL: ADMIT / EDIT STUDENT ================= */}
@@ -1449,6 +1922,58 @@ export const PrincipalPortal: React.FC = () => {
                     onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
                   />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
+                  Health, Emergency & Social Demographics
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Emergency Contact Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="+91 98111 99887"
+                      value={studentForm.emergencyPhone}
+                      onChange={(e) => setStudentForm({ ...studentForm, emergencyPhone: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Caste / Social Category</label>
+                    <select
+                      value={studentForm.category}
+                      onChange={(e) => setStudentForm({ ...studentForm, category: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                    >
+                      <option value="General">General</option>
+                      <option value="OBC">OBC (Other Backward Class)</option>
+                      <option value="SC">SC (Scheduled Caste)</option>
+                      <option value="ST">ST (Scheduled Tribe)</option>
+                      <option value="EWS">EWS (Economically Weaker Section)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Medical Conditions / Notes</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Asthma, Spectacles, Heart condition"
+                      value={studentForm.medicalConditions}
+                      onChange={(e) => setStudentForm({ ...studentForm, medicalConditions: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Known Allergies</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Peanuts, Penicillin, Dust allergy"
+                      value={studentForm.allergies}
+                      onChange={(e) => setStudentForm({ ...studentForm, allergies: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1837,6 +2362,254 @@ export const PrincipalPortal: React.FC = () => {
                   className="px-5 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-600/30"
                 >
                   Broadcast Circular
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ================= MODAL: ASSIGN TIMETABLE PERIOD ================= */}
+      {showPeriodModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-900">Assign Period Slot</h3>
+              <button onClick={() => setShowPeriodModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePeriod} className="space-y-3.5 pt-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Day of Week</label>
+                  <select
+                    value={periodForm.dayOfWeek}
+                    onChange={(e) => setPeriodForm({ ...periodForm, dayOfWeek: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  >
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Period Number</label>
+                  <select
+                    value={periodForm.periodNumber}
+                    onChange={(e) => setPeriodForm({ ...periodForm, periodNumber: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>
+                        Period {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    required
+                    value={periodForm.startTime}
+                    onChange={(e) => setPeriodForm({ ...periodForm, startTime: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">End Time</label>
+                  <input
+                    type="time"
+                    required
+                    value={periodForm.endTime}
+                    onChange={(e) => setPeriodForm({ ...periodForm, endTime: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Subject</label>
+                <select
+                  required
+                  value={periodForm.subjectId}
+                  onChange={(e) => setPeriodForm({ ...periodForm, subjectId: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  <option value="">-- Select Subject --</option>
+                  {classesData?.subjects?.map((sub: any) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.code || 'SUB'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Assigned Faculty Member</label>
+                <select
+                  required
+                  value={periodForm.teacherId}
+                  onChange={(e) => setPeriodForm({ ...periodForm, teacherId: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  <option value="">-- Select Teacher --</option>
+                  {staffList
+                    ?.filter((s: any) => s.role === 'teacher')
+                    ?.map((t: any) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Classroom / Laboratory</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Room 101, Science Lab A"
+                  value={periodForm.roomNumber}
+                  onChange={(e) => setPeriodForm({ ...periodForm, roomNumber: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowPeriodModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow"
+                >
+                  Save Period
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: LOG STUDENT INCIDENT / AWARD ================= */}
+      {showLogModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <ShieldAlert size={18} className="text-amber-500" />
+                <span>Log Student Observation / Incident</span>
+              </h3>
+              <button onClick={() => setShowLogModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLog} className="space-y-3.5 pt-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Select Student</label>
+                  <select
+                    required
+                    value={logForm.studentId}
+                    onChange={(e) => setLogForm({ ...logForm, studentId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  >
+                    <option value="">-- Choose Student --</option>
+                    {students.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.firstName} {s.lastName || ''} (#{s.rollNo || '01'} - {s.admissionNo})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Record Type</label>
+                  <select
+                    value={logForm.logType}
+                    onChange={(e) => setLogForm({ ...logForm, logType: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  >
+                    <option value="award">Award / Recognition</option>
+                    <option value="observation">Teacher Observation / Commendation</option>
+                    <option value="discipline">Disciplinary Incident / Infraction</option>
+                    <option value="medical">Medical Room / Health Visit</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Title / Summary</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 1st Place in Science Quiz / Late Arrival / Headache"
+                  value={logForm.title}
+                  onChange={(e) => setLogForm({ ...logForm, title: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Detailed Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Describe what happened, context, and student reaction..."
+                  value={logForm.description}
+                  onChange={(e) => setLogForm({ ...logForm, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Corrective Action Taken / Award Given</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Verbal reprimand / Medal presented / First aid administered"
+                  value={logForm.actionTaken}
+                  onChange={(e) => setLogForm({ ...logForm, actionTaken: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={logForm.notifyParent}
+                    onChange={(e) => setLogForm({ ...logForm, notifyParent: e.target.checked })}
+                    className="w-4 h-4 rounded text-blue-600"
+                  />
+                  <span>Dispatch in-app notification to parents</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowLogModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow"
+                >
+                  Save & Notify
                 </button>
               </div>
             </form>

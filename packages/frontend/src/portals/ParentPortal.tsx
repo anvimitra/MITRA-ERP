@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
-import { ReportCardData } from '../types';
+import { ReportCardData, TimetablePeriod, StudentLog } from '../types';
 import { ReportCardModal } from '../components/ReportCardModal';
-import { Calendar, Award, Receipt, Bell, CheckCircle2, XCircle, Clock, Sparkles, Printer, FileText } from 'lucide-react';
+import { Calendar, Award, Receipt, Bell, CheckCircle2, XCircle, Clock, Sparkles, Printer, FileText, ShieldAlert } from 'lucide-react';
 
 interface Props {
   user: any;
@@ -10,7 +10,10 @@ interface Props {
 }
 
 export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'exams' | 'fees' | 'notifications'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'timetable' | 'exams' | 'discipline' | 'fees' | 'notifications'>('attendance');
+  const [timetable, setTimetable] = useState<TimetablePeriod[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string>('Monday');
+  const [studentLogs, setStudentLogs] = useState<StudentLog[]>([]);
   const [attendanceData, setAttendanceData] = useState<any>(null);
   const [feesData, setFeesData] = useState<any>(null);
   const [exams, setExams] = useState<any[]>([]);
@@ -35,6 +38,25 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
 
       const notifs = await ApiService.getMyAlerts().catch(() => ({ notifications: [] }));
       setNotifications(notifs.notifications || []);
+
+      // Load Student Logs
+      const logs = await ApiService.getStudentLogs(studentId).catch(() => ({ logs: [] }));
+      setStudentLogs(logs.logs || []);
+
+      // Load Timetable
+      const me = await ApiService.getMe().catch(() => null);
+      const child = me?.linkedStudents?.find((s: any) => s.id === studentId);
+      if (child?.classId && child?.sectionId) {
+        const tt = await ApiService.getTimetableByClass(child.classId, child.sectionId).catch(() => ({ periods: [] }));
+        setTimetable(tt.periods || []);
+      } else {
+        // Fallback: try loading for Class 10 / Section A or Class 8 / Section A
+        const isLSK = studentId.includes('lsk') || studentId.includes('aryan') || studentId.includes('zara');
+        const classId = isLSK ? 'class-school-lsk-01-8' : 'class-10';
+        const secId = isLSK ? 'sec-class-school-lsk-01-8-a' : 'sec-10-a';
+        const tt = await ApiService.getTimetableByClass(classId, secId).catch(() => ({ periods: [] }));
+        setTimetable(tt.periods || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -101,6 +123,15 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
             <span>Attendance</span>
           </button>
           <button
+            onClick={() => setActiveTab('timetable')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition ${
+              activeTab === 'timetable' ? 'bg-white text-slate-950 shadow' : 'text-white/80 hover:text-white'
+            }`}
+          >
+            <Clock size={13} />
+            <span>Child Timetable</span>
+          </button>
+          <button
             onClick={() => setActiveTab('exams')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition ${
               activeTab === 'exams' ? 'bg-white text-slate-950 shadow' : 'text-white/80 hover:text-white'
@@ -108,6 +139,15 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
           >
             <Award size={13} />
             <span>Exams & Report Cards</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('discipline')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition ${
+              activeTab === 'discipline' ? 'bg-white text-slate-950 shadow' : 'text-white/80 hover:text-white'
+            }`}
+          >
+            <ShieldAlert size={13} />
+            <span>Conduct & Awards</span>
           </button>
           <button
             onClick={() => setActiveTab('fees')}
@@ -325,6 +365,152 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Child Timetable Matrix */}
+      {activeTab === 'timetable' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Clock className="text-blue-600" size={20} />
+                <span>Class Timetable & Daily Schedule</span>
+              </h2>
+              <p className="text-xs text-slate-500">
+                Weekly lectures, subject teacher allocations, and classroom locations for your child
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDay(d)}
+                  className={`px-3 py-1.5 rounded-xl transition ${
+                    selectedDay === d ? 'bg-white text-blue-700 shadow font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {d.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {timetable
+              .filter((p) => p.dayOfWeek.toLowerCase() === selectedDay.toLowerCase())
+              .sort((a, b) => a.periodNumber - b.periodNumber)
+              .map((p) => (
+                <div
+                  key={p.id}
+                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-blue-300 hover:shadow-md transition space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800">
+                      Period {p.periodNumber}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-500">
+                      {p.startTime} - {p.endTime}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900">{p.subjectName || 'Subject'}</h4>
+                    <p className="text-xs text-slate-600">Faculty: {p.teacherName || 'Assigned Teacher'}</p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>Classroom:</span>
+                    <span className="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {p.roomNumber || 'Room 101'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            {timetable.filter((p) => p.dayOfWeek.toLowerCase() === selectedDay.toLowerCase()).length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 text-xs font-semibold">
+                No periods scheduled for {selectedDay}.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Conduct, Discipline & Awards Feed */}
+      {activeTab === 'discipline' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="text-amber-500" size={20} />
+              <span>Student Conduct, Honors & Incident History</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Official school records of achievements, awards, teacher observations, and disciplinary notes
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {studentLogs.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs font-semibold">
+                No behavioral or award records logged for this student.
+              </div>
+            ) : (
+              studentLogs.map((log) => {
+                const isAward = log.logType === 'award';
+                const isDiscipline = log.logType === 'discipline';
+                const isMedical = log.logType === 'medical';
+                return (
+                  <div
+                    key={log.id}
+                    className={`p-5 rounded-2xl border transition space-y-2.5 ${
+                      isAward
+                        ? 'bg-amber-50/40 border-amber-200'
+                        : isDiscipline
+                        ? 'bg-rose-50/30 border-rose-200'
+                        : isMedical
+                        ? 'bg-blue-50/30 border-blue-200'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                          isAward
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : isDiscipline
+                            ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                            : isMedical
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                            : 'bg-slate-200 text-slate-800'
+                        }`}
+                      >
+                        {log.logType}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{log.date}</span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900">{log.title}</h4>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{log.description}</p>
+                    </div>
+
+                    {log.actionTaken && (
+                      <div className="p-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-xs text-slate-700">
+                        <span className="font-bold text-slate-900">Action / Recognition: </span>
+                        {log.actionTaken}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                      <span>Logged by: {log.reporterName || 'Class Faculty'}</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Verified School Record
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

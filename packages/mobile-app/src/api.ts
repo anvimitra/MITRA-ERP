@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog } from './types';
 
 // Dynamic API Base URL detection
 export function getApiBaseUrl(): string {
@@ -485,6 +485,75 @@ export async function broadcastLiveNotice(title: string, message: string) {
     throw new Error(data.error || 'Failed to broadcast notice.');
   }
   return data;
+}
+
+// 12. Fetch Class Timetable from ERP
+export async function fetchClassTimetable(classId: string, sectionId: string): Promise<TimetablePeriod[]> {
+  try {
+    const res = await authFetch(`/timetable/class/${classId}/${sectionId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.periods)) {
+        return data.periods;
+      }
+    }
+  } catch (err) {
+    console.warn('Class timetable offline:', err);
+  }
+  return [];
+}
+
+// 13. Fetch Teacher Timetable from ERP
+export async function fetchTeacherTimetable(teacherId: string): Promise<TimetablePeriod[]> {
+  try {
+    const res = await authFetch(`/timetable/teacher/${teacherId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.periods)) {
+        return data.periods;
+      }
+    }
+  } catch (err) {
+    console.warn('Teacher timetable offline:', err);
+  }
+  return [];
+}
+
+// 14. Fetch Student Logs (Awards, Discipline, Conduct)
+export async function fetchStudentLogs(studentId: string): Promise<StudentLog[]> {
+  try {
+    const res = await authFetch(`/student-logs/student/${studentId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.logs)) {
+        return data.logs;
+      }
+    }
+  } catch (err) {
+    console.warn('Student logs offline:', err);
+  }
+  return [];
+}
+
+// 15. Create Student Observation / Incident Log
+export async function createStudentObservationLog(data: {
+  studentId: string;
+  logType: string;
+  title: string;
+  description: string;
+  actionTaken?: string;
+  date?: string;
+  notifyParent?: boolean;
+}) {
+  const res = await authFetch('/student-logs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to save student observation.');
+  }
+  return resData;
 }
 
 // Version & Auto-Update

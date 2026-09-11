@@ -104,6 +104,28 @@ class SyncClient {
           }
         }
 
+        // 6. Update Timetable Periods
+        if (dataset?.timetable) {
+          const insertTt = db.prepare(`
+            INSERT OR REPLACE INTO local_timetable (id, class_id, section_id, day_of_week, period_number, start_time, end_time, subject_id, teacher_id, room_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const t of dataset.timetable) {
+            insertTt.run(t.id, t.classId, t.sectionId, t.dayOfWeek, t.periodNumber, t.startTime, t.endTime, t.subjectId, t.teacherId, t.roomNumber);
+          }
+        }
+
+        // 7. Update Student Behavioral / Conduct Logs
+        if (dataset?.studentLogs) {
+          const insertLog = db.prepare(`
+            INSERT OR REPLACE INTO local_student_logs (id, student_id, log_type, title, description, action_taken, reported_by_user_id, date, notify_parent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const l of dataset.studentLogs) {
+            insertLog.run(l.id, l.studentId, l.logType, l.title, l.description, l.actionTaken, l.reportedByUserId, l.date, l.notifyParent);
+          }
+        }
+
         // Save last sync time
         db.prepare(`
           INSERT OR REPLACE INTO sync_meta (key, value)
@@ -134,6 +156,8 @@ class SyncClient {
     const attendanceCount = db.prepare('SELECT COUNT(*) as count FROM local_attendance').get().count;
     const marksCount = db.prepare('SELECT COUNT(*) as count FROM local_marks').get().count;
     const feesCount = db.prepare('SELECT COUNT(*) as count FROM local_fees').get().count;
+    const timetableCount = db.prepare('SELECT COUNT(*) as count FROM local_timetable').get().count;
+    const studentLogsCount = db.prepare('SELECT COUNT(*) as count FROM local_student_logs').get().count;
     const meta = db.prepare("SELECT value FROM sync_meta WHERE key = 'last_sync_timestamp'").get();
     const school = db.prepare('SELECT * FROM local_school LIMIT 1').get();
 
@@ -142,6 +166,8 @@ class SyncClient {
       attendanceCount,
       marksCount,
       feesCount,
+      timetableCount,
+      studentLogsCount,
       lastSyncTimestamp: meta?.value || this.lastSyncTime || 'Never',
       school,
     };

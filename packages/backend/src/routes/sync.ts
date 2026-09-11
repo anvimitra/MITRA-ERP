@@ -90,6 +90,8 @@ syncRoutes.post('/pull', async (c) => {
   const schoolMarks = db.select().from(schema.marks).where(eq(schema.marks.schoolId, schoolId)).all();
   const schoolFeeStructures = db.select().from(schema.feeStructures).where(eq(schema.feeStructures.schoolId, schoolId)).all();
   const schoolFeePayments = db.select().from(schema.feePayments).where(eq(schema.feePayments.schoolId, schoolId)).all();
+  const schoolTimetable = db.select().from(schema.timetablePeriods).where(eq(schema.timetablePeriods.schoolId, schoolId)).all();
+  const schoolStudentLogs = db.select().from(schema.studentLogs).where(eq(schema.studentLogs.schoolId, schoolId)).all();
 
   const totalRecords =
     schoolClasses.length +
@@ -99,7 +101,9 @@ syncRoutes.post('/pull', async (c) => {
     schoolAttendance.length +
     schoolExams.length +
     schoolMarks.length +
-    schoolFeePayments.length;
+    schoolFeePayments.length +
+    schoolTimetable.length +
+    schoolStudentLogs.length;
 
   const now = new Date().toISOString();
 
@@ -139,6 +143,8 @@ syncRoutes.post('/pull', async (c) => {
       marks: schoolMarks,
       feeStructures: schoolFeeStructures,
       feePayments: schoolFeePayments,
+      timetable: schoolTimetable,
+      studentLogs: schoolStudentLogs,
     },
   });
 });

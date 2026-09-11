@@ -1,5 +1,5 @@
 import { initializeDatabase } from './init.js';
-import { db, schema } from './index.js';
+import { db, schema, eq } from './index.js';
 import { hashPassword } from '../services/auth.js';
 import crypto from 'crypto';
 
@@ -1080,6 +1080,198 @@ export async function seedDatabase() {
     },
   ]).onConflictDoNothing().run();
 
+  // 12. Student User Accounts (For Student Portal)
+  const studentRahulUserId = 'user-student-rahul';
+  const studentAryanUserId = 'user-student-aryan';
+
+  db.insert(schema.users).values([
+    {
+      id: studentRahulUserId,
+      schoolId: dpsId,
+      role: 'student',
+      name: 'Rahul Sharma',
+      email: 'student.rahul@dps.edu',
+      phone: '+91 98111 22334',
+      passwordHash: hashPassword('student123'),
+      appInstalled: 1,
+      lastActiveAt: now,
+      isActive: 1,
+      createdAt: now,
+    },
+    {
+      id: studentAryanUserId,
+      schoolId: lskId,
+      role: 'student',
+      name: 'Aryan Mishra',
+      email: 'student.aryan@lskacademy.edu',
+      phone: '+91 98333 44556',
+      passwordHash: hashPassword('student123'),
+      appInstalled: 1,
+      lastActiveAt: now,
+      isActive: 1,
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  // Update students with extended profile data and link user_id
+  db.update(schema.students)
+    .set({
+      userId: studentRahulUserId,
+      emergencyPhone: '+91 98111 99887',
+      medicalConditions: 'None',
+      allergies: 'Peanuts (Mild)',
+      category: 'General',
+    })
+    .where(eq(schema.students.id, stuRahulId))
+    .run();
+
+  db.update(schema.students)
+    .set({
+      userId: studentAryanUserId,
+      emergencyPhone: '+91 98333 88776',
+      medicalConditions: 'Asthma (Carries Inhaler)',
+      allergies: 'Dust allergy',
+      category: 'OBC',
+    })
+    .where(eq(schema.students.id, lskStuAryanId))
+    .run();
+
+  // 13. Timetable Scheduling Matrix (6 Days x 8 Periods)
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // DPS Class 10-A Timetable
+  const dpsTimetableEntries: any[] = [];
+  const dpsScheduleTemplate = [
+    { period: 1, start: '08:30', end: '09:15', subject: subMath, teacher: teacher1Id, room: 'Room 101' },
+    { period: 2, start: '09:15', end: '10:00', subject: subSci, teacher: teacher2Id, room: 'Room 101' },
+    { period: 3, start: '10:00', end: '10:45', subject: subEng, teacher: teacher1Id, room: 'Room 101' },
+    { period: 4, start: '10:45', end: '11:30', subject: subSSt, teacher: teacher2Id, room: 'Room 101' },
+    { period: 5, start: '12:00', end: '12:45', subject: subHindi, teacher: teacher1Id, room: 'Room 101' },
+    { period: 6, start: '12:45', end: '01:30', subject: subSci, teacher: teacher2Id, room: 'Science Lab A' },
+    { period: 7, start: '01:30', end: '02:15', subject: subMath, teacher: teacher1Id, room: 'Room 101' },
+    { period: 8, start: '02:15', end: '03:00', subject: subEng, teacher: teacher2Id, room: 'Ground / Library' },
+  ];
+
+  for (const day of daysOfWeek) {
+    for (const p of dpsScheduleTemplate) {
+      dpsTimetableEntries.push({
+        id: `dps-tt-${class10Id}-${day.toLowerCase()}-p${p.period}`,
+        schoolId: dpsId,
+        classId: class10Id,
+        sectionId: sec10AId,
+        dayOfWeek: day,
+        periodNumber: p.period,
+        startTime: p.start,
+        endTime: p.end,
+        subjectId: p.subject,
+        teacherId: p.teacher,
+        roomNumber: p.room,
+      });
+    }
+  }
+  db.insert(schema.timetablePeriods).values(dpsTimetableEntries).onConflictDoNothing().run();
+
+  // LSK Class 8-A Timetable
+  const lskTimetableEntries: any[] = [];
+  const lskScheduleTemplate = [
+    { period: 1, start: '08:30', end: '09:15', subject: lskSubMath, teacher: lskTeacher1Id, room: 'Room 204' },
+    { period: 2, start: '09:15', end: '10:00', subject: lskSubSci, teacher: lskTeacher2Id, room: 'Room 204' },
+    { period: 3, start: '10:00', end: '10:45', subject: lskSubEng, teacher: lskTeacher1Id, room: 'Room 204' },
+    { period: 4, start: '10:45', end: '11:30', subject: lskSubSSt, teacher: lskTeacher2Id, room: 'Room 204' },
+    { period: 5, start: '12:00', end: '12:45', subject: lskSubHindi, teacher: lskTeacher1Id, room: 'Room 204' },
+    { period: 6, start: '12:45', end: '01:30', subject: lskSubSci, teacher: lskTeacher2Id, room: 'Junior Lab' },
+    { period: 7, start: '01:30', end: '02:15', subject: lskSubMath, teacher: lskTeacher1Id, room: 'Room 204' },
+    { period: 8, start: '02:15', end: '03:00', subject: lskSubSSt, teacher: lskTeacher2Id, room: 'Activity Hall' },
+  ];
+
+  for (const day of daysOfWeek) {
+    for (const p of lskScheduleTemplate) {
+      lskTimetableEntries.push({
+        id: `lsk-tt-${lskClass8Id}-${day.toLowerCase()}-p${p.period}`,
+        schoolId: lskId,
+        classId: lskClass8Id,
+        sectionId: lskSec8AId,
+        dayOfWeek: day,
+        periodNumber: p.period,
+        startTime: p.start,
+        endTime: p.end,
+        subjectId: p.subject,
+        teacherId: p.teacher,
+        roomNumber: p.room,
+      });
+    }
+  }
+  db.insert(schema.timetablePeriods).values(lskTimetableEntries).onConflictDoNothing().run();
+
+  // 14. Student Logs (Discipline, Awards, Observations, Medical)
+  db.insert(schema.studentLogs).values([
+    {
+      id: 'log-dps-rahul-01',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      logType: 'award',
+      title: '1st Place in Regional Science Olympiad',
+      description: 'Rahul secured Rank 1 in the State Level Science & Mathematics Olympiad with an exceptional score of 98%.',
+      actionTaken: 'Certificate of Distinction & Trophy awarded during school morning assembly.',
+      reportedByUserId: teacher2Id,
+      date: '2026-09-02',
+      notifyParent: 1,
+      createdAt: now,
+    },
+    {
+      id: 'log-dps-rahul-02',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      logType: 'discipline',
+      title: 'Classroom Disturbance in Mathematics Period',
+      description: 'Found repeatedly talking and causing distraction during trigonometry problem-solving session.',
+      actionTaken: 'Verbal warning given; seat moved to front row for closer supervision.',
+      reportedByUserId: teacher1Id,
+      date: '2026-09-05',
+      notifyParent: 1,
+      createdAt: now,
+    },
+    {
+      id: 'log-dps-rahul-03',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      logType: 'medical',
+      title: 'Minor Ankle Sprain in Sports Period',
+      description: 'Twisted left ankle while playing inter-house football match on school ground.',
+      actionTaken: 'First aid ice compression applied in infirmary by school nurse; rested for 40 mins and walked comfortably.',
+      reportedByUserId: teacher2Id,
+      date: '2026-09-08',
+      notifyParent: 1,
+      createdAt: now,
+    },
+    {
+      id: 'log-lsk-aryan-01',
+      schoolId: lskId,
+      studentId: lskStuAryanId,
+      logType: 'award',
+      title: 'Best Innovation Award - Science Exhibition',
+      description: 'Built a sustainable smart solar irrigation prototype praised by external judges.',
+      actionTaken: 'Awarded Gold Medal and ₹1,500 book voucher by Principal.',
+      reportedByUserId: lskTeacher2Id,
+      date: '2026-09-03',
+      notifyParent: 1,
+      createdAt: now,
+    },
+    {
+      id: 'log-lsk-aryan-02',
+      schoolId: lskId,
+      studentId: lskStuAryanId,
+      logType: 'observation',
+      title: 'Exemplary Peer Mentoring in Algebra',
+      description: 'Assisted 4 struggling classmates in mastering linear equation exercises during tutorial period.',
+      actionTaken: 'Commended in class and positive behavioral credit recorded.',
+      reportedByUserId: lskTeacher1Id,
+      date: '2026-09-07',
+      notifyParent: 1,
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
   console.log('✅ Seed completed successfully! Demo accounts ready:');
   console.log('  1. Super Admin: superadmin@anvimitra.com / admin123');
   console.log('  2. Principal (DPS): principal@dps.edu / principal123');
@@ -1088,14 +1280,16 @@ export async function seedDatabase() {
   console.log('  5. Accountant (DPS): accountant@dps.edu / staff123');
   console.log('  6. Parent App-Active (DPS): parent.rahul@gmail.com / parent123');
   console.log('  7. Parent SMS-Fallback (DPS): parent.priya@gmail.com / parent123');
+  console.log('  8. Student (DPS 10-A): student.rahul@dps.edu / student123');
   console.log('');
   console.log('  ─── LSK Academy (LSK01) ───');
-  console.log('  8.  Principal: principal@lskacademy.edu / principal123');
-  console.log('  9.  Class Teacher (8-A & Math): rani@lskacademy.edu / teacher123');
-  console.log('  10. Science Teacher: kiran@lskacademy.edu / teacher123');
-  console.log('  11. Accountant: accounts@lskacademy.edu / staff123');
-  console.log('  12. Parent App-Active: parent.aryan@gmail.com / parent123');
-  console.log('  13. Parent SMS-Fallback: parent.zara@gmail.com / parent123');
+  console.log('  9.  Principal: principal@lskacademy.edu / principal123');
+  console.log('  10. Class Teacher (8-A & Math): rani@lskacademy.edu / teacher123');
+  console.log('  11. Science Teacher: kiran@lskacademy.edu / teacher123');
+  console.log('  12. Accountant: accounts@lskacademy.edu / staff123');
+  console.log('  13. Parent App-Active: parent.aryan@gmail.com / parent123');
+  console.log('  14. Parent SMS-Fallback: parent.zara@gmail.com / parent123');
+  console.log('  15. Student (LSK 8-A): student.aryan@lskacademy.edu / student123');
 }
 
 if (process.argv[1]?.includes('seed.ts')) {

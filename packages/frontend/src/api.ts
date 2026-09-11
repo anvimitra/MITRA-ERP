@@ -10,6 +10,9 @@ import {
   FeePayment,
   NotificationItem,
   SMSLogItem,
+  TimetablePeriod,
+  StudentLog,
+  Student,
 } from './types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
@@ -60,6 +63,7 @@ export class ApiService {
       user: User;
       school: School | null;
       linkedStudents: any[];
+      studentRecord?: Student | null;
     }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, schoolCode, isMobileApp }),
@@ -74,6 +78,7 @@ export class ApiService {
       user: User;
       school: School | null;
       linkedStudents: any[];
+      studentRecord?: Student | null;
     }>('/auth/me');
   }
 
@@ -309,6 +314,58 @@ export class ApiService {
     return this.request<{ success: boolean; message: string }>('/notifications/broadcast', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Timetable Scheduling Matrix
+  static async getTimetableByClass(classId: string, sectionId: string) {
+    return this.request<{ periods: TimetablePeriod[] }>(`/timetable/class/${classId}/${sectionId}`);
+  }
+
+  static async getTimetableByTeacher(teacherId: string) {
+    return this.request<{ periods: TimetablePeriod[] }>(`/timetable/teacher/${teacherId}`);
+  }
+
+  static async saveTimetablePeriod(data: Partial<TimetablePeriod>) {
+    return this.request<{ success: boolean; message: string; period: TimetablePeriod }>('/timetable/period', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteTimetablePeriod(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/timetable/period/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Student Behavioral & Incident Logs
+  static async getSchoolStudentLogs() {
+    return this.request<{ logs: StudentLog[] }>('/student-logs/school');
+  }
+
+  static async getStudentLogs(studentId: string) {
+    return this.request<{ logs: StudentLog[] }>(`/student-logs/student/${studentId}`);
+  }
+
+  static async createStudentLog(data: {
+    studentId: string;
+    logType: string;
+    title: string;
+    description: string;
+    actionTaken?: string;
+    date?: string;
+    notifyParent?: boolean | number;
+  }) {
+    return this.request<{ success: boolean; message: string; logId: string }>('/student-logs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteStudentLog(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/student-logs/${id}`, {
+      method: 'DELETE',
     });
   }
 }
