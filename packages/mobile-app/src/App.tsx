@@ -44,10 +44,34 @@ export const App: React.FC = () => {
     appInstalled: 1,
   });
 
-  const [student, setStudent] = useState<Student>(DEFAULT_STUDENT);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
-  const [fees, setFees] = useState<FeeItem[]>(MOCK_FEES);
-  const [latestReport, setLatestReport] = useState<ExamReport>(MOCK_REPORTS['sa1']);
+  const [student, setStudent] = useState<Student>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_student');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return DEFAULT_STUDENT;
+  });
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_attendance');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return MOCK_ATTENDANCE;
+  });
+  const [fees, setFees] = useState<FeeItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_fees');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return MOCK_FEES;
+  });
+  const [latestReport, setLatestReport] = useState<ExamReport>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_report');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return MOCK_REPORTS['sa1'];
+  });
   const [enrolledStudentsCount, setEnrolledStudentsCount] = useState<number>(0);
   const [classesCount, setClassesCount] = useState<number>(12);
 
@@ -63,7 +87,7 @@ export const App: React.FC = () => {
 
   const refreshUserData = async (currentUser: User, currentStudent?: Student) => {
     try {
-      if (currentUser.role === 'principal' || currentUser.role === 'teacher') {
+      if (currentUser.role === 'principal' || currentUser.role === 'accountant' || currentUser.role === 'teacher') {
         const [stuList, classesData] = await Promise.all([
           fetchLiveStudents(),
           fetchLiveClasses(),
@@ -74,14 +98,24 @@ export const App: React.FC = () => {
 
       const stu = currentStudent || student;
       if (stu?.id) {
+        localStorage.setItem('anvimitra_cached_student', JSON.stringify(stu));
         const [att, f, rep] = await Promise.all([
           fetchStudentAttendanceHistory(stu.id),
           fetchStudentFeesLedger(stu.id),
           fetchStudentExamReport(stu.id),
         ]);
-        if (att && att.length > 0) setAttendance(att);
-        if (f && f.length > 0) setFees(f);
-        if (rep) setLatestReport(rep);
+        if (att && att.length > 0) {
+          setAttendance(att);
+          localStorage.setItem('anvimitra_cached_attendance', JSON.stringify(att));
+        }
+        if (f && f.length > 0) {
+          setFees(f);
+          localStorage.setItem('anvimitra_cached_fees', JSON.stringify(f));
+        }
+        if (rep) {
+          setLatestReport(rep);
+          localStorage.setItem('anvimitra_cached_report', JSON.stringify(rep));
+        }
       }
     } catch (err) {
       console.warn('Live data sync offline, kept cached state', err);
@@ -167,7 +201,7 @@ export const App: React.FC = () => {
 
     if (newUser.role === 'teacher') {
       setActiveTab('teacher');
-    } else if (newUser.role === 'principal') {
+    } else if (newUser.role === 'principal' || newUser.role === 'accountant') {
       setActiveTab('principal');
     } else {
       setActiveTab('home');
@@ -250,7 +284,7 @@ export const App: React.FC = () => {
                 <TeacherView teacher={user} />
               )}
 
-              {activeTab === 'principal' && user?.role === 'principal' && (
+              {activeTab === 'principal' && (user?.role === 'principal' || user?.role === 'accountant') && (
                 <PrincipalView
                   principal={user}
                   school={school}

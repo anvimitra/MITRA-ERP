@@ -6,7 +6,9 @@ let localDb = null;
 let currentDbPath = '';
 
 function getStoragePath() {
-  return currentDbPath || path.resolve(process.cwd(), 'local-storage', 'anvimitra_secondary.db');
+  if (currentDbPath) return currentDbPath;
+  if (process.env.LOCAL_DB_PATH) return path.resolve(process.env.LOCAL_DB_PATH);
+  return path.resolve(__dirname, '..', 'local-storage', 'anvimitra_secondary.db');
 }
 
 function initLocalDatabase(customPath) {
@@ -19,6 +21,17 @@ function initLocalDatabase(customPath) {
 
   localDb = new DatabaseSync(targetPath);
   localDb.exec('PRAGMA journal_mode = WAL;');
+  localDb.exec('PRAGMA synchronous = NORMAL;');
+  localDb.exec('PRAGMA busy_timeout = 5000;');
+
+  const handleExit = () => {
+    try {
+      localDb.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch {}
+  };
+  process.on('SIGINT', handleExit);
+  process.on('SIGTERM', handleExit);
+  process.on('exit', handleExit);
 
   // Secondary local replica schema
   localDb.exec(`

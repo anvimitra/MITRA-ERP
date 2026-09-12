@@ -28,11 +28,11 @@ export const Navbar: React.FC<Props> = ({
       case 'super_admin':
         return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">SUPER ADMIN</span>;
       case 'principal':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">PRINCIPAL</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">PRINCIPAL & BURSAR</span>;
       case 'teacher':
         return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">TEACHER</span>;
       case 'accountant':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">ACCOUNTS / STAFF</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">PRINCIPAL & ACCOUNTS</span>;
       case 'parent':
         return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">PARENT</span>;
       default:

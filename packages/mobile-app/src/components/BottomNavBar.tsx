@@ -71,7 +71,7 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
           </button>
         )}
 
-        {role === 'principal' && (
+        {(role === 'principal' || role === 'accountant') && (
           <button
             onClick={() => onChangeTab('principal')}
             className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
@@ -79,7 +79,7 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
             }`}
           >
             <Shield className={`w-5 h-5 ${activeTab === 'principal' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            <span className="text-[10px] mt-0.5">Admin</span>
+            <span className="text-[10px] mt-0.5">Admin & Accounts</span>
           </button>
         )}
       </div>

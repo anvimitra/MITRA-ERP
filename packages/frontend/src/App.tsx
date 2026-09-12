@@ -189,9 +189,8 @@ export const App: React.FC = () => {
       {/* Main Content Rendered strictly based on Authenticated Role */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {user.role === 'super_admin' && <SuperAdminPortal />}
-        {user.role === 'principal' && <PrincipalPortal />}
+        {(user.role === 'principal' || user.role === 'accountant') && <PrincipalPortal userRole={user.role} />}
         {user.role === 'teacher' && <TeacherPortal user={user} />}
-        {user.role === 'accountant' && <AccountantPortal />}
         {user.role === 'parent' && <ParentPortal user={user} studentId={selectedStudentId} />}
         {user.role === 'student' && <StudentPortal user={user} />}
       </main>

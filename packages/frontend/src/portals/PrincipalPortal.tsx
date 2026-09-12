@@ -46,7 +46,7 @@ import { LibraryDesk } from '../components/LibraryDesk';
 import { TransportDesk } from '../components/TransportDesk';
 import { InventoryDesk } from '../components/InventoryDesk';
 
-export const PrincipalPortal: React.FC = () => {
+export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) => {
   // Navigation Sidebar
   const [activeTab, setActiveTab] = useState<
     | 'dashboard'
@@ -66,7 +66,7 @@ export const PrincipalPortal: React.FC = () => {
     | 'inventory'
     | 'notices'
     | 'settings'
-  >('dashboard');
+  >(userRole === 'accountant' ? 'fees' : 'dashboard');
 
   // Core Data
   const [classesData, setClassesData] = useState<any>(null);
@@ -78,6 +78,23 @@ export const PrincipalPortal: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Student search & filter
+  // Fees & Accounts Management Suite (Merged Principal & Accountant Desk)
+  const [structures, setStructures] = useState<any[]>([]);
+  const [feeSubTab, setFeeSubTab] = useState<'ledger' | 'defaulters' | 'structures'>('ledger');
+  const [feeSearch, setFeeSearch] = useState('');
+  const [showCollectModal, setShowCollectModal] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedFeeStructId, setSelectedFeeStructId] = useState('');
+  const [amountPaid, setAmountPaid] = useState('15000');
+  const [paymentMode, setPaymentMode] = useState('cash');
+  const [paymentRemarks, setPaymentRemarks] = useState('Quarter 1 Tuition Fee Paid');
+  const [showAddStructModal, setShowAddStructModal] = useState(false);
+  const [structTitle, setStructTitle] = useState('');
+  const [structAmount, setStructAmount] = useState('');
+  const [structClassId, setStructClassId] = useState('');
+  const [structDueDate, setStructDueDate] = useState('2026-10-15');
+  const [latestReceipt, setLatestReceipt] = useState<any | null>(null);
+  const [reminderStatus, setReminderStatus] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('');
 
@@ -287,13 +304,14 @@ export const PrincipalPortal: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cData, sData, stData, eData, pData, nData] = await Promise.all([
+      const [cData, sData, stData, eData, pData, nData, fData] = await Promise.all([
         ApiService.getClasses().catch(() => ({ classes: [], sections: [], subjects: [], teachers: [] })),
         ApiService.getStudents().catch(() => ({ students: [] })),
         ApiService.getTeachers().catch(() => ({ staff: [] })),
         ApiService.getExams().catch(() => ({ exams: [] })),
         ApiService.getPayments().catch(() => ({ payments: [] })),
         ApiService.getNotices().catch(() => ({ notices: [] })),
+        ApiService.getFeeStructures().catch(() => ({ structures: [] })),
       ]);
 
       setClassesData(cData);
@@ -302,6 +320,17 @@ export const PrincipalPortal: React.FC = () => {
       setExams(eData.exams || []);
       setPayments(pData.payments || []);
       setNotices(nData.notices || []);
+      setStructures(fData.structures || []);
+      if (sData.students?.length > 0) {
+        setSelectedStudentId(sData.students[0].id);
+      }
+      if (fData.structures?.length > 0) {
+        setSelectedFeeStructId(fData.structures[0].id);
+        setAmountPaid(String(fData.structures[0].amount));
+      }
+      if (cData.classes?.length > 0) {
+        setStructClassId(cData.classes[0].id);
+      }
 
       if (cData?.classes?.length > 0) {
         setCtClassId(cData.classes[0].id);
@@ -567,6 +596,85 @@ export const PrincipalPortal: React.FC = () => {
       }
     } catch (err: any) {
       alert('Report Card Generation: ' + err.message);
+    }
+  };
+
+// --- Merged Fee Handlers ---
+  const handleCollectFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentId || !selectedFeeStructId) {
+      alert('Please select both a student and a fee structure');
+      return;
+    }
+
+    if (paymentMode === 'upi') {
+      alert('⚠️ UPI / QR Payment Gateway is currently under development (Coming Soon). Please collect fee via Cash, Cheque, or Bank Transfer.');
+      return;
+    }
+
+    try {
+      const res = await ApiService.collectFee({
+        studentId: selectedStudentId,
+        feeStructureId: selectedFeeStructId,
+        amountPaid: Number(amountPaid),
+        paymentMode,
+        remarks: paymentRemarks,
+      });
+
+      const selectedStudent = students.find((s) => s.id === selectedStudentId);
+      const selectedStruct = structures.find((st) => st.id === selectedFeeStructId);
+
+      setLatestReceipt({
+        ...res.payment,
+        studentName: selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName || ''}`.trim() : 'Student',
+        admissionNo: selectedStudent?.admissionNo || 'N/A',
+        className: selectedStudent?.className || 'Class 10',
+        feeTitle: selectedStruct?.title || 'Tuition Fee',
+        paymentMode,
+        remarks: paymentRemarks,
+      });
+
+      setShowCollectModal(false);
+      alert('✅ Fee payment recorded & official receipt generated!');
+      const pRes = await ApiService.getPayments();
+      setPayments(pRes.payments || []);
+    } catch (err: any) {
+      alert('Error collecting fee: ' + err.message);
+    }
+  };
+
+  const handleCreateStructure = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!structTitle || !structAmount || !structClassId) return;
+
+    try {
+      await ApiService.createFeeStructure({
+        classId: structClassId,
+        title: structTitle,
+        amount: Number(structAmount),
+        dueDate: structDueDate,
+        academicYear: '2026-2027',
+      });
+
+      alert('✅ New Fee Head added to institutional ledger!');
+      setShowAddStructModal(false);
+      setStructTitle('');
+      setStructAmount('');
+      const fRes = await ApiService.getFeeStructures();
+      setStructures(fRes.structures || []);
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleSendReminder = async (studentId: string, name: string, dueAmount: number) => {
+    try {
+      const res = await ApiService.sendFeeReminder(studentId, dueAmount, '2026-10-15');
+      setReminderStatus(
+        `✅ Automated fee reminder sent to ${name} (${res.dispatchResult?.recipientPhone || 'App Notification'})`
+      );
+    } catch (err: any) {
+      alert('Error sending reminder: ' + err.message);
     }
   };
 
@@ -2733,6 +2841,317 @@ export const PrincipalPortal: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: COLLECT FEE ================= */}
+      {showCollectModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
+            <button
+              onClick={() => setShowCollectModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1 rounded-xl hover:bg-slate-100"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-black text-slate-900 mb-1 flex items-center gap-2">
+              <Receipt className="text-emerald-600" size={22} />
+              Collect Student Fee & Print Receipt
+            </h3>
+            <p className="text-xs text-slate-500 mb-5">
+              Record fee collection in the institutional ledger and issue official receipt.
+            </p>
+
+            <form onSubmit={handleCollectFee} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Select Student *</label>
+                <select
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.firstName} {s.lastName} ({s.admissionNo} - {s.className})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Fee Head Category *</label>
+                <select
+                  value={selectedFeeStructId}
+                  onChange={(e) => {
+                    setSelectedFeeStructId(e.target.value);
+                    const found = structures.find((st) => st.id === e.target.value);
+                    if (found) setAmountPaid(String(found.amount));
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  {structures.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.title} - ₹{Number(st.amount).toLocaleString('en-IN')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Amount Paid (INR) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-black text-base"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Payment Mode *</label>
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold uppercase"
+                  >
+                    <option value="cash">Cash Counter</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="bank_transfer">Bank Transfer / NEFT</option>
+                    <option value="dd">Demand Draft (DD)</option>
+                    <option value="upi">UPI / QR Code (Coming Soon)</option>
+                  </select>
+                </div>
+              </div>
+
+              {paymentMode === 'upi' && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold">
+                  ⚠️ UPI Payment Gateway integration is marked "Coming Soon". Please select Cash, Cheque, or Bank Transfer to complete collection.
+                </div>
+              )}
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Payment Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Paid in full with receipt voucher"
+                  value={paymentRemarks}
+                  onChange={(e) => setPaymentRemarks(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCollectModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-600/30 transition"
+                >
+                  Record & Issue Receipt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADD FEE STRUCTURE ================= */}
+      {showAddStructModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
+            <button
+              onClick={() => setShowAddStructModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1 rounded-xl hover:bg-slate-100"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-black text-slate-900 mb-1">New Fee Structure Head</h3>
+            <p className="text-xs text-slate-500 mb-5">Define an institutional fee head for a class batch.</p>
+
+            <form onSubmit={handleCreateStructure} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Fee Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Annual Composite Fee 2026-27"
+                  value={structTitle}
+                  onChange={(e) => setStructTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Amount (INR) *</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="25000"
+                    value={structAmount}
+                    onChange={(e) => setStructAmount(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-black text-base"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Target Class *</label>
+                  <select
+                    value={structClassId}
+                    onChange={(e) => setStructClassId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  >
+                    {classesData?.classes?.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Payment Due Date</label>
+                <input
+                  type="date"
+                  value={structDueDate}
+                  onChange={(e) => setStructDueDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStructModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-600/30 transition"
+                >
+                  Create Fee Head
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PRINTABLE RECEIPT ================= */}
+      {latestReceipt && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-8 shadow-2xl border border-slate-200 relative my-6">
+            <div className="no-print flex items-center justify-between border-b border-slate-200 pb-4 mb-6">
+              <span className="text-xs font-black text-emerald-700 uppercase tracking-wide flex items-center gap-1.5">
+                <CheckCircle2 size={16} /> Payment Verified & Stamped
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Printer size={14} />
+                  <span>Print Receipt</span>
+                </button>
+                <button
+                  onClick={() => setLatestReceipt(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Receipt Layout */}
+            <div className="border-2 border-slate-800 p-6 rounded-2xl font-serif text-slate-900 bg-amber-50/20">
+              <div className="text-center border-b-2 border-slate-800 pb-4 mb-4">
+                <span className="text-[10px] font-sans font-black tracking-widest text-slate-500 uppercase block">
+                  Official Institutional Fee Challan & Receipt
+                </span>
+                <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-950 font-serif mt-1">
+                  LSK ACADEMY
+                </h2>
+                <p className="text-[11px] text-slate-600 font-sans">
+                  CBSE Affiliated Senior Secondary School • Affiliation: 2130099
+                </p>
+                <p className="text-[10px] text-slate-500 font-sans">
+                  42-B, Shivaji Nagar, Bhopal, M.P. • Phone: +91 99887 76655
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 text-xs font-sans mb-4 border-b border-slate-300 pb-3 gap-y-1.5">
+                <div>
+                  <span className="text-slate-500">Receipt No:</span>{' '}
+                  <strong className="font-mono">{latestReceipt.receiptNo}</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500">Date:</span>{' '}
+                  <strong>{latestReceipt.paymentDate || new Date().toISOString().split('T')[0]}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500">Student:</span>{' '}
+                  <strong className="uppercase">{latestReceipt.studentName}</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500">Admission No:</span>{' '}
+                  <strong className="font-mono">{latestReceipt.admissionNo || 'LSK-ADM'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500">Class:</span>{' '}
+                  <strong>{latestReceipt.className || 'Standard Batch'}</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500">Payment Mode:</span>{' '}
+                  <strong className="uppercase">{latestReceipt.paymentMode || 'CASH'}</strong>
+                </div>
+              </div>
+
+              <table className="w-full text-xs font-sans border-collapse mb-4">
+                <thead>
+                  <tr className="border-b-2 border-slate-800 bg-slate-100">
+                    <th className="py-2 text-left px-2">Description</th>
+                    <th className="py-2 text-right px-2">Amount Paid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2.5 px-2 font-medium">{latestReceipt.feeTitle}</td>
+                    <td className="py-2.5 px-2 text-right font-bold">
+                      ₹{Number(latestReceipt.amountPaid).toLocaleString('en-IN')}.00
+                    </td>
+                  </tr>
+                  <tr className="border-t-2 border-slate-800 font-black text-sm bg-emerald-50/50">
+                    <td className="py-2.5 px-2">TOTAL RECEIVED</td>
+                    <td className="py-2.5 px-2 text-right text-emerald-800">
+                      ₹{Number(latestReceipt.amountPaid).toLocaleString('en-IN')}.00
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="flex justify-between items-end pt-8 font-sans text-[11px] text-slate-600">
+                <div>
+                  <p className="italic">Computer Generated Validated Counter Receipt</p>
+                  <p className="text-[10px] text-slate-400">Preserve this copy for annual tax rebate claim.</p>
+                </div>
+                <div className="text-center">
+                  <div className="border-b border-slate-800 w-36 mb-1"></div>
+                  <span className="font-bold text-slate-900">Bursar / Accounts Signatory</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

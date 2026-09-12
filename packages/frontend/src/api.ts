@@ -196,6 +196,13 @@ export class ApiService {
     return this.request<{ structures: FeeStructure[] }>('/fees/structures');
   }
 
+  static async createFeeStructure(data: { classId: string; title: string; amount: number; dueDate?: string; academicYear?: string }) {
+    return this.request<{ success: boolean; message: string; id: string }>('/fees/structures', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   static async collectFee(data: { studentId: string; feeStructureId: string; amountPaid: number; paymentMode: string; remarks?: string }) {
     return this.request<any>('/fees/collect', {
       method: 'POST',

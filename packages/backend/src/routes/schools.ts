@@ -166,8 +166,8 @@ schoolRoutes.put('/:id', async (c) => {
 
   const body = await c.req.json();
 
-  // If user is principal, restrict changing core details
-  if (user.role === 'principal') {
+  // If user is principal or accountant, restrict changing core details (Super Admin can change everything)
+  if (user.role === 'principal' || user.role === 'accountant') {
     if (user.schoolId !== schoolId) {
       return c.json({ error: 'Forbidden: Access to another school is restricted' }, 403);
     }

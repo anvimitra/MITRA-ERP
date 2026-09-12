@@ -64,6 +64,10 @@ studentRoutes.get('/', async (c) => {
       primaryPhone: p?.primaryPhone || '',
       email: p?.email || '',
       address: p?.address || '',
+      emergencyPhone: s.emergencyPhone || '',
+      medicalConditions: s.medicalConditions || '',
+      allergies: s.allergies || '',
+      category: s.category || 'General',
     };
   });
 
@@ -88,6 +92,10 @@ studentRoutes.post('/', async (c) => {
     gender,
     dob,
     bloodGroup,
+    emergencyPhone,
+    medicalConditions,
+    allergies,
+    category,
     fatherName,
     motherName,
     primaryPhone,
@@ -140,6 +148,10 @@ studentRoutes.post('/', async (c) => {
     gender: gender || 'Male',
     dob: dob || null,
     bloodGroup: bloodGroup || null,
+    emergencyPhone: emergencyPhone || null,
+    medicalConditions: medicalConditions || null,
+    allergies: allergies || null,
+    category: category || 'General',
     photoUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150`,
     isActive: 1,
   }).run();
@@ -180,6 +192,10 @@ studentRoutes.put('/:id', async (c) => {
     gender,
     dob,
     bloodGroup,
+    emergencyPhone,
+    medicalConditions,
+    allergies,
+    category,
     fatherName,
     motherName,
     primaryPhone,
@@ -199,6 +215,10 @@ studentRoutes.put('/:id', async (c) => {
       gender: gender !== undefined ? gender : existing.gender,
       dob: dob !== undefined ? dob : existing.dob,
       bloodGroup: bloodGroup !== undefined ? bloodGroup : existing.bloodGroup,
+      emergencyPhone: emergencyPhone !== undefined ? emergencyPhone : existing.emergencyPhone,
+      medicalConditions: medicalConditions !== undefined ? medicalConditions : existing.medicalConditions,
+      allergies: allergies !== undefined ? allergies : existing.allergies,
+      category: category !== undefined ? category : existing.category,
       isActive: isActive !== undefined ? isActive : existing.isActive,
     })
     .where(eq(schema.students.id, studentId))

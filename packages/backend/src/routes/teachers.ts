@@ -40,8 +40,8 @@ teacherRoutes.get('/', async (c) => {
 // POST /api/teachers - Add new teacher or staff member
 teacherRoutes.post('/', async (c) => {
   const user = getAuthUser(c);
-  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
-    return c.json({ error: 'Only Principal or Super Admin can recruit staff' }, 403);
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin' && user.role !== 'accountant')) {
+    return c.json({ error: 'Only Principal, Accountant or Super Admin can recruit staff' }, 403);
   }
 
   const body = await c.req.json();
@@ -83,8 +83,8 @@ teacherRoutes.post('/', async (c) => {
 // PUT /api/teachers/:id - Edit faculty details
 teacherRoutes.put('/:id', async (c) => {
   const user = getAuthUser(c);
-  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
-    return c.json({ error: 'Only Principal or Super Admin can edit staff' }, 403);
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin' && user.role !== 'accountant')) {
+    return c.json({ error: 'Only Principal, Accountant or Super Admin can edit staff' }, 403);
   }
 
   const staffId = c.req.param('id');
@@ -99,7 +99,7 @@ teacherRoutes.put('/:id', async (c) => {
   }
 
   const body = await c.req.json();
-  const { name, phone, role, isActive, password } = body;
+  const { name, email, phone, role, isActive, password } = body;
 
   const updates: any = {
     name: name !== undefined ? name : existing.name,
@@ -107,6 +107,14 @@ teacherRoutes.put('/:id', async (c) => {
     role: role !== undefined ? role : existing.role,
     isActive: isActive !== undefined ? isActive : existing.isActive,
   };
+
+  if (email && email !== existing.email) {
+    const conflict = db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+    if (conflict) {
+      return c.json({ error: `User with email '${email}' already exists` }, 400);
+    }
+    updates.email = email;
+  }
 
   if (password) {
     updates.passwordHash = hashPassword(password);
@@ -123,8 +131,8 @@ teacherRoutes.put('/:id', async (c) => {
 // DELETE /api/teachers/:id - Remove or deactivate staff
 teacherRoutes.delete('/:id', async (c) => {
   const user = getAuthUser(c);
-  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
-    return c.json({ error: 'Only Principal or Super Admin can remove staff' }, 403);
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin' && user.role !== 'accountant')) {
+    return c.json({ error: 'Only Principal, Accountant or Super Admin can remove staff' }, 403);
   }
 
   const staffId = c.req.param('id');

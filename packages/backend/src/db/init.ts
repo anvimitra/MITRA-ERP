@@ -1,15 +1,33 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 let globalDbInstance: DatabaseSync | null = null;
+
+export function getCanonicalDbPath(): string {
+  if (process.env.DB_PATH) return path.resolve(process.env.DB_PATH);
+  // Canonical location is inside packages/backend/data/anvimitra_dev.db
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(__dirname, '..', '..', 'data', 'anvimitra_dev.db');
+}
+
+export function checkpointDatabase(): void {
+  if (globalDbInstance) {
+    try {
+      globalDbInstance.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (e) {
+      console.error('Database checkpoint error:', e);
+    }
+  }
+}
 
 export function initializeDatabase(dbPath?: string): DatabaseSync {
   if (globalDbInstance) {
     return globalDbInstance;
   }
 
-  const targetPath = dbPath || path.resolve(process.cwd(), 'data', 'anvimitra_dev.db');
+  const targetPath = dbPath || getCanonicalDbPath();
   const parentDir = path.dirname(targetPath);
   if (!fs.existsSync(parentDir)) {
     fs.mkdirSync(parentDir, { recursive: true });
@@ -17,6 +35,18 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
 
   const sqlite = new DatabaseSync(targetPath);
   sqlite.exec('PRAGMA journal_mode = WAL;');
+  sqlite.exec('PRAGMA synchronous = NORMAL;');
+  sqlite.exec('PRAGMA busy_timeout = 5000;');
+
+  // Automatic checkpoint on shutdown to ensure data is permanently flushed to disk
+  const handleExit = () => {
+    try {
+      sqlite.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch {}
+  };
+  process.on('SIGINT', handleExit);
+  process.on('SIGTERM', handleExit);
+  process.on('exit', handleExit);
 
   // Create all Multi-Tenant ERP Tables
   sqlite.exec(`
