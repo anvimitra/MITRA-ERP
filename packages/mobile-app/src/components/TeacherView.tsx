@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { User, Student } from '../types';
-import { DEFAULT_STUDENTS_LIST, submitClassAttendance, fetchLiveStudents, fetchLiveClasses } from '../api';
-import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck, RefreshCw } from 'lucide-react';
+import { User, Student, StaffLeaveItem } from '../types';
+import { DEFAULT_STUDENTS_LIST, submitClassAttendance, fetchLiveStudents, fetchLiveClasses, fetchStaffLeaves, applyStaffLeave } from '../api';
+import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck, RefreshCw, Briefcase, Plus } from 'lucide-react';
 
 interface Props {
   teacher: User;
 }
 
 export const TeacherView: React.FC<Props> = ({ teacher }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'marks'>('attendance');
+  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'marks' | 'leaves'>('attendance');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [classList, setClassList] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -24,8 +24,18 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
   const [selectedExam, setSelectedExam] = useState('lsk-exam-sa1');
   const [selectedSubject, setSelectedSubject] = useState('Mathematics');
 
+  // Leaves state
+  const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [leaveType, setLeaveType] = useState('CASUAL');
+  const [leaveStartDate, setLeaveStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [leaveReason, setLeaveReason] = useState('');
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+
   useEffect(() => {
     loadClassData();
+    fetchStaffLeaves().then(setLeaves).catch(() => {});
   }, []);
 
   const loadClassData = async () => {
@@ -145,7 +155,15 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
             activeSubTab === 'marks' ? 'bg-white text-purple-800 shadow-sm' : 'text-slate-600'
           }`}
         >
-          Subject Marks Entry
+          Subject Marks
+        </button>
+        <button
+          onClick={() => setActiveSubTab('leaves')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+            activeSubTab === 'leaves' ? 'bg-white text-purple-800 shadow-sm' : 'text-slate-600'
+          }`}
+        >
+          Faculty Leaves
         </button>
       </div>
 
@@ -328,6 +346,163 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
             <BookOpen className="w-4 h-4" />
             <span>Save Subject Marks</span>
           </button>
+        </div>
+      )}
+
+      {/* LEAVES MODE */}
+      {activeSubTab === 'leaves' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+              <Briefcase className="w-4 h-4 text-purple-600" />
+              <span>My Leave Applications ({leaves.length})</span>
+            </h3>
+            <button
+              onClick={() => setShowApplyModal(true)}
+              className="px-3 py-1.5 bg-purple-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow flex items-center space-x-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Apply</span>
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            {leaves.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs bg-white rounded-2xl border p-4">
+                No leave requests filed yet. Tap "Apply" above to submit a leave request.
+              </div>
+            ) : (
+              leaves.map((l) => (
+                <div key={l.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-purple-100 text-purple-800">
+                      {l.leaveType} LEAVE
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                      l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
+                      l.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {l.status}
+                    </span>
+                  </div>
+                  <p className="font-bold text-slate-800">{l.startDate} to {l.endDate} ({l.totalDays} days)</p>
+                  <p className="text-slate-600 text-[11px]"><span className="text-slate-400">Reason:</span> {l.reason}</p>
+                  {l.reviewRemarks && (
+                    <p className="text-[10px] bg-slate-50 p-1.5 rounded-lg border text-slate-500 italic">
+                      <strong>Principal:</strong> {l.reviewRemarks}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: APPLY LEAVE */}
+      {showApplyModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-sm w-full bg-white rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-xs font-black uppercase text-purple-900">Apply Faculty Leave</span>
+              <button onClick={() => setShowApplyModal(false)} className="text-slate-400 p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!leaveReason.trim()) return;
+                setSubmittingLeave(true);
+                try {
+                  await applyStaffLeave({
+                    leaveType,
+                    startDate: leaveStartDate,
+                    endDate: leaveEndDate,
+                    totalDays: 1,
+                    reason: leaveReason,
+                  });
+                  setFeedback('✅ Leave application submitted to Principal!');
+                  setShowApplyModal(false);
+                  setLeaveReason('');
+                  fetchStaffLeaves().then(setLeaves).catch(() => {});
+                } catch (err: any) {
+                  alert(err.message || 'Failed to submit leave.');
+                } finally {
+                  setSubmittingLeave(false);
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Leave Type</label>
+                <select
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                >
+                  <option value="CASUAL">Casual Leave (CL)</option>
+                  <option value="SICK">Medical / Sick Leave (ML)</option>
+                  <option value="EARNED">Earned Leave (EL)</option>
+                  <option value="DUTY">Official Duty (OD)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">From</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveStartDate}
+                    onChange={(e) => setLeaveStartDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">To</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveEndDate}
+                    onChange={(e) => setLeaveEndDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Reason</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={leaveReason}
+                  onChange={(e) => setLeaveReason(e.target.value)}
+                  placeholder="State reason for absence..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowApplyModal(false)}
+                  className="px-3 py-2 text-slate-600 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingLeave}
+                  className="px-4 py-2 bg-purple-700 text-white font-bold rounded-xl shadow disabled:opacity-50"
+                >
+                  {submittingLeave ? 'Submitting...' : 'Submit Leave'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

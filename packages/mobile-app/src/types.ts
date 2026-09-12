@@ -146,3 +146,60 @@ export interface AppUpdateInfo {
   isMandatory: boolean;
   autoUpdateSupported: boolean;
 }
+
+export interface CertificateItem {
+  id: string;
+  certificateType: string;
+  certificateNo: string;
+  studentName?: string;
+  admissionNo?: string;
+  issueDate: string;
+  academicYear: string;
+  reason?: string;
+  conduct?: string;
+  status: string;
+}
+
+export interface StudentTransportItem {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  admissionNo?: string;
+  routeName: string;
+  stopName: string;
+  pickupTime: string;
+  dropTime: string;
+  vehicleNo: string;
+}
+
+export interface LibraryBookItem {
+  id: string;
+  title: string;
+  author: string;
+  subject?: string;
+  rackNumber?: string;
+  availableCopies: number;
+}
+
+export interface LibraryIssueItem {
+  id: string;
+  bookTitle?: string;
+  bookAuthor?: string;
+  issueDate: string;
+  dueDate: string;
+  fineAmount: number;
+  status: 'ISSUED' | 'RETURNED' | 'OVERDUE';
+}
+
+export interface StaffLeaveItem {
+  id: string;
+  staffUserId: string;
+  staffName?: string;
+  leaveType: 'CASUAL' | 'SICK' | 'EARNED' | 'MATERNITY' | 'DUTY';
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewRemarks?: string;
+}

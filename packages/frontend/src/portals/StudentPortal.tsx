@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
-import { TimetablePeriod, StudentLog, ReportCardData } from '../types';
+import { TimetablePeriod, StudentLog, ReportCardData, CertificateItem, StudentTransportItem, LibraryIssueItem, LibraryBookItem } from '../types';
 import { ReportCardModal } from '../components/ReportCardModal';
 import {
   GraduationCap,
@@ -22,6 +22,10 @@ import {
   Phone,
   QrCode,
   Layers,
+  Bus,
+  Download,
+  X,
+  Navigation,
 } from 'lucide-react';
 
 interface Props {
@@ -31,7 +35,9 @@ interface Props {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const StudentPortal: React.FC<Props> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'timetable' | 'attendance' | 'academics' | 'conduct' | 'notices'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'timetable' | 'attendance' | 'academics' | 'conduct' | 'notices' | 'certificates' | 'transport' | 'library'
+  >('overview');
   const [selectedDay, setSelectedDay] = useState<string>('Monday');
   const [student, setStudent] = useState<any>(null);
   const [timetable, setTimetable] = useState<TimetablePeriod[]>([]);
@@ -40,6 +46,15 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
   const [exams, setExams] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // New modules state
+  const [studentTransport, setStudentTransport] = useState<StudentTransportItem | null>(null);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [myBooks, setMyBooks] = useState<LibraryIssueItem[]>([]);
+  const [libraryCatalog, setLibraryCatalog] = useState<LibraryBookItem[]>([]);
+  const [viewCertModal, setViewCertModal] = useState<CertificateItem | null>(null);
+  const [viewAdmitCardModal, setViewAdmitCardModal] = useState<any | null>(null);
+  const [loadingAdmitCard, setLoadingAdmitCard] = useState(false);
 
   // Modals
   const [showIdCardModal, setShowIdCardModal] = useState(false);
@@ -85,6 +100,24 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
 
         const logs = await ApiService.getStudentLogs(currentStudent.id).catch(() => ({ logs: [] }));
         setStudentLogs(logs.logs || []);
+
+        // Load Transport Details
+        const tr = await ApiService.getStudentTransport(currentStudent.id).catch(() => null);
+        setStudentTransport(tr?.allocation || null);
+
+        // Load Certificates
+        const cr = await ApiService.getCertificates().catch(() => ({ certificates: [] }));
+        const myCerts = (cr.certificates || []).filter((c: any) => c.studentId === currentStudent.id);
+        setCertificates(myCerts);
+
+        // Load Library Books
+        const lr = await ApiService.getLibraryIssues().catch(() => ({ issues: [] }));
+        const myIss = (lr.issues || []).filter((i: any) => i.studentId === currentStudent.id);
+        setMyBooks(myIss);
+
+        // Load Library Catalog
+        const catRes = await ApiService.getLibraryBooks().catch(() => ({ books: [] }));
+        setLibraryCatalog(catRes.books || []);
       }
 
       const ex = await ApiService.getExams().catch(() => ({ exams: [] }));
@@ -115,6 +148,21 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
       alert('Report card not available yet: ' + err.message);
     } finally {
       setLoadingReportCard(false);
+    }
+  };
+
+  const handleViewAdmitCard = async () => {
+    if (!student?.id) return;
+    setLoadingAdmitCard(true);
+    try {
+      const res = await ApiService.getAdmitCardData(student.id);
+      if (res.admitCard) {
+        setViewAdmitCardModal(res.admitCard);
+      }
+    } catch (err: any) {
+      alert('Admit card not generated yet: ' + err.message);
+    } finally {
+      setLoadingAdmitCard(false);
     }
   };
 
@@ -214,6 +262,9 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
             { key: 'timetable', label: 'Weekly Period Matrix', icon: Calendar },
             { key: 'attendance', label: 'Attendance Meter', icon: CheckCircle2 },
             { key: 'academics', label: 'Marksheets & Exams', icon: GraduationCap },
+            { key: 'certificates', label: 'Admit Card & Certificates', icon: FileText },
+            { key: 'transport', label: 'My School Bus', icon: Bus },
+            { key: 'library', label: 'Library Books', icon: BookOpen },
             { key: 'conduct', label: 'Conduct & Honors', icon: Award },
             { key: 'notices', label: 'Circulars & Notices', icon: Bell },
           ].map((t) => {
@@ -675,6 +726,244 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
         </div>
       )}
 
+      {/* TAB 7: CERTIFICATES & ADMIT CARD */}
+      {activeTab === 'certificates' && (
+        <div className="space-y-6">
+          {/* Admit Card Highlight Card */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-200 border border-blue-400/30">
+                Official Examination Document
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black">CBSE Annual Board / Term Exam Admit Card 2026</h2>
+              <p className="text-xs text-slate-300 max-w-xl">
+                Official hall ticket containing Roll Number, Examination Center details, Subject Date Sheet, and Student Verification code.
+              </p>
+            </div>
+            <button
+              onClick={handleViewAdmitCard}
+              disabled={loadingAdmitCard}
+              className="px-6 py-3.5 bg-white text-slate-950 hover:bg-slate-100 rounded-2xl font-black text-xs shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+            >
+              <Printer size={16} className="text-blue-600" />
+              <span>{loadingAdmitCard ? 'Generating...' : 'View & Print Admit Card'}</span>
+            </button>
+          </div>
+
+          {/* Academic Certificates Registry */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="text-indigo-600" size={20} />
+                <span>Issued Academic Certificates</span>
+              </h3>
+              <p className="text-xs text-slate-500">Official certificates authenticated by Principal office</p>
+            </div>
+
+            {certificates.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-medium">
+                No official certificates issued currently. Request one at the Front Desk / Reception.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {certificates.map((cert) => (
+                  <div key={cert.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800">
+                          {cert.certificateType}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-400">{cert.issueDate}</span>
+                      </div>
+                      <h4 className="text-sm font-black text-slate-900 pt-1">
+                        Certificate No: {cert.certificateNo}
+                      </h4>
+                      <p className="text-xs text-slate-500">Academic Year: {cert.academicYear || '2026-2027'}</p>
+                      {cert.reason && (
+                        <p className="text-xs text-slate-600 italic">Purpose: {cert.reason}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setViewCertModal(cert)}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 self-start"
+                    >
+                      <Printer size={14} />
+                      <span>View Official Certificate</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: TRANSPORT */}
+      {activeTab === 'transport' && (
+        <div className="space-y-6">
+          {studentTransport ? (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <Bus size={28} />
+                  </div>
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800">
+                      Transport Active
+                    </span>
+                    <h2 className="text-xl font-black text-slate-900 mt-0.5">
+                      Bus No: {studentTransport.vehicleNo}
+                    </h2>
+                    <p className="text-xs text-slate-500">Route: {studentTransport.routeName}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-500">Bus Model:</span>
+                  <span className="text-xs font-black text-slate-800">Tata Starbus School Fleet</span>
+                </div>
+              </div>
+
+              {/* Stops and Timing Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Designated Boarding Stop</div>
+                  <div className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <MapPin size={16} className="text-rose-500" />
+                    <span>{studentTransport.stopName}</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Arrive 5 mins prior to schedule</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-1">
+                  <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Morning Pickup Schedule</div>
+                  <div className="text-xl font-black text-emerald-900 flex items-center gap-2">
+                    <Clock size={18} className="text-emerald-600" />
+                    <span>{studentTransport.pickupTime}</span>
+                  </div>
+                  <p className="text-xs text-emerald-700 font-medium">Daily Mon – Sat</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-1">
+                  <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Afternoon Drop Schedule</div>
+                  <div className="text-xl font-black text-blue-900 flex items-center gap-2">
+                    <Clock size={18} className="text-blue-600" />
+                    <span>{studentTransport.dropTime}</span>
+                  </div>
+                  <p className="text-xs text-blue-700 font-medium">Post school dismissal</p>
+                </div>
+              </div>
+
+              {/* Driver and Emergency Contact Details */}
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Assigned Driver & Helpline</div>
+                  <div className="text-base font-black flex items-center gap-2">
+                    <User size={18} />
+                    <span>Rajesh Kumar (Authorized Commercial Driver)</span>
+                  </div>
+                  <p className="text-xs text-slate-300">Commercial License Verified • Regular Vehicle Maintenance Checked</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href="tel:+919876543210"
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-2"
+                  >
+                    <Phone size={14} />
+                    <span>Call Driver (+91 98765 43210)</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center shadow-sm space-y-3">
+              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
+                <Bus size={32} />
+              </div>
+              <h3 className="text-base font-black text-slate-900">No School Bus Allocated</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                You are currently marked as a Self / Private Commuter. To enroll for School Bus Transport, please submit an application at the Front Desk Reception.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 9: LIBRARY */}
+      {activeTab === 'library' && (
+        <div className="space-y-6">
+          {/* Active Issues */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen className="text-blue-600" size={20} />
+                <span>My Borrowed Library Books</span>
+              </h3>
+              <p className="text-xs text-slate-500">Active and past books issued on your library card</p>
+            </div>
+
+            {myBooks.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-xs font-medium">
+                No library books currently issued. Browse the catalog below to borrow from the School Library.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myBooks.map((b) => (
+                  <div key={b.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        b.status === 'ISSUED' ? 'bg-blue-100 text-blue-800' :
+                        b.status === 'RETURNED' ? 'bg-emerald-100 text-emerald-800' :
+                        'bg-rose-100 text-rose-800'
+                      }`}>
+                        {b.status}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-400">Due: {b.dueDate}</span>
+                    </div>
+                    <h4 className="text-sm font-black text-slate-900">{b.bookTitle || 'Library Book'}</h4>
+                    <p className="text-xs text-slate-500">Author: {b.bookAuthor || 'NCERT / Educational Press'}</p>
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/60">
+                      <span className="text-slate-500">Issued Date: {b.issueDate}</span>
+                      {b.fineAmount > 0 && (
+                        <span className="text-rose-600 font-bold">Fine Due: ₹{b.fineAmount}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* School Library Catalog Explorer */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">School Library Catalog Explorer</h3>
+              <p className="text-xs text-slate-500">Available titles in the central reading room & reference section</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {libraryCatalog.slice(0, 9).map((book) => (
+                <div key={book.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase text-blue-600 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded">
+                      {book.subject || 'General'}
+                    </span>
+                    <span className={`text-[10px] font-bold ${book.availableCopies > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {book.availableCopies > 0 ? `${book.availableCopies} Copies Available` : 'All Issued'}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-slate-900 pt-1 line-clamp-1">{book.title}</h4>
+                  <p className="text-[11px] text-slate-500 line-clamp-1">Author: {book.author}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">Location: {book.rackNumber || 'Rack A1'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DIGITAL ID CARD MODAL */}
       {showIdCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -756,6 +1045,232 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
       {/* REPORT CARD VIEWER MODAL */}
       {activeReportCard && (
         <ReportCardModal data={activeReportCard} onClose={() => setActiveReportCard(null)} />
+      )}
+
+      {/* MODAL: OFFICIAL CBSE ADMIT CARD */}
+      {viewAdmitCardModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-3xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-300 relative my-6">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                <Printer size={16} className="text-amber-400" />
+                <span>Official CBSE Examination Admit Card</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <Printer size={14} />
+                  <span>Print Admit Card</span>
+                </button>
+                <button
+                  onClick={() => setViewAdmitCardModal(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-6 text-slate-900 font-sans print:p-0">
+              {/* Board Header */}
+              <div className="text-center border-b-2 border-slate-900 pb-4">
+                <h2 className="text-xl font-black uppercase tracking-wide">
+                  {viewAdmitCardModal.schoolName || 'DELHI PUBLIC GLOBAL ACADEMY'}
+                </h2>
+                <p className="text-xs font-bold text-slate-700">
+                  Affiliation No: {viewAdmitCardModal.schoolAffiliation || 'CBSE/AFF/1032890'} • Center Code: {viewAdmitCardModal.centerNumber || '8402'}
+                </p>
+                <div className="inline-block mt-2 px-4 py-1 bg-slate-100 border border-slate-400 rounded-lg text-xs font-black uppercase tracking-wider">
+                  {viewAdmitCardModal.examTitle || 'SECONDARY SCHOOL EXAMINATION 2026 • ADMIT CARD'}
+                </div>
+              </div>
+
+              {/* Candidate Details & Photo */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-slate-300 pb-5 text-xs">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 flex-1">
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Candidate Roll No:</span>
+                    <strong className="text-sm font-mono text-blue-900 font-black">
+                      #{viewAdmitCardModal.rollNo || student?.rollNo || '01'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Roll Code:</span>
+                    <strong className="text-xs font-mono font-black">{viewAdmitCardModal.rollCode || 'CBSE-2026-0001'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Candidate Name:</span>
+                    <strong className="text-xs uppercase font-bold">{viewAdmitCardModal.studentName || student?.firstName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Admission Number:</span>
+                    <strong className="text-xs font-mono">{viewAdmitCardModal.admissionNo || student?.admissionNo}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Father's Name:</span>
+                    <strong className="text-xs uppercase">{viewAdmitCardModal.fatherName || 'Guardian'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Class & Section:</span>
+                    <strong className="text-xs">{viewAdmitCardModal.className} - {viewAdmitCardModal.sectionName}</strong>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Examination Center:</span>
+                    <strong className="text-xs">{viewAdmitCardModal.centerName}</strong>
+                  </div>
+                </div>
+
+                <div className="w-24 h-28 border-2 border-slate-800 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center text-3xl font-black shrink-0 self-center">
+                  {student?.photoUrl ? (
+                    <img src={student.photoUrl} alt="Photo" className="w-full h-full object-cover" />
+                  ) : (
+                    '🎓'
+                  )}
+                </div>
+              </div>
+
+              {/* Subject Schedule Table */}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2">Subject Examination Schedule</h4>
+                <div className="border border-slate-300 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 font-bold border-b border-slate-300 text-[10px] uppercase">
+                      <tr>
+                        <th className="py-2.5 px-3">Sub Code</th>
+                        <th className="py-2.5 px-3">Subject Name</th>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Timing</th>
+                        <th className="py-2.5 px-3">Room</th>
+                        <th className="py-2.5 px-3 text-center">Invigilator Sign</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {viewAdmitCardModal.schedule?.map((item: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-2.5 px-3 font-mono font-bold text-blue-900">{item.subCode}</td>
+                          <td className="py-2.5 px-3 font-bold">{item.subName}</td>
+                          <td className="py-2.5 px-3 font-medium">{item.examDate}</td>
+                          <td className="py-2.5 px-3 text-slate-600">{item.examTime}</td>
+                          <td className="py-2.5 px-3 font-medium">{item.roomNo}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-300">__________</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Guidelines */}
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-950 space-y-1">
+                <strong className="block text-xs uppercase font-black text-amber-900">Important Instructions:</strong>
+                <ul className="list-disc list-inside space-y-0.5 text-[10px]">
+                  {viewAdmitCardModal.instructions?.map((inst: string, idx: number) => (
+                    <li key={idx}>{inst}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Signatures */}
+              <div className="flex items-end justify-between pt-8 text-xs font-bold">
+                <div className="text-center">
+                  <div className="border-b border-slate-800 w-40 mb-1"></div>
+                  <span className="text-[10px] uppercase text-slate-600">Candidate Signature</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-900 mx-auto mb-1">
+                    SCHOOL SEAL
+                  </div>
+                  <span className="text-[10px] uppercase text-slate-500">Official Stamp</span>
+                </div>
+                <div className="text-center">
+                  <div className="border-b border-slate-800 w-40 mb-1"></div>
+                  <span className="text-[10px] uppercase text-slate-900 font-black">Principal Signature</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: VIEW CERTIFICATE */}
+      {viewCertModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-300 relative my-6">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                <Award size={16} className="text-amber-400" />
+                <span>Official School Certificate</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <Printer size={14} />
+                  <span>Print Certificate</span>
+                </button>
+                <button
+                  onClick={() => setViewCertModal(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 sm:p-12 space-y-8 text-slate-900 font-serif border-8 border-double border-slate-200 m-4 rounded-2xl bg-gradient-to-b from-amber-50/20 to-white">
+              <div className="text-center space-y-1 border-b-2 border-slate-800 pb-4">
+                <h2 className="text-2xl font-black tracking-wider uppercase font-sans text-slate-900">
+                  {student?.schoolName || 'DELHI PUBLIC GLOBAL ACADEMY'}
+                </h2>
+                <p className="text-xs font-sans text-slate-600">CBSE Affiliation No: 1032890 • School Code: 8402</p>
+                <div className="pt-4">
+                  <h3 className="text-lg font-black uppercase tracking-widest font-sans text-indigo-900 underline decoration-2 underline-offset-8">
+                    {viewCertModal.certificateType}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-sans text-slate-500">
+                <span>Ref No: <strong className="font-mono text-slate-800">{viewCertModal.certificateNo}</strong></span>
+                <span>Date: <strong className="text-slate-800">{viewCertModal.issueDate}</strong></span>
+              </div>
+
+              <div className="text-sm leading-relaxed space-y-4 text-justify text-slate-800">
+                <p>
+                  This is to officially certify that <strong className="uppercase font-sans font-black">{student?.firstName} {student?.lastName || ''}</strong>, 
+                  son/daughter of <strong className="font-sans font-bold">{student?.fatherName || 'Guardian'}</strong>, 
+                  bearing Admission Number <strong className="font-mono font-bold">{student?.admissionNo}</strong> and Roll Number <strong className="font-bold">#{student?.rollNo || '01'}</strong>, 
+                  is a bona fide student of Class <strong className="font-sans font-bold">{student?.className || '10'} - Section {student?.sectionName || 'A'}</strong> in this institution for the Academic Session <strong className="font-sans font-bold">{viewCertModal.academicYear || '2026-2027'}</strong>.
+                </p>
+                <p>
+                  According to institutional records, his/her general conduct and moral character have been found to be <strong className="font-sans font-bold uppercase">{viewCertModal.conduct || 'Good'}</strong>.
+                </p>
+                {viewCertModal.reason && (
+                  <p className="italic text-xs text-slate-600">
+                    This certificate is granted for the purpose of: {viewCertModal.reason}.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-end justify-between pt-12 text-xs font-sans font-bold">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-400 flex items-center justify-center text-[9px] text-slate-400 mx-auto mb-1">
+                    SEAL
+                  </div>
+                  <span className="text-[10px] text-slate-500 uppercase">Institutional Seal</span>
+                </div>
+
+                <div className="text-center">
+                  <div className="border-b border-slate-800 w-44 mb-1"></div>
+                  <span className="text-xs uppercase text-slate-900 font-black">Principal Signature</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -250,6 +250,198 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       notify_parent INTEGER DEFAULT 1,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS certificates (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      certificate_type TEXT NOT NULL,
+      certificate_no TEXT NOT NULL UNIQUE,
+      issue_date TEXT NOT NULL,
+      academic_year TEXT NOT NULL,
+      reason TEXT,
+      conduct TEXT,
+      extra_fields TEXT,
+      status TEXT DEFAULT 'ISSUED',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS front_desk_visitors (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      visitor_name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      whom_to_meet TEXT NOT NULL,
+      id_card_type TEXT,
+      id_card_no TEXT,
+      check_in TEXT NOT NULL,
+      check_out TEXT,
+      badge_number TEXT,
+      status TEXT DEFAULT 'IN',
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS front_desk_inquiries (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_name TEXT NOT NULL,
+      parent_name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT,
+      class_seeking TEXT NOT NULL,
+      source TEXT,
+      status TEXT DEFAULT 'NEW',
+      follow_up_date TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS front_desk_postal_complaints (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      reference_no TEXT,
+      from_name TEXT,
+      to_name TEXT,
+      contact_phone TEXT,
+      description TEXT,
+      action_taken TEXT,
+      status TEXT DEFAULT 'PENDING',
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_leaves (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      staff_user_id TEXT NOT NULL,
+      leave_type TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      total_days REAL NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT DEFAULT 'PENDING',
+      reviewed_by_user_id TEXT,
+      review_remarks TEXT,
+      applied_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_payroll (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      staff_user_id TEXT NOT NULL,
+      month_year TEXT NOT NULL,
+      basic_salary REAL NOT NULL,
+      hra REAL DEFAULT 0,
+      da REAL DEFAULT 0,
+      special_allowance REAL DEFAULT 0,
+      deduction_pf REAL DEFAULT 0,
+      deduction_tax REAL DEFAULT 0,
+      deduction_leave REAL DEFAULT 0,
+      net_salary REAL NOT NULL,
+      payment_status TEXT DEFAULT 'PAID',
+      payment_date TEXT,
+      payment_mode TEXT DEFAULT 'BANK_TRANSFER',
+      slip_no TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS library_books (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      isbn TEXT,
+      title TEXT NOT NULL,
+      author TEXT NOT NULL,
+      publisher TEXT,
+      subject TEXT,
+      rack_number TEXT,
+      total_copies INTEGER NOT NULL DEFAULT 1,
+      available_copies INTEGER NOT NULL DEFAULT 1,
+      price REAL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS library_issues (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      book_id TEXT NOT NULL,
+      student_id TEXT,
+      staff_user_id TEXT,
+      issue_date TEXT NOT NULL,
+      due_date TEXT NOT NULL,
+      return_date TEXT,
+      fine_amount REAL DEFAULT 0,
+      status TEXT DEFAULT 'ISSUED',
+      issued_by_user_id TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS transport_vehicles (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      vehicle_no TEXT NOT NULL,
+      vehicle_model TEXT,
+      seating_capacity INTEGER NOT NULL DEFAULT 40,
+      driver_name TEXT NOT NULL,
+      driver_phone TEXT NOT NULL,
+      driver_license TEXT,
+      status TEXT DEFAULT 'ACTIVE'
+    );
+
+    CREATE TABLE IF NOT EXISTS transport_routes (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      route_name TEXT NOT NULL,
+      start_location TEXT NOT NULL,
+      end_location TEXT NOT NULL,
+      vehicle_id TEXT,
+      monthly_fare REAL NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS transport_stops (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      route_id TEXT NOT NULL,
+      stop_name TEXT NOT NULL,
+      pickup_time TEXT NOT NULL,
+      drop_time TEXT NOT NULL,
+      sequence_order INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS student_transport (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      route_id TEXT NOT NULL,
+      stop_id TEXT NOT NULL,
+      academic_year TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_items (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'PCS',
+      current_quantity INTEGER NOT NULL DEFAULT 0,
+      minimum_alert_quantity INTEGER DEFAULT 5
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_transactions (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      transaction_type TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price REAL,
+      supplier_or_recipient TEXT NOT NULL,
+      invoice_or_slip_no TEXT,
+      date TEXT NOT NULL,
+      notes TEXT,
+      created_by_user_id TEXT NOT NULL
+    );
   `);
 
   // Auto-migrate school profile columns if upgrading an existing SQLite DB

@@ -1272,6 +1272,574 @@ export async function seedDatabase() {
     },
   ]).onConflictDoNothing().run();
 
+  // 15. Certificates Engine (Transfer Certificates, Bonafide, Character, Admit Cards)
+  db.insert(schema.certificates).values([
+    {
+      id: 'cert-dps-tc-01',
+      schoolId: dpsId,
+      studentId: stuAaravId,
+      certificateType: 'TRANSFER_CERTIFICATE',
+      certificateNo: 'TC-2026-1042',
+      issueDate: '2026-08-15',
+      academicYear: '2026-2027',
+      reason: 'Parent transfer to Mumbai Maharashtra',
+      conduct: 'Exemplary',
+      extraFields: JSON.stringify({
+        leavingClass: 'Class 10-A',
+        duesCleared: 'Yes, All dues paid up to August 2026',
+        promotedToNext: 'Promoted to Class 11',
+        totalWorkingDays: 180,
+        attendedDays: 168,
+        gamesPlayed: 'Basketball Sub-Junior Captain',
+      }),
+      status: 'ISSUED',
+      createdAt: now,
+    },
+    {
+      id: 'cert-dps-bon-01',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      certificateType: 'BONAFIDE_CERTIFICATE',
+      certificateNo: 'BON-2026-2089',
+      issueDate: '2026-09-01',
+      academicYear: '2026-2027',
+      reason: 'Passport and Visa Application',
+      conduct: 'Good',
+      extraFields: JSON.stringify({
+        purpose: 'International Passport renewal documentation',
+        validTill: '2027-03-31',
+      }),
+      status: 'ISSUED',
+      createdAt: now,
+    },
+    {
+      id: 'cert-dps-adm-01',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      certificateType: 'ADMIT_CARD',
+      certificateNo: 'ADM-2026-9012',
+      issueDate: '2026-09-10',
+      academicYear: '2026-2027',
+      reason: 'Mid-Term Examination 2026-27',
+      conduct: 'Eligible',
+      extraFields: JSON.stringify({
+        examName: 'Mid-Term Board Preparatory Examination',
+        examCenter: 'Hall A, Main Academic Block, DPS RK Puram',
+        reportingTime: '08:15 AM',
+        schedule: [
+          { date: '2026-09-20', subject: 'Mathematics (101)', timing: '09:00 AM - 12:00 PM' },
+          { date: '2026-09-22', subject: 'Science & Tech (102)', timing: '09:00 AM - 12:00 PM' },
+          { date: '2026-09-24', subject: 'English Language (103)', timing: '09:00 AM - 12:00 PM' },
+          { date: '2026-09-26', subject: 'Social Sciences (104)', timing: '09:00 AM - 12:00 PM' },
+        ],
+      }),
+      status: 'ISSUED',
+      createdAt: now,
+    },
+    {
+      id: 'cert-dps-cc-01',
+      schoolId: dpsId,
+      studentId: stuPriyaId,
+      certificateType: 'CHARACTER_CERTIFICATE',
+      certificateNo: 'CC-2026-3041',
+      issueDate: '2026-09-05',
+      academicYear: '2026-2027',
+      reason: 'National Cadet Corps (NCC) Enrolment',
+      conduct: 'Very Good and Disciplined',
+      extraFields: JSON.stringify({
+        generalBehavior: 'Courteous, cooperative, and enthusiastic participant in school clubs.',
+      }),
+      status: 'ISSUED',
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  // 16. Front Desk & Reception (Visitors, Inquiries, Postal & Complaints)
+  db.insert(schema.frontDeskVisitors).values([
+    {
+      id: 'vis-dps-01',
+      schoolId: dpsId,
+      visitorName: 'Mr. Arvind Saxena',
+      phone: '+91 98111 22334',
+      purpose: 'Admission Inquiry for Class 9',
+      whomToMeet: 'Vice Principal / Admissions Desk',
+      idCardType: 'Aadhaar Card',
+      idCardNo: '4532 8901 2341',
+      checkIn: '09:30 AM',
+      checkOut: '10:45 AM',
+      badgeNumber: 'PASS-101',
+      status: 'OUT',
+      date: '2026-09-11',
+      createdAt: now,
+    },
+    {
+      id: 'vis-dps-02',
+      schoolId: dpsId,
+      visitorName: 'Mrs. Kavita Reddy',
+      phone: '+91 98222 33445',
+      purpose: 'Meeting Class Teacher regarding bus stop change',
+      whomToMeet: 'Mr. Rajesh Sharma (Class Teacher 10-A)',
+      idCardType: 'Driving License',
+      idCardNo: 'DL-04-2018-99231',
+      checkIn: '11:15 AM',
+      checkOut: '',
+      badgeNumber: 'PASS-102',
+      status: 'IN',
+      date: '2026-09-12',
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  db.insert(schema.frontDeskInquiries).values([
+    {
+      id: 'inq-dps-01',
+      schoolId: dpsId,
+      studentName: 'Aarav Saxena',
+      parentName: 'Mr. Arvind Saxena',
+      phone: '+91 98111 22334',
+      email: 'arvind.saxena@outlook.com',
+      classSeeking: 'Class 9',
+      source: 'Walk-in',
+      status: 'IN_PROGRESS',
+      followUpDate: '2026-09-15',
+      notes: 'Parent visited campus; impressed with Robotics lab. Entrance test scheduled for Sept 18.',
+      createdAt: now,
+    },
+    {
+      id: 'inq-dps-02',
+      schoolId: dpsId,
+      studentName: 'Meera Kapoor',
+      parentName: 'Col. Vikram Kapoor',
+      phone: '+91 98777 66554',
+      email: 'v.kapoor@army.mil.in',
+      classSeeking: 'Class 11 (Science PCM)',
+      source: 'Online Website',
+      status: 'NEW',
+      followUpDate: '2026-09-14',
+      notes: 'Transfer from Army Public School Pune. Scored 94% in Class 10 CBSE.',
+      createdAt: now,
+    },
+    {
+      id: 'inq-dps-03',
+      schoolId: dpsId,
+      studentName: 'Kabir Singhania',
+      parentName: 'Mrs. Neha Singhania',
+      phone: '+91 98999 11223',
+      email: 'neha.s@singhania.com',
+      classSeeking: 'Class 6',
+      source: 'Referral',
+      status: 'CONVERTED',
+      followUpDate: '2026-09-10',
+      notes: 'Admission form submitted, fees paid, enrolled into Section 6-B.',
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  db.insert(schema.frontDeskPostalComplaints).values([
+    {
+      id: 'post-dps-01',
+      schoolId: dpsId,
+      type: 'POSTAL_RECEIVE',
+      title: 'CBSE Examination Circular & Registration Dossier',
+      referenceNo: 'CBSE/RO/DEL/2026/8941',
+      fromName: 'CBSE Regional Office Patparganj',
+      toName: 'The Principal, DPS RK Puram',
+      contactPhone: '011-22233344',
+      description: 'Official dispatch containing revised list of examination dates and OMR guidelines.',
+      actionTaken: 'Handed over to Exam Incharge Mr. Verma',
+      status: 'RECEIVED',
+      date: '2026-09-08',
+      createdAt: now,
+    },
+    {
+      id: 'post-dps-02',
+      schoolId: dpsId,
+      type: 'COMPLAINT',
+      title: 'Bus Route 4 Delayed by 25 Minutes at Moti Bagh',
+      referenceNo: 'CMP-2026-042',
+      fromName: 'Parent of Class 8 Student (Mr. N. Khurana)',
+      toName: 'Transport Supervisor',
+      contactPhone: '+91 98101 22998',
+      description: 'Morning pickup bus arrived at 07:45 AM instead of scheduled 07:20 AM due to puncture.',
+      actionTaken: 'Transport manager contacted driver, backup vehicle deployed for evening drop.',
+      status: 'RESOLVED',
+      date: '2026-09-09',
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  // 17. Staff HR & Payroll (Leaves & Monthly Salary Slips)
+  db.insert(schema.staffLeaves).values([
+    {
+      id: 'leave-dps-sharma-01',
+      schoolId: dpsId,
+      staffUserId: teacher1Id,
+      leaveType: 'CASUAL',
+      startDate: '2026-09-18',
+      endDate: '2026-09-19',
+      totalDays: 2,
+      reason: 'Attending family wedding ceremony in Jaipur',
+      status: 'APPROVED',
+      reviewedByUserId: principalId,
+      reviewRemarks: 'Approved. Arrangement lectures handed over to Mrs. Sunita.',
+      appliedAt: '2026-09-08T10:00:00.000Z',
+    },
+    {
+      id: 'leave-dps-verma-01',
+      schoolId: dpsId,
+      staffUserId: teacher2Id,
+      leaveType: 'SICK',
+      startDate: '2026-09-21',
+      endDate: '2026-09-22',
+      totalDays: 2,
+      reason: 'Viral fever and medical consultation',
+      status: 'PENDING',
+      reviewedByUserId: null,
+      reviewRemarks: null,
+      appliedAt: '2026-09-11T14:30:00.000Z',
+    },
+  ]).onConflictDoNothing().run();
+
+  db.insert(schema.staffPayroll).values([
+    {
+      id: 'slip-dps-sharma-aug26',
+      schoolId: dpsId,
+      staffUserId: teacher1Id,
+      monthYear: '2026-08',
+      basicSalary: 45000,
+      hra: 18000,
+      da: 9000,
+      specialAllowance: 5000,
+      deductionPf: 5400,
+      deductionTax: 2500,
+      deductionLeave: 0,
+      netSalary: 69100,
+      paymentStatus: 'PAID',
+      paymentDate: '2026-08-31',
+      paymentMode: 'BANK_TRANSFER',
+      slipNo: 'PAY-202608-101',
+      createdAt: now,
+    },
+    {
+      id: 'slip-dps-verma-aug26',
+      schoolId: dpsId,
+      staffUserId: teacher2Id,
+      monthYear: '2026-08',
+      basicSalary: 42000,
+      hra: 16800,
+      da: 8400,
+      specialAllowance: 4500,
+      deductionPf: 5040,
+      deductionTax: 2000,
+      deductionLeave: 0,
+      netSalary: 64660,
+      paymentStatus: 'PAID',
+      paymentDate: '2026-08-31',
+      paymentMode: 'BANK_TRANSFER',
+      slipNo: 'PAY-202608-102',
+      createdAt: now,
+    },
+    {
+      id: 'slip-dps-accountant-aug26',
+      schoolId: dpsId,
+      staffUserId: staffId,
+      monthYear: '2026-08',
+      basicSalary: 38000,
+      hra: 15200,
+      da: 7600,
+      specialAllowance: 3500,
+      deductionPf: 4560,
+      deductionTax: 1800,
+      deductionLeave: 0,
+      netSalary: 57940,
+      paymentStatus: 'PAID',
+      paymentDate: '2026-08-31',
+      paymentMode: 'BANK_TRANSFER',
+      slipNo: 'PAY-202608-103',
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  // 18. Library Management (Books Catalog & Issue/Return Tracking)
+  const book1Id = 'book-ncert-phy-10';
+  const book2Id = 'book-rd-math-10';
+  const book3Id = 'book-wings-of-fire';
+  const book4Id = 'book-oxford-dict';
+
+  db.insert(schema.libraryBooks).values([
+    {
+      id: book1Id,
+      schoolId: dpsId,
+      isbn: '978-81-7450-492-0',
+      title: 'Science & Physics Class 10 (NCERT)',
+      author: 'NCERT Curriculum Council',
+      publisher: 'National Council of Educational Research',
+      subject: 'Physics & Science',
+      rackNumber: 'Rack-B4',
+      totalCopies: 25,
+      availableCopies: 23,
+      price: 240,
+      createdAt: now,
+    },
+    {
+      id: book2Id,
+      schoolId: dpsId,
+      isbn: '978-93-8959-102-1',
+      title: 'Mathematics for Class 10 with Advanced Problems',
+      author: 'Dr. R.D. Sharma',
+      publisher: 'Dhanpat Rai Publications',
+      subject: 'Mathematics',
+      rackNumber: 'Rack-A2',
+      totalCopies: 30,
+      availableCopies: 28,
+      price: 650,
+      createdAt: now,
+    },
+    {
+      id: book3Id,
+      schoolId: dpsId,
+      isbn: '978-81-7371-146-6',
+      title: 'Wings of Fire: An Autobiography',
+      author: 'Dr. A.P.J. Abdul Kalam & Arun Tiwari',
+      publisher: 'Universities Press',
+      subject: 'General Literature / Biography',
+      rackNumber: 'Rack-Lit-1',
+      totalCopies: 15,
+      availableCopies: 14,
+      price: 395,
+      createdAt: now,
+    },
+    {
+      id: book4Id,
+      schoolId: dpsId,
+      isbn: '978-01-9957-112-3',
+      title: 'Oxford Advanced Learner\'s English Dictionary 10th Ed',
+      author: 'A.S. Hornby',
+      publisher: 'Oxford University Press',
+      subject: 'English Language Reference',
+      rackNumber: 'Ref-Desk-1',
+      totalCopies: 10,
+      availableCopies: 10,
+      price: 890,
+      createdAt: now,
+    },
+  ]).onConflictDoNothing().run();
+
+  db.insert(schema.libraryIssues).values([
+    {
+      id: 'iss-dps-rahul-01',
+      schoolId: dpsId,
+      bookId: book3Id,
+      studentId: stuRahulId,
+      staffUserId: null,
+      issueDate: '2026-09-01',
+      dueDate: '2026-09-15',
+      returnDate: null,
+      fineAmount: 0,
+      status: 'ISSUED',
+      issuedByUserId: teacher1Id,
+    },
+    {
+      id: 'iss-dps-priya-01',
+      schoolId: dpsId,
+      bookId: book1Id,
+      studentId: stuPriyaId,
+      staffUserId: null,
+      issueDate: '2026-08-20',
+      dueDate: '2026-09-03',
+      returnDate: '2026-09-02',
+      fineAmount: 0,
+      status: 'RETURNED',
+      issuedByUserId: teacher1Id,
+    },
+  ]).onConflictDoNothing().run();
+
+  // 19. Transport Fleet & Routes
+  const veh1Id = 'veh-dps-bus-01';
+  const veh2Id = 'veh-dps-bus-02';
+
+  db.insert(schema.transportVehicles).values([
+    {
+      id: veh1Id,
+      schoolId: dpsId,
+      vehicleNo: 'DL-1PB-4521',
+      vehicleModel: 'Tata Starbus 42-Seater (AC)',
+      seatingCapacity: 42,
+      driverName: 'Mr. Jagdish Prasad',
+      driverPhone: '+91 98112 34567',
+      driverLicense: 'DL-03-2015-88124',
+      status: 'ACTIVE',
+    },
+    {
+      id: veh2Id,
+      schoolId: dpsId,
+      vehicleNo: 'DL-1PB-8944',
+      vehicleModel: 'Eicher Skyline 35-Seater',
+      seatingCapacity: 35,
+      driverName: 'Mr. Sukhvinder Singh',
+      driverPhone: '+91 98223 45678',
+      driverLicense: 'DL-07-2017-43219',
+      status: 'ACTIVE',
+    },
+  ]).onConflictDoNothing().run();
+
+  const route1Id = 'route-dps-01';
+  const route2Id = 'route-dps-02';
+
+  db.insert(schema.transportRoutes).values([
+    {
+      id: route1Id,
+      schoolId: dpsId,
+      routeName: 'Route 1: Vasant Kunj - Munirka - RK Puram',
+      startLocation: 'Vasant Kunj C-Block',
+      endLocation: 'DPS Sector 12 RK Puram',
+      vehicleId: veh1Id,
+      monthlyFare: 2200,
+    },
+    {
+      id: route2Id,
+      schoolId: dpsId,
+      routeName: 'Route 2: Hauz Khas - Green Park - Safdarjung',
+      startLocation: 'Hauz Khas Metro Station',
+      endLocation: 'DPS Sector 12 RK Puram',
+      vehicleId: veh2Id,
+      monthlyFare: 2400,
+    },
+  ]).onConflictDoNothing().run();
+
+  const stop1Id = 'stop-vk-cblock';
+  const stop2Id = 'stop-munirka-flyover';
+  const stop3Id = 'stop-rkp-sec8';
+
+  db.insert(schema.transportStops).values([
+    {
+      id: stop1Id,
+      schoolId: dpsId,
+      routeId: route1Id,
+      stopName: 'Vasant Kunj C-Block Gate 2',
+      pickupTime: '07:15 AM',
+      dropTime: '02:40 PM',
+      sequenceOrder: 1,
+    },
+    {
+      id: stop2Id,
+      schoolId: dpsId,
+      routeId: route1Id,
+      stopName: 'Munirka Flyover Bus Bay',
+      pickupTime: '07:30 AM',
+      dropTime: '02:25 PM',
+      sequenceOrder: 2,
+    },
+    {
+      id: stop3Id,
+      schoolId: dpsId,
+      routeId: route1Id,
+      stopName: 'RK Puram Sector 8 Market',
+      pickupTime: '07:42 AM',
+      dropTime: '02:15 PM',
+      sequenceOrder: 3,
+    },
+  ]).onConflictDoNothing().run();
+
+  // Student transport allocation: Rahul Verma -> Route 1, Stop 2 (Munirka)
+  db.insert(schema.studentTransport).values([
+    {
+      id: 'alloc-dps-rahul-bus',
+      schoolId: dpsId,
+      studentId: stuRahulId,
+      routeId: route1Id,
+      stopId: stop2Id,
+      academicYear: '2026-2027',
+    },
+  ]).onConflictDoNothing().run();
+
+  // 20. Stock & Inventory Management
+  const item1Id = 'inv-dps-diary';
+  const item2Id = 'inv-dps-tie';
+  const item3Id = 'inv-dps-lab-beaker';
+  const item4Id = 'inv-dps-markers';
+
+  db.insert(schema.inventoryItems).values([
+    {
+      id: item1Id,
+      schoolId: dpsId,
+      name: 'Official Student School Almanac & Diary 2026-27',
+      category: 'STATIONERY',
+      unit: 'PCS',
+      currentQuantity: 340,
+      minimumAlertQuantity: 50,
+    },
+    {
+      id: item2Id,
+      schoolId: dpsId,
+      name: 'Senior House Necktie (Blue / Gold Striped)',
+      category: 'UNIFORMS',
+      unit: 'PCS',
+      currentQuantity: 85,
+      minimumAlertQuantity: 20,
+    },
+    {
+      id: item3Id,
+      schoolId: dpsId,
+      name: 'Borosilicate Glass Beaker 250ml (Chemistry Lab)',
+      category: 'LAB_EQUIPMENT',
+      unit: 'PCS',
+      currentQuantity: 4, // Trigger low-stock alert!
+      minimumAlertQuantity: 10,
+    },
+    {
+      id: item4Id,
+      schoolId: dpsId,
+      name: 'Whiteboard Dry-Erase Markers (Pack of 12)',
+      category: 'STATIONERY',
+      unit: 'BOX',
+      currentQuantity: 18,
+      minimumAlertQuantity: 5,
+    },
+  ]).onConflictDoNothing().run();
+
+  db.insert(schema.inventoryTransactions).values([
+    {
+      id: 'inv-tx-dps-01',
+      schoolId: dpsId,
+      itemId: item1Id,
+      transactionType: 'INWARD',
+      quantity: 500,
+      unitPrice: 65,
+      supplierOrRecipient: 'Prabhat Stationery Mart & Printers',
+      invoiceOrSlipNo: 'INV-PSM-4491',
+      date: '2026-07-20',
+      notes: 'Annual batch print for session 2026-27',
+      createdByUserId: staffId,
+    },
+    {
+      id: 'inv-tx-dps-02',
+      schoolId: dpsId,
+      itemId: item1Id,
+      transactionType: 'OUTWARD',
+      quantity: 160,
+      unitPrice: 65,
+      supplierOrRecipient: 'Class 10 & 11 Orientation Desk',
+      invoiceOrSlipNo: 'ISSUE-ORI-01',
+      date: '2026-08-01',
+      notes: 'Dispatched to admitted batch during registration',
+      createdByUserId: staffId,
+    },
+    {
+      id: 'inv-tx-dps-03',
+      schoolId: dpsId,
+      itemId: item3Id,
+      transactionType: 'OUTWARD',
+      quantity: 16,
+      unitPrice: 120,
+      supplierOrRecipient: 'Chemistry Lab Senior Wing',
+      invoiceOrSlipNo: 'ISSUE-CHEM-04',
+      date: '2026-09-04',
+      notes: 'Issued to Lab Assistant for titration experiments (current stock low)',
+      createdByUserId: staffId,
+    },
+  ]).onConflictDoNothing().run();
+
   console.log('✅ Seed completed successfully! Demo accounts ready:');
   console.log('  1. Super Admin: superadmin@anvimitra.com / admin123');
   console.log('  2. Principal (DPS): principal@dps.edu / principal123');

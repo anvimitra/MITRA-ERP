@@ -92,6 +92,19 @@ syncRoutes.post('/pull', async (c) => {
   const schoolFeePayments = db.select().from(schema.feePayments).where(eq(schema.feePayments.schoolId, schoolId)).all();
   const schoolTimetable = db.select().from(schema.timetablePeriods).where(eq(schema.timetablePeriods.schoolId, schoolId)).all();
   const schoolStudentLogs = db.select().from(schema.studentLogs).where(eq(schema.studentLogs.schoolId, schoolId)).all();
+  const schoolCertificates = db.select().from(schema.certificates).where(eq(schema.certificates.schoolId, schoolId)).all();
+  const schoolVisitors = db.select().from(schema.frontDeskVisitors).where(eq(schema.frontDeskVisitors.schoolId, schoolId)).all();
+  const schoolInquiries = db.select().from(schema.frontDeskInquiries).where(eq(schema.frontDeskInquiries.schoolId, schoolId)).all();
+  const schoolLeaves = db.select().from(schema.staffLeaves).where(eq(schema.staffLeaves.schoolId, schoolId)).all();
+  const schoolPayroll = db.select().from(schema.staffPayroll).where(eq(schema.staffPayroll.schoolId, schoolId)).all();
+  const schoolBooks = db.select().from(schema.libraryBooks).where(eq(schema.libraryBooks.schoolId, schoolId)).all();
+  const schoolIssues = db.select().from(schema.libraryIssues).where(eq(schema.libraryIssues.schoolId, schoolId)).all();
+  const schoolVehicles = db.select().from(schema.transportVehicles).where(eq(schema.transportVehicles.schoolId, schoolId)).all();
+  const schoolTransportRoutes = db.select().from(schema.transportRoutes).where(eq(schema.transportRoutes.schoolId, schoolId)).all();
+  const schoolTransportStops = db.select().from(schema.transportStops).where(eq(schema.transportStops.schoolId, schoolId)).all();
+  const schoolStudentTransport = db.select().from(schema.studentTransport).where(eq(schema.studentTransport.schoolId, schoolId)).all();
+  const schoolInventoryItems = db.select().from(schema.inventoryItems).where(eq(schema.inventoryItems.schoolId, schoolId)).all();
+  const schoolInventoryTransactions = db.select().from(schema.inventoryTransactions).where(eq(schema.inventoryTransactions.schoolId, schoolId)).all();
 
   const totalRecords =
     schoolClasses.length +
@@ -103,7 +116,17 @@ syncRoutes.post('/pull', async (c) => {
     schoolMarks.length +
     schoolFeePayments.length +
     schoolTimetable.length +
-    schoolStudentLogs.length;
+    schoolStudentLogs.length +
+    schoolCertificates.length +
+    schoolVisitors.length +
+    schoolInquiries.length +
+    schoolLeaves.length +
+    schoolPayroll.length +
+    schoolBooks.length +
+    schoolIssues.length +
+    schoolVehicles.length +
+    schoolTransportRoutes.length +
+    schoolInventoryItems.length;
 
   const now = new Date().toISOString();
 
@@ -145,6 +168,19 @@ syncRoutes.post('/pull', async (c) => {
       feePayments: schoolFeePayments,
       timetable: schoolTimetable,
       studentLogs: schoolStudentLogs,
+      certificates: schoolCertificates,
+      visitors: schoolVisitors,
+      inquiries: schoolInquiries,
+      leaves: schoolLeaves,
+      payroll: schoolPayroll,
+      books: schoolBooks,
+      libraryIssues: schoolIssues,
+      vehicles: schoolVehicles,
+      routes: schoolTransportRoutes,
+      stops: schoolTransportStops,
+      studentTransport: schoolStudentTransport,
+      inventoryItems: schoolInventoryItems,
+      inventoryTransactions: schoolInventoryTransactions,
     },
   });
 });

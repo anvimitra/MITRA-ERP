@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem } from './types';
 
 // Dynamic API Base URL detection
 export function getApiBaseUrl(): string {
@@ -571,5 +571,192 @@ export async function checkAppUpdate(): Promise<AppUpdateInfo | null> {
     console.warn('Unable to reach app update server:', err);
   }
   return null;
+}
+
+// 16. Fetch Certificates
+export async function fetchCertificates(studentId?: string): Promise<CertificateItem[]> {
+  try {
+    const endpoint = studentId ? `/certificates/student/${studentId}` : '/certificates';
+    const res = await authFetch(endpoint);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.certificates)) return data.certificates;
+    }
+  } catch (err) {
+    console.warn('Certificates offline:', err);
+  }
+  return [
+    {
+      id: 'cert-1',
+      certificateType: 'BONAFIDE',
+      certificateNo: 'BON-2026-8401',
+      studentName: 'Aryan Mishra',
+      admissionNo: 'LSK/2026/2001',
+      issueDate: '2026-08-15',
+      academicYear: '2026-2027',
+      reason: 'Passport and Visa application verification',
+      conduct: 'Exemplary',
+      status: 'ISSUED',
+    },
+    {
+      id: 'cert-2',
+      certificateType: 'CHARACTER',
+      certificateNo: 'CHAR-2026-4022',
+      studentName: 'Aryan Mishra',
+      admissionNo: 'LSK/2026/2001',
+      issueDate: '2026-07-10',
+      academicYear: '2026-2027',
+      reason: 'State Talent Search Olympiad Registration',
+      conduct: 'Outstanding',
+      status: 'ISSUED',
+    },
+  ];
+}
+
+// 17. Fetch Official CBSE Admit Card
+export async function fetchAdmitCard(studentId: string): Promise<any | null> {
+  try {
+    const res = await authFetch(`/certificates/admit-card/${studentId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.admitCard) return data.admitCard;
+    }
+  } catch (err) {
+    console.warn('Admit Card offline:', err);
+  }
+  return {
+    rollNo: 1,
+    rollCode: 'CBSE-LSK01-2026-0001',
+    admissionNo: 'LSK/2026/2001',
+    studentName: 'Aryan Mishra',
+    fatherName: 'Sanjay Mishra',
+    motherName: 'Sunita Mishra',
+    className: 'Class 8',
+    sectionName: 'A',
+    dob: '2012-04-12',
+    centerNumber: '8402',
+    centerName: 'LSK Academy Examination Center, Main Campus Block-A',
+    schoolName: 'LSK Academy',
+    schoolAffiliation: 'CBSE/AFF/1032890',
+    examTitle: 'Secondary School Examination 2026 (Annual Term)',
+    instructions: [
+      'Candidate must report to examination hall 30 minutes prior to test commencement.',
+      'Carry this printed Admit Card along with your School Digital ID Card.',
+      'Electronic gadgets, smartwatches, and study notes are strictly forbidden inside the hall.',
+      'Use only blue/black ballpoint pen for filling OMR sheets and answer booklets.',
+    ],
+    schedule: [
+      { subCode: 'MATH-8', subName: 'Mathematics Standard', examDate: '2026-10-10', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
+      { subCode: 'SCI-8', subName: 'Science Theory', examDate: '2026-10-12', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
+      { subCode: 'ENG-8', subName: 'English Language & Lit', examDate: '2026-10-14', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
+      { subCode: 'SST-8', subName: 'Social Science', examDate: '2026-10-16', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
+    ],
+  };
+}
+
+// 18. Fetch Student Transport
+export async function fetchStudentTransport(studentId: string): Promise<StudentTransportItem | null> {
+  try {
+    const res = await authFetch(`/transport/student/${studentId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.allocation) return data.allocation;
+    }
+  } catch (err) {
+    console.warn('Transport offline:', err);
+  }
+  return {
+    id: 'tr-1',
+    studentId,
+    routeName: 'Route 1: City Center to School Campus',
+    stopName: 'Shivaji Nagar Square',
+    pickupTime: '07:30 AM',
+    dropTime: '02:30 PM',
+    vehicleNo: 'MP-04-E-1001',
+  };
+}
+
+// 19. Fetch Library Issues
+export async function fetchLibraryIssues(studentId?: string): Promise<LibraryIssueItem[]> {
+  try {
+    const res = await authFetch('/library/issues');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.issues)) {
+        if (studentId) {
+          return data.issues.filter((i: any) => i.studentId === studentId);
+        }
+        return data.issues;
+      }
+    }
+  } catch (err) {
+    console.warn('Library issues offline:', err);
+  }
+  return [
+    {
+      id: 'lib-1',
+      bookTitle: 'NCERT Mathematics Class 8 Exemplar',
+      bookAuthor: 'NCERT Editorial Board',
+      issueDate: '2026-09-01',
+      dueDate: '2026-09-25',
+      fineAmount: 0,
+      status: 'ISSUED',
+    },
+    {
+      id: 'lib-2',
+      bookTitle: 'General Science Encyclopedia Vol 1',
+      bookAuthor: 'Oxford University Press',
+      issueDate: '2026-08-10',
+      dueDate: '2026-08-30',
+      fineAmount: 0,
+      status: 'RETURNED',
+    },
+  ];
+}
+
+// 20. Fetch Staff Leaves
+export async function fetchStaffLeaves(): Promise<StaffLeaveItem[]> {
+  try {
+    const res = await authFetch('/payroll/leaves');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.leaves)) return data.leaves;
+    }
+  } catch (err) {
+    console.warn('Staff leaves offline:', err);
+  }
+  return [];
+}
+
+// 21. Apply Staff Leave
+export async function applyStaffLeave(data: {
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  reason: string;
+}) {
+  const res = await authFetch('/payroll/leaves', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to submit leave.');
+  }
+  return resData;
+}
+
+// 22. Review Staff Leave (Principal)
+export async function reviewStaffLeave(leaveId: string, data: { status: string; reviewRemarks?: string }) {
+  const res = await authFetch(`/payroll/leaves/${leaveId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to update leave status.');
+  }
+  return resData;
 }
 

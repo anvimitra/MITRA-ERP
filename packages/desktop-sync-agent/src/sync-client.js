@@ -126,6 +126,94 @@ class SyncClient {
           }
         }
 
+        // 8. Update Certificates
+        if (dataset?.certificates) {
+          const insertCert = db.prepare(`
+            INSERT OR REPLACE INTO local_certificates (id, student_id, certificate_type, certificate_no, issue_date, academic_year, reason, conduct, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const c of dataset.certificates) {
+            insertCert.run(c.id, c.studentId, c.certificateType, c.certificateNo, c.issueDate, c.academicYear, c.reason, c.conduct, c.status);
+          }
+        }
+
+        // 9. Update Front Desk Visitors
+        if (dataset?.visitors) {
+          const insertVis = db.prepare(`
+            INSERT OR REPLACE INTO local_visitors (id, visitor_name, phone, purpose, whom_to_meet, check_in, check_out, badge_number, status, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const v of dataset.visitors) {
+            insertVis.run(v.id, v.visitorName, v.phone, v.purpose, v.whomToMeet, v.checkIn, v.checkOut, v.badgeNumber, v.status, v.date);
+          }
+        }
+
+        // 10. Update Admission Inquiries
+        if (dataset?.inquiries) {
+          const insertInq = db.prepare(`
+            INSERT OR REPLACE INTO local_inquiries (id, student_name, parent_name, phone, class_seeking, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const i of dataset.inquiries) {
+            insertInq.run(i.id, i.studentName, i.parentName, i.phone, i.classSeeking, i.status, i.notes);
+          }
+        }
+
+        // 11. Update Staff Leaves
+        if (dataset?.leaves) {
+          const insertLeave = db.prepare(`
+            INSERT OR REPLACE INTO local_leaves (id, staff_user_id, leave_type, start_date, end_date, total_days, reason, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const lv of dataset.leaves) {
+            insertLeave.run(lv.id, lv.staffUserId, lv.leaveType, lv.startDate, lv.endDate, lv.totalDays, lv.reason, lv.status);
+          }
+        }
+
+        // 12. Update Staff Payroll
+        if (dataset?.payroll) {
+          const insertPay = db.prepare(`
+            INSERT OR REPLACE INTO local_payroll (id, staff_user_id, month_year, basic_salary, net_salary, payment_status, slip_no)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const p of dataset.payroll) {
+            insertPay.run(p.id, p.staffUserId, p.monthYear, p.basicSalary, p.netSalary, p.paymentStatus, p.slipNo);
+          }
+        }
+
+        // 13. Update Library Books
+        if (dataset?.books) {
+          const insertBook = db.prepare(`
+            INSERT OR REPLACE INTO local_books (id, isbn, title, author, subject, rack_number, total_copies, available_copies)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const b of dataset.books) {
+            insertBook.run(b.id, b.isbn, b.title, b.author, b.subject, b.rackNumber, b.totalCopies, b.availableCopies);
+          }
+        }
+
+        // 14. Update Transport Vehicles
+        if (dataset?.vehicles) {
+          const insertVeh = db.prepare(`
+            INSERT OR REPLACE INTO local_vehicles (id, vehicle_no, driver_name, driver_phone, status)
+            VALUES (?, ?, ?, ?, ?)
+          `);
+          for (const v of dataset.vehicles) {
+            insertVeh.run(v.id, v.vehicleNo, v.driverName, v.driverPhone, v.status);
+          }
+        }
+
+        // 15. Update Inventory Items
+        if (dataset?.inventoryItems) {
+          const insertItem = db.prepare(`
+            INSERT OR REPLACE INTO local_inventory_items (id, name, category, unit, current_quantity, minimum_alert_quantity)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `);
+          for (const itm of dataset.inventoryItems) {
+            insertItem.run(itm.id, itm.name, itm.category, itm.unit, itm.currentQuantity, itm.minimumAlertQuantity);
+          }
+        }
+
         // Save last sync time
         db.prepare(`
           INSERT OR REPLACE INTO sync_meta (key, value)
@@ -158,8 +246,12 @@ class SyncClient {
     const feesCount = db.prepare('SELECT COUNT(*) as count FROM local_fees').get().count;
     const timetableCount = db.prepare('SELECT COUNT(*) as count FROM local_timetable').get().count;
     const studentLogsCount = db.prepare('SELECT COUNT(*) as count FROM local_student_logs').get().count;
-    const meta = db.prepare("SELECT value FROM sync_meta WHERE key = 'last_sync_timestamp'").get();
-    const school = db.prepare('SELECT * FROM local_school LIMIT 1').get();
+    const certificatesCount = db.prepare('SELECT COUNT(*) as count FROM local_certificates').get().count;
+    const visitorsCount = db.prepare('SELECT COUNT(*) as count FROM local_visitors').get().count;
+    const booksCount = db.prepare('SELECT COUNT(*) as count FROM local_books').get().count;
+    const itemsCount = db.prepare('SELECT COUNT(*) as count FROM local_inventory_items').get().count;
+
+    const lastSyncMeta = db.prepare("SELECT value FROM sync_meta WHERE key = 'last_sync_timestamp'").get();
 
     return {
       studentsCount,
@@ -168,10 +260,14 @@ class SyncClient {
       feesCount,
       timetableCount,
       studentLogsCount,
-      lastSyncTimestamp: meta?.value || this.lastSyncTime || 'Never',
-      school,
+      certificatesCount,
+      visitorsCount,
+      booksCount,
+      itemsCount,
+      lastSyncTimestamp: lastSyncMeta ? lastSyncMeta.value : 'Never',
     };
   }
 }
 
 module.exports = SyncClient;
+module.exports.SyncClient = SyncClient;

@@ -104,6 +104,99 @@ function initLocalDatabase(customPath) {
       date TEXT,
       notify_parent INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS local_certificates (
+      id TEXT PRIMARY KEY,
+      student_id TEXT,
+      certificate_type TEXT,
+      certificate_no TEXT,
+      issue_date TEXT,
+      academic_year TEXT,
+      reason TEXT,
+      conduct TEXT,
+      status TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_visitors (
+      id TEXT PRIMARY KEY,
+      visitor_name TEXT,
+      phone TEXT,
+      purpose TEXT,
+      whom_to_meet TEXT,
+      check_in TEXT,
+      check_out TEXT,
+      badge_number TEXT,
+      status TEXT,
+      date TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_inquiries (
+      id TEXT PRIMARY KEY,
+      student_name TEXT,
+      parent_name TEXT,
+      phone TEXT,
+      class_seeking TEXT,
+      status TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_leaves (
+      id TEXT PRIMARY KEY,
+      staff_user_id TEXT,
+      leave_type TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      total_days REAL,
+      reason TEXT,
+      status TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_payroll (
+      id TEXT PRIMARY KEY,
+      staff_user_id TEXT,
+      month_year TEXT,
+      basic_salary REAL,
+      net_salary REAL,
+      payment_status TEXT,
+      slip_no TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_books (
+      id TEXT PRIMARY KEY,
+      isbn TEXT,
+      title TEXT,
+      author TEXT,
+      subject TEXT,
+      rack_number TEXT,
+      total_copies INTEGER,
+      available_copies INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS local_library_issues (
+      id TEXT PRIMARY KEY,
+      book_id TEXT,
+      student_id TEXT,
+      issue_date TEXT,
+      due_date TEXT,
+      status TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_vehicles (
+      id TEXT PRIMARY KEY,
+      vehicle_no TEXT,
+      driver_name TEXT,
+      driver_phone TEXT,
+      status TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS local_inventory_items (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      category TEXT,
+      unit TEXT,
+      current_quantity INTEGER,
+      minimum_alert_quantity INTEGER
+    );
   `);
 
   console.log(`[Secondary PC Storage] Local SQLite initialized at: ${targetPath}`);

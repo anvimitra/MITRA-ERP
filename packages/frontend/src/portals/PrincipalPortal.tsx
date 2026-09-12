@@ -33,12 +33,39 @@ import {
   School as SchoolIcon,
   CheckCircle2,
   AlertCircle,
+  Building2,
+  Bus,
+  Package,
+  Briefcase,
+  Bookmark,
 } from 'lucide-react';
+import { CertificatesDesk } from '../components/CertificatesDesk';
+import { FrontDeskReception } from '../components/FrontDeskReception';
+import { StaffPayrollDesk } from '../components/StaffPayrollDesk';
+import { LibraryDesk } from '../components/LibraryDesk';
+import { TransportDesk } from '../components/TransportDesk';
+import { InventoryDesk } from '../components/InventoryDesk';
 
 export const PrincipalPortal: React.FC = () => {
   // Navigation Sidebar
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'students' | 'academics' | 'timetable' | 'attendance' | 'exams' | 'fees' | 'faculty' | 'discipline' | 'notices' | 'settings'
+    | 'dashboard'
+    | 'students'
+    | 'academics'
+    | 'timetable'
+    | 'attendance'
+    | 'exams'
+    | 'fees'
+    | 'faculty'
+    | 'discipline'
+    | 'certificates'
+    | 'frontdesk'
+    | 'payroll'
+    | 'library'
+    | 'transport'
+    | 'inventory'
+    | 'notices'
+    | 'settings'
   >('dashboard');
 
   // Core Data
@@ -673,6 +700,66 @@ export const PrincipalPortal: React.FC = () => {
                 <span>Conduct & Discipline Desk</span>
               </div>
               <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full">{schoolLogs.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('certificates')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'certificates' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Award size={16} />
+              <span>Certificates Engine</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('frontdesk')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'frontdesk' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Building2 size={16} />
+              <span>Front Desk & Reception</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('payroll')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'payroll' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Briefcase size={16} />
+              <span>Staff HR & Payroll</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('library')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'library' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <BookOpen size={16} />
+              <span>Library Management</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('transport')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'transport' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Bus size={16} />
+              <span>Transport & Fleet</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'inventory' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Package size={16} />
+              <span>Stock & Inventory</span>
             </button>
 
             <button
@@ -1750,6 +1837,36 @@ export const PrincipalPortal: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* ================= MODULE: CERTIFICATES & CREDENTIALS ================= */}
+        {activeTab === 'certificates' && (
+          <CertificatesDesk students={students} schoolInfo={classesData?.school} />
+        )}
+
+        {/* ================= MODULE: FRONT DESK & RECEPTION ================= */}
+        {activeTab === 'frontdesk' && (
+          <FrontDeskReception />
+        )}
+
+        {/* ================= MODULE: STAFF HR & PAYROLL ================= */}
+        {activeTab === 'payroll' && (
+          <StaffPayrollDesk staffList={staffList} />
+        )}
+
+        {/* ================= MODULE: LIBRARY MANAGEMENT ================= */}
+        {activeTab === 'library' && (
+          <LibraryDesk students={students} staffList={staffList} />
+        )}
+
+        {/* ================= MODULE: TRANSPORT FLEET ================= */}
+        {activeTab === 'transport' && (
+          <TransportDesk students={students} />
+        )}
+
+        {/* ================= MODULE: STOCK & INVENTORY ================= */}
+        {activeTab === 'inventory' && (
+          <InventoryDesk />
         )}
       </main>
 

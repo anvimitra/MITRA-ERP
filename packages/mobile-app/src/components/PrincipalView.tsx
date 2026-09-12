@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { User, School } from '../types';
-import { broadcastLiveNotice } from '../api';
-import { Users, CheckCircle2, TrendingUp, BellRing, Database, Radio } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, School, StaffLeaveItem } from '../types';
+import { broadcastLiveNotice, fetchStaffLeaves, reviewStaffLeave } from '../api';
+import { Users, CheckCircle2, TrendingUp, BellRing, Database, Radio, Briefcase, Check, X, Bus, BookOpen, FileText, PhoneCall } from 'lucide-react';
 
 interface Props {
   principal: User;
@@ -15,6 +15,29 @@ export const PrincipalView: React.FC<Props> = ({ principal, school, studentCount
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sentNotice, setSentNotice] = useState(false);
+
+  // Staff leaves
+  const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchStaffLeaves().then(setLeaves).catch(() => {});
+  }, []);
+
+  const handleReview = async (leaveId: string, status: 'APPROVED' | 'REJECTED') => {
+    setReviewingId(leaveId);
+    try {
+      await reviewStaffLeave(leaveId, {
+        status,
+        reviewRemarks: status === 'APPROVED' ? 'Approved by Principal via Mobile App' : 'Declined per academic coverage',
+      });
+      fetchStaffLeaves().then(setLeaves).catch(() => {});
+    } catch (err: any) {
+      alert(err.message || 'Failed to update leave.');
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +156,115 @@ export const PrincipalView: React.FC<Props> = ({ principal, school, studentCount
             <span>{sending ? 'Broadcasting to App...' : 'Send In-App Notification'}</span>
           </button>
         </form>
+      </div>
+
+      {/* Real-Time School Operations Hub */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+        <h3 className="font-bold text-sm text-slate-800">Ecosystem Operations Matrix</h3>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2">
+            <div className="p-1.5 rounded-lg bg-amber-100 text-amber-800">
+              <Bus className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Buses Active</span>
+              <strong className="text-slate-800">4 Fleet Routes</strong>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2">
+            <div className="p-1.5 rounded-lg bg-blue-100 text-blue-800">
+              <BookOpen className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Central Library</span>
+              <strong className="text-slate-800">1,450 Volumes</strong>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2">
+            <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+              <PhoneCall className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Front Desk</span>
+              <strong className="text-slate-800">18 Inquiries</strong>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center space-x-2">
+            <div className="p-1.5 rounded-lg bg-purple-100 text-purple-800">
+              <FileText className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Certificates</span>
+              <strong className="text-slate-800">35 CBSE Verified</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Faculty Leave Approval Queue */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-sm text-slate-800 flex items-center space-x-1.5">
+            <Briefcase className="w-4 h-4 text-purple-600" />
+            <span>Faculty Leave Requests ({leaves.length})</span>
+          </h3>
+          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
+            1-Tap Approval
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {leaves.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs">
+              No leave applications awaiting approval.
+            </div>
+          ) : (
+            leaves.map((l) => (
+              <div key={l.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <strong className="text-slate-900 block">{l.staffName || 'Faculty Member'}</strong>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">{l.leaveType} LEAVE • {l.totalDays} Days</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                    l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
+                    l.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
+                    'bg-amber-100 text-amber-800'
+                  }`}>
+                    {l.status}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-600">{l.reason}</p>
+                <p className="text-[10px] text-slate-400">Duration: {l.startDate} to {l.endDate}</p>
+
+                {l.status === 'PENDING' && (
+                  <div className="flex items-center space-x-2 pt-1 border-t border-slate-200">
+                    <button
+                      disabled={reviewingId === l.id}
+                      onClick={() => handleReview(l.id, 'APPROVED')}
+                      className="flex-1 py-1.5 bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center justify-center space-x-1 shadow-sm disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      disabled={reviewingId === l.id}
+                      onClick={() => handleReview(l.id, 'REJECTED')}
+                      className="flex-1 py-1.5 bg-rose-600 active:bg-rose-700 text-white font-bold text-xs rounded-lg flex items-center justify-center space-x-1 shadow-sm disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Decline</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

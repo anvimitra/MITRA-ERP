@@ -244,3 +244,219 @@ export interface SMSLogItem {
   status: string;
   sentAt: string;
 }
+
+export interface CertificateItem {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  studentName?: string;
+  admissionNo?: string;
+  rollNo?: number;
+  className?: string;
+  sectionName?: string;
+  certificateType: 'TRANSFER_CERTIFICATE' | 'BONAFIDE_CERTIFICATE' | 'CHARACTER_CERTIFICATE' | 'ADMIT_CARD' | 'APPRECIATION_AWARD';
+  certificateNo: string;
+  issueDate: string;
+  academicYear: string;
+  reason?: string;
+  conduct?: string;
+  status: string;
+  extra?: any;
+}
+
+export interface VisitorItem {
+  id: string;
+  schoolId: string;
+  visitorName: string;
+  phone: string;
+  purpose: string;
+  whomToMeet: string;
+  idCardType?: string;
+  idCardNo?: string;
+  checkIn: string;
+  checkOut?: string;
+  badgeNumber: string;
+  status: 'IN' | 'OUT';
+  date: string;
+}
+
+export interface InquiryItem {
+  id: string;
+  schoolId: string;
+  studentName: string;
+  parentName: string;
+  phone: string;
+  email?: string;
+  classSeeking: string;
+  source: string;
+  status: 'NEW' | 'IN_PROGRESS' | 'CONVERTED' | 'CLOSED';
+  followUpDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PostalComplaintItem {
+  id: string;
+  schoolId: string;
+  type: 'POSTAL_DISPATCH' | 'POSTAL_RECEIVE' | 'COMPLAINT' | 'CALL_LOG';
+  title: string;
+  referenceNo?: string;
+  fromName?: string;
+  toName?: string;
+  contactPhone?: string;
+  description?: string;
+  actionTaken?: string;
+  status: 'PENDING' | 'RESOLVED' | 'DISPATCHED' | 'RECEIVED';
+  date: string;
+}
+
+export interface StaffLeaveItem {
+  id: string;
+  schoolId: string;
+  staffUserId: string;
+  staffName?: string;
+  staffRole?: string;
+  staffEmail?: string;
+  leaveType: 'CASUAL' | 'SICK' | 'EARNED' | 'MATERNITY' | 'DUTY';
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewRemarks?: string;
+  appliedAt: string;
+}
+
+export interface StaffPayrollItem {
+  id: string;
+  schoolId: string;
+  staffUserId: string;
+  staffName?: string;
+  staffRole?: string;
+  monthYear: string;
+  basicSalary: number;
+  hra: number;
+  da: number;
+  specialAllowance: number;
+  deductionPf: number;
+  deductionTax: number;
+  deductionLeave: number;
+  netSalary: number;
+  paymentStatus: 'PAID' | 'GENERATED' | 'HOLD';
+  paymentDate?: string;
+  paymentMode: string;
+  slipNo: string;
+}
+
+export interface LibraryBookItem {
+  id: string;
+  schoolId: string;
+  isbn?: string;
+  title: string;
+  author: string;
+  publisher?: string;
+  subject?: string;
+  rackNumber?: string;
+  totalCopies: number;
+  availableCopies: number;
+  price?: number;
+}
+
+export interface LibraryIssueItem {
+  id: string;
+  schoolId: string;
+  bookId: string;
+  bookTitle?: string;
+  bookAuthor?: string;
+  isbn?: string;
+  studentId?: string;
+  staffUserId?: string;
+  borrowerName?: string;
+  borrowerType?: string;
+  admissionNo?: string;
+  issueDate: string;
+  dueDate: string;
+  returnDate?: string;
+  fineAmount: number;
+  status: 'ISSUED' | 'RETURNED' | 'OVERDUE';
+}
+
+export interface TransportVehicleItem {
+  id: string;
+  schoolId: string;
+  vehicleNo: string;
+  vehicleModel?: string;
+  seatingCapacity: number;
+  driverName: string;
+  driverPhone: string;
+  driverLicense?: string;
+  status: string;
+}
+
+export interface TransportStopItem {
+  id: string;
+  routeId: string;
+  stopName: string;
+  pickupTime: string;
+  dropTime: string;
+  sequenceOrder: number;
+}
+
+export interface TransportRouteItem {
+  id: string;
+  schoolId: string;
+  routeName: string;
+  startLocation: string;
+  endLocation: string;
+  vehicleId?: string;
+  vehicleNo?: string;
+  driverName?: string;
+  driverPhone?: string;
+  monthlyFare: number;
+  stops?: TransportStopItem[];
+}
+
+export interface StudentTransportItem {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  admissionNo?: string;
+  className?: string;
+  sectionName?: string;
+  routeName: string;
+  stopName: string;
+  pickupTime: string;
+  dropTime: string;
+  vehicleNo: string;
+  driverName: string;
+  driverPhone: string;
+  monthlyFare: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  schoolId: string;
+  name: string;
+  category: 'STATIONERY' | 'UNIFORMS' | 'BOOKS' | 'LAB_EQUIPMENT' | 'SPORTS' | 'FURNITURE' | 'OTHER';
+  unit: string;
+  currentQuantity: number;
+  minimumAlertQuantity: number;
+  isLowStock?: boolean;
+}
+
+export interface InventoryTransactionItem {
+  id: string;
+  schoolId: string;
+  itemId: string;
+  itemName?: string;
+  category?: string;
+  unit?: string;
+  transactionType: 'INWARD' | 'OUTWARD';
+  quantity: number;
+  unitPrice?: number;
+  supplierOrRecipient: string;
+  invoiceOrSlipNo?: string;
+  date: string;
+  notes?: string;
+  creatorName?: string;
+}

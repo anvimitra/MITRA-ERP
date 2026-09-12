@@ -368,6 +368,354 @@ export class ApiService {
       method: 'DELETE',
     });
   }
+
+  // ==================== CERTIFICATES ====================
+  static async getCertificates() {
+    return this.request<{ certificates: any[] }>('/certificates');
+  }
+
+  static async getStudentCertificates(studentId: string) {
+    return this.request<{ certificates: any[] }>(`/certificates/student/${studentId}`);
+  }
+
+  static async getCertificateDetail(id: string) {
+    return this.request<{ certificate: any }>(`/certificates/${id}`);
+  }
+
+  static async getAdmitCardData(studentId: string) {
+    return this.request<{ admitCard: any }>(`/certificates/admit-card/${studentId}`);
+  }
+
+  static async createCertificate(data: {
+    studentId: string;
+    certificateType: string;
+    academicYear?: string;
+    issueDate?: string;
+    reason?: string;
+    conduct?: string;
+    extraFields?: any;
+  }) {
+    return this.request<{ success: boolean; message: string; certificateId: string; certificateNo: string }>('/certificates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteCertificate(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/certificates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ==================== FRONT DESK & RECEPTION ====================
+  static async getVisitors() {
+    return this.request<{ visitors: any[] }>('/front-desk/visitors');
+  }
+
+  static async createVisitor(data: {
+    visitorName: string;
+    phone: string;
+    purpose: string;
+    whomToMeet?: string;
+    idCardType?: string;
+    idCardNo?: string;
+    badgeNumber?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; visitorId: string }>('/front-desk/visitors', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async checkoutVisitor(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/front-desk/visitors/${id}/checkout`, {
+      method: 'PUT',
+    });
+  }
+
+  static async getInquiries() {
+    return this.request<{ inquiries: any[] }>('/front-desk/inquiries');
+  }
+
+  static async createInquiry(data: {
+    studentName: string;
+    parentName: string;
+    phone: string;
+    email?: string;
+    classSeeking: string;
+    source?: string;
+    followUpDate?: string;
+    notes?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; inquiryId: string }>('/front-desk/inquiries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateInquiry(id: string, data: { status?: string; followUpDate?: string; notes?: string }) {
+    return this.request<{ success: boolean; message: string }>(`/front-desk/inquiries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getPostalComplaints() {
+    return this.request<{ items: any[] }>('/front-desk/postal-complaints');
+  }
+
+  static async createPostalComplaint(data: {
+    type: string;
+    title: string;
+    referenceNo?: string;
+    fromName?: string;
+    toName?: string;
+    contactPhone?: string;
+    description?: string;
+    actionTaken?: string;
+    status?: string;
+    date?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; itemId: string }>('/front-desk/postal-complaints', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updatePostalComplaint(id: string, data: { actionTaken?: string; status?: string }) {
+    return this.request<{ success: boolean; message: string }>(`/front-desk/postal-complaints/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ==================== HR & PAYROLL ====================
+  static async getStaffLeaves() {
+    return this.request<{ leaves: any[] }>('/payroll/leaves');
+  }
+
+  static async applyStaffLeave(data: {
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    totalDays: number;
+    reason: string;
+  }) {
+    return this.request<{ success: boolean; message: string; leaveId: string }>('/payroll/leaves', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async reviewStaffLeave(id: string, status: 'APPROVED' | 'REJECTED', reviewRemarks?: string) {
+    return this.request<{ success: boolean; message: string }>(`/payroll/leaves/${id}/review`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, reviewRemarks }),
+    });
+  }
+
+  static async getPayrollSlips() {
+    return this.request<{ slips: any[] }>('/payroll/slips');
+  }
+
+  static async getPayrollSlipDetail(id: string) {
+    return this.request<{ slip: any }>(`/payroll/slips/${id}`);
+  }
+
+  static async generatePayrollSlip(data: {
+    staffUserId: string;
+    monthYear: string;
+    basicSalary: number;
+    hra?: number;
+    da?: number;
+    specialAllowance?: number;
+    deductionPf?: number;
+    deductionTax?: number;
+    deductionLeave?: number;
+    paymentMode?: string;
+    paymentStatus?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; slipId: string; slipNo: string; netSalary: number }>('/payroll/generate-slip', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ==================== LIBRARY MANAGEMENT ====================
+  static async getLibraryBooks() {
+    return this.request<{ books: any[] }>('/library/books');
+  }
+
+  static async createLibraryBook(data: {
+    isbn?: string;
+    title: string;
+    author: string;
+    publisher?: string;
+    subject?: string;
+    rackNumber?: string;
+    totalCopies: number;
+    price?: number;
+  }) {
+    return this.request<{ success: boolean; message: string; bookId: string }>('/library/books', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateLibraryBook(id: string, data: any) {
+    return this.request<{ success: boolean; message: string }>(`/library/books/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteLibraryBook(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/library/books/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async getLibraryIssues() {
+    return this.request<{ issues: any[] }>('/library/issues');
+  }
+
+  static async getStudentLibraryIssues(studentId: string) {
+    return this.request<{ issues: any[] }>(`/library/student/${studentId}`);
+  }
+
+  static async issueLibraryBook(data: {
+    bookId: string;
+    studentId?: string;
+    staffUserId?: string;
+    issueDate?: string;
+    dueDate?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; issueId: string }>('/library/issue-book', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async returnLibraryBook(id: string, returnDate?: string, fineAmount?: number) {
+    return this.request<{ success: boolean; message: string }>(`/library/return-book/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ returnDate, fineAmount }),
+    });
+  }
+
+  // ==================== TRANSPORT FLEET ====================
+  static async getTransportVehicles() {
+    return this.request<{ vehicles: any[] }>('/transport/vehicles');
+  }
+
+  static async createTransportVehicle(data: {
+    vehicleNo: string;
+    vehicleModel?: string;
+    seatingCapacity?: number;
+    driverName: string;
+    driverPhone: string;
+    driverLicense?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; vehicleId: string }>('/transport/vehicles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getTransportRoutes() {
+    return this.request<{ routes: any[] }>('/transport/routes');
+  }
+
+  static async createTransportRoute(data: {
+    routeName: string;
+    startLocation: string;
+    endLocation: string;
+    vehicleId?: string;
+    monthlyFare?: number;
+  }) {
+    return this.request<{ success: boolean; message: string; routeId: string }>('/transport/routes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async createTransportStop(data: {
+    routeId: string;
+    stopName: string;
+    pickupTime: string;
+    dropTime?: string;
+    sequenceOrder?: number;
+  }) {
+    return this.request<{ success: boolean; message: string; stopId: string }>('/transport/stops', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getStudentTransportAllocations() {
+    return this.request<{ allocations: any[] }>('/transport/student-allocations');
+  }
+
+  static async allocateStudentTransport(data: {
+    studentId: string;
+    routeId: string;
+    stopId: string;
+    academicYear?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; allocId: string }>('/transport/student-allocations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getStudentTransport(studentId: string) {
+    return this.request<{ transport: any }>(`/transport/student/${studentId}`);
+  }
+
+  // ==================== STOCK & INVENTORY ====================
+  static async getInventoryItems() {
+    return this.request<{ items: any[] }>('/inventory/items');
+  }
+
+  static async createInventoryItem(data: {
+    name: string;
+    category: string;
+    unit?: string;
+    currentQuantity?: number;
+    minimumAlertQuantity?: number;
+  }) {
+    return this.request<{ success: boolean; message: string; itemId: string }>('/inventory/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateInventoryItem(id: string, data: any) {
+    return this.request<{ success: boolean; message: string }>(`/inventory/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getInventoryTransactions() {
+    return this.request<{ transactions: any[] }>('/inventory/transactions');
+  }
+
+  static async createInventoryTransaction(data: {
+    itemId: string;
+    transactionType: 'INWARD' | 'OUTWARD';
+    quantity: number;
+    unitPrice?: number;
+    supplierOrRecipient: string;
+    invoiceOrSlipNo?: string;
+    date?: string;
+    notes?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; transactionId: string; newQuantity: number }>('/inventory/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 

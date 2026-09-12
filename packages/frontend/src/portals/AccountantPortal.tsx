@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
 import { FeeStructure, FeePayment } from '../types';
+import { StaffPayrollDesk } from '../components/StaffPayrollDesk';
+import { InventoryDesk } from '../components/InventoryDesk';
+import { TransportDesk } from '../components/TransportDesk';
+import { FrontDeskReception } from '../components/FrontDeskReception';
 import {
   Receipt,
   CreditCard,
@@ -15,6 +19,10 @@ import {
   FileText,
   DollarSign,
   Download,
+  Users,
+  Package,
+  Bus,
+  PhoneCall,
 } from 'lucide-react';
 
 export const AccountantPortal: React.FC = () => {
@@ -25,7 +33,7 @@ export const AccountantPortal: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'collection' | 'structures' | 'history' | 'defaulters'>('collection');
+  const [activeTab, setActiveTab] = useState<'collection' | 'structures' | 'history' | 'defaulters' | 'payroll' | 'inventory' | 'transport' | 'frontdesk'>('collection');
 
   // Collection modal state
   const [showCollectModal, setShowCollectModal] = useState(false);
@@ -238,6 +246,42 @@ export const AccountantPortal: React.FC = () => {
           <FileText size={15} />
           <span>Fee Heads ({structures.length})</span>
         </button>
+        <button
+          onClick={() => setActiveTab('payroll')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'payroll' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Users size={15} />
+          <span>Staff Payroll & Salary</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('inventory')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'inventory' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Package size={15} />
+          <span>Stock & Inventory</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('transport')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'transport' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Bus size={15} />
+          <span>Transport & Fleet</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('frontdesk')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'frontdesk' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <PhoneCall size={15} />
+          <span>Front Desk & Inquiries</span>
+        </button>
       </div>
 
       {reminderStatus && (
@@ -379,6 +423,34 @@ export const AccountantPortal: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ================= TAB 4: STAFF PAYROLL ================= */}
+      {activeTab === 'payroll' && (
+        <div>
+          <StaffPayrollDesk />
+        </div>
+      )}
+
+      {/* ================= TAB 5: STOCK & INVENTORY ================= */}
+      {activeTab === 'inventory' && (
+        <div>
+          <InventoryDesk />
+        </div>
+      )}
+
+      {/* ================= TAB 6: TRANSPORT & FLEET ================= */}
+      {activeTab === 'transport' && (
+        <div>
+          <TransportDesk />
+        </div>
+      )}
+
+      {/* ================= TAB 7: FRONT DESK & INQUIRIES ================= */}
+      {activeTab === 'frontdesk' && (
+        <div>
+          <FrontDeskReception />
         </div>
       )}
 

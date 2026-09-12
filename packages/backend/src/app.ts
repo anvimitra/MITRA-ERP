@@ -13,6 +13,12 @@ import { teacherRoutes } from './routes/teachers.js';
 import { appUpdateRoutes } from './routes/app-update.js';
 import { timetableRoutes } from './routes/timetable.js';
 import { studentLogRoutes } from './routes/student-logs.js';
+import { certificateRoutes } from './routes/certificates.js';
+import { frontDeskRoutes } from './routes/front-desk.js';
+import { payrollRoutes } from './routes/payroll.js';
+import { libraryRoutes } from './routes/library.js';
+import { transportRoutes } from './routes/transport.js';
+import { inventoryRoutes } from './routes/inventory.js';
 
 export const app = new Hono();
 
@@ -50,3 +56,9 @@ app.route('/api/teachers', teacherRoutes);
 app.route('/api/app', appUpdateRoutes);
 app.route('/api/timetable', timetableRoutes);
 app.route('/api/student-logs', studentLogRoutes);
+app.route('/api/certificates', certificateRoutes);
+app.route('/api/front-desk', frontDeskRoutes);
+app.route('/api/payroll', payrollRoutes);
+app.route('/api/library', libraryRoutes);
+app.route('/api/transport', transportRoutes);
+app.route('/api/inventory', inventoryRoutes);

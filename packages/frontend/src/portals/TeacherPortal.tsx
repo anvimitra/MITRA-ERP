@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
-import { TeacherAllocation, AttendanceRecord, Exam, TimetablePeriod, StudentLog } from '../types';
-import { CheckCircle2, UserCheck, Award, Calendar, AlertTriangle, MessageSquare, Send, ShieldAlert, BookOpen, Clock, Plus, Trash2, X } from 'lucide-react';
+import { TeacherAllocation, AttendanceRecord, Exam, TimetablePeriod, StudentLog, StaffLeaveItem } from '../types';
+import { LibraryDesk } from '../components/LibraryDesk';
+import { TransportDesk } from '../components/TransportDesk';
+import { CheckCircle2, UserCheck, Award, Calendar, AlertTriangle, MessageSquare, Send, ShieldAlert, BookOpen, Clock, Plus, Trash2, X, Briefcase, FileCheck, Bus, Search } from 'lucide-react';
 
 export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'marks' | 'schedule' | 'discipline'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'marks' | 'schedule' | 'discipline' | 'leaves' | 'library' | 'transport'>('attendance');
   const [teacherSchedule, setTeacherSchedule] = useState<TimetablePeriod[]>([]);
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<string>('Monday');
   const [studentLogs, setStudentLogs] = useState<StudentLog[]>([]);
@@ -18,6 +20,16 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
     date: new Date().toISOString().split('T')[0],
     notifyParent: true,
   });
+
+  // Staff Leave state
+  const [myLeaves, setMyLeaves] = useState<StaffLeaveItem[]>([]);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveType, setLeaveType] = useState<'CASUAL' | 'SICK' | 'EARNED' | 'MATERNITY' | 'DUTY'>('CASUAL');
+  const [leaveStartDate, setLeaveStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [leaveReason, setLeaveReason] = useState('');
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+
   const [allocations, setAllocations] = useState<TeacherAllocation | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +76,47 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
       // Load School Student Logs
       const logs = await ApiService.getSchoolStudentLogs().catch(() => ({ logs: [] }));
       setStudentLogs(logs.logs || []);
+
+      // Load Staff Leaves
+      const leavesRes = await ApiService.getStaffLeaves().catch(() => ({ leaves: [] }));
+      setMyLeaves(leavesRes.leaves || []);
     } catch (err) {
       console.error('Error loading teacher portal data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplyLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveReason.trim()) {
+      alert('Please provide a reason for the leave application');
+      return;
+    }
+    setSubmittingLeave(true);
+    try {
+      const start = new Date(leaveStartDate);
+      const end = new Date(leaveEndDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      await ApiService.applyStaffLeave({
+        leaveType,
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        totalDays: isNaN(totalDays) || totalDays < 1 ? 1 : totalDays,
+        reason: leaveReason,
+      });
+
+      alert('✅ Leave application submitted to Principal for approval!');
+      setShowLeaveModal(false);
+      setLeaveReason('');
+      const leavesRes = await ApiService.getStaffLeaves().catch(() => ({ leaves: [] }));
+      setMyLeaves(leavesRes.leaves || []);
+    } catch (err: any) {
+      alert('Failed to submit leave: ' + err.message);
+    } finally {
+      setSubmittingLeave(false);
     }
   };
 
@@ -278,6 +327,33 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
           >
             <ShieldAlert size={14} />
             <span>Conduct & Awards Desk</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('leaves')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+              activeTab === 'leaves' ? 'bg-white text-blue-950 shadow' : 'text-white/80 hover:text-white'
+            }`}
+          >
+            <Briefcase size={14} />
+            <span>Leave Applications ({myLeaves.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('library')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+              activeTab === 'library' ? 'bg-white text-blue-950 shadow' : 'text-white/80 hover:text-white'
+            }`}
+          >
+            <BookOpen size={14} />
+            <span>Library & Books</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('transport')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+              activeTab === 'transport' ? 'bg-white text-blue-950 shadow' : 'text-white/80 hover:text-white'
+            }`}
+          >
+            <Bus size={14} />
+            <span>School Buses & Routes</span>
           </button>
         </div>
       </div>
@@ -774,6 +850,173 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                 );
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Staff Leaves Desk */}
+      {activeTab === 'leaves' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Briefcase size={20} className="text-blue-600" />
+                  <span>Faculty Leave Management</span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Submit leave applications directly to Principal & track approval status in real-time.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowLeaveModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-600/30 transition"
+              >
+                <Plus size={16} />
+                <span>Apply for Leave</span>
+              </button>
+            </div>
+
+            {/* Leave Requests List */}
+            <div className="mt-6 space-y-3">
+              {myLeaves.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 font-medium text-xs">
+                  No leave applications submitted yet. Click "Apply for Leave" above.
+                </div>
+              ) : (
+                myLeaves.map((leave) => (
+                  <div key={leave.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800">
+                          {leave.leaveType} LEAVE
+                        </span>
+                        <span className="text-xs font-black text-slate-800">
+                          {leave.startDate} to {leave.endDate} ({leave.totalDays} {leave.totalDays === 1 ? 'day' : 'days'})
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Reason:</span> {leave.reason}</p>
+                      {leave.reviewRemarks && (
+                        <p className="text-xs text-slate-500 italic bg-white p-2 rounded-lg border border-slate-200 mt-1">
+                          <span className="font-bold text-slate-700">Principal Remarks:</span> {leave.reviewRemarks}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                        leave.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                        leave.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                        'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {leave.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Library Desk */}
+      {activeTab === 'library' && (
+        <div>
+          <LibraryDesk />
+        </div>
+      )}
+
+      {/* Tab 7: Transport Desk */}
+      {activeTab === 'transport' && (
+        <div>
+          <TransportDesk />
+        </div>
+      )}
+
+      {/* Modal: Apply for Leave */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Briefcase size={18} className="text-blue-600" />
+                <span>Apply Faculty Leave</span>
+              </h3>
+              <button onClick={() => setShowLeaveModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyLeave} className="space-y-4 pt-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Leave Category *</label>
+                <select
+                  value={leaveType}
+                  onChange={(e: any) => setLeaveType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  <option value="CASUAL">Casual Leave (CL)</option>
+                  <option value="SICK">Medical / Sick Leave (ML)</option>
+                  <option value="EARNED">Earned Leave (EL)</option>
+                  <option value="MATERNITY">Maternity / Paternity Leave</option>
+                  <option value="DUTY">On Official School Duty (OD)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">From Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveStartDate}
+                    onChange={(e) => setLeaveStartDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">To Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveEndDate}
+                    onChange={(e) => setLeaveEndDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Reason for Leave *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="State the reason for leave application..."
+                  value={leaveReason}
+                  onChange={(e) => setLeaveReason(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingLeave}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow disabled:opacity-50"
+                >
+                  {submittingLeave ? 'Submitting...' : 'Submit Application'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
