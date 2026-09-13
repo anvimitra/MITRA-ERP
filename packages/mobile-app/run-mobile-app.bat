@@ -1,7 +1,7 @@
 @echo off
-title LSK Academy - ANVIMITRA Mobile App Server
+title MITRA-ERP Mobile App Server
 echo ============================================================
-echo   LSK ACADEMY SMART ERP MOBILE APP (ANVIMITRA-ERP)
+echo   MITRA-ERP SMART MOBILE APP
 echo ============================================================
 echo Starting Mobile App Dev Server on http://localhost:5174 ...
 cd /d "%~dp0"

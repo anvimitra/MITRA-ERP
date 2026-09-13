@@ -38,6 +38,7 @@ import {
   Package,
   Briefcase,
   Bookmark,
+  Copy,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
 import { FrontDeskReception } from '../components/FrontDeskReception';
@@ -46,7 +47,27 @@ import { LibraryDesk } from '../components/LibraryDesk';
 import { TransportDesk } from '../components/TransportDesk';
 import { InventoryDesk } from '../components/InventoryDesk';
 
-export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) => {
+export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({ userRole, school: initialSchool }) => {
+  const [currentSchool, setCurrentSchool] = useState<any>(initialSchool || null);
+  const [createdParentCreds, setCreatedParentCreds] = useState<{
+    loginId: string;
+    password: string;
+    parentName: string;
+    studentName: string;
+  } | null>(null);
+  const [showParentCredsModal, setShowParentCredsModal] = useState(false);
+  const [copiedParentCreds, setCopiedParentCreds] = useState(false);
+
+  useEffect(() => {
+    if (initialSchool) {
+      setCurrentSchool(initialSchool);
+    } else {
+      ApiService.getMe().then((res) => {
+        if (res?.school) setCurrentSchool(res.school);
+      }).catch(() => {});
+    }
+  }, [initialSchool]);
+
   // Navigation Sidebar
   const [activeTab, setActiveTab] = useState<
     | 'dashboard'
@@ -429,8 +450,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
         await ApiService.updateStudent(editingStudentId, studentForm);
         alert('✅ Student details updated successfully!');
       } else {
-        await ApiService.createStudent(studentForm);
-        alert('✅ New Student admitted successfully!');
+        const res = await ApiService.createStudent(studentForm);
+        if (res.parentCredentials) {
+          setCreatedParentCreds(res.parentCredentials);
+          setShowParentCredsModal(true);
+        } else {
+          alert('✅ New Student admitted successfully!');
+        }
       }
       setShowStudentModal(false);
       const res = await ApiService.getStudents();
@@ -894,8 +920,10 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
 
         {/* Institution Badge */}
         <div className="pt-4 mt-6 border-t border-slate-800 text-[11px] text-slate-400">
-          <div className="font-bold text-slate-200">LSK ACADEMY</div>
-          <div className="text-[10px] text-emerald-400">CBSE Affiliation: 2130099</div>
+          <div className="font-bold text-slate-200">{currentSchool?.name || 'School ERP'}</div>
+          <div className="text-[10px] text-emerald-400">
+            {currentSchool?.affiliationNo ? `Affiliation: ${currentSchool.affiliationNo}` : (currentSchool?.code ? `Code: ${currentSchool.code}` : 'Cloud Campus')}
+          </div>
         </div>
       </aside>
 
@@ -1619,26 +1647,26 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Institution Legal Name (Locked)</span>
-                <span className="text-sm font-black text-slate-900">LSK ACADEMY</span>
+                <span className="text-sm font-black text-slate-900">{currentSchool?.name || 'Educational Institution'}</span>
                 <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">Super Admin Managed</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">School Code / Tenant ID (Locked)</span>
-                <span className="text-sm font-black text-slate-900 font-mono">LSK01</span>
+                <span className="text-sm font-black text-slate-900 font-mono">{currentSchool?.code || 'SCH01'}</span>
                 <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">Fixed</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Board Affiliation Number (Locked)</span>
-                <span className="text-sm font-black text-slate-900 font-mono">CBSE-2130099</span>
-                <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">CBSE</span>
+                <span className="text-sm font-black text-slate-900 font-mono">{currentSchool?.affiliationNo || 'Affiliation Pending'}</span>
+                <span className="absolute top-4 right-4 text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded">CBSE / State</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <span className="text-slate-400 font-bold block mb-1">Campus Physical Address</span>
-                <span className="text-sm font-bold text-slate-900">42-B, Shivaji Nagar, Bhopal, M.P.</span>
+                <span className="text-sm font-bold text-slate-900">{currentSchool?.address || 'Campus Address Not Configured'}</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <span className="text-slate-400 font-bold block mb-1">Primary Administration Phone</span>
-                <span className="text-sm font-mono font-bold text-slate-900">+91 99887 76655</span>
+                <span className="text-sm font-mono font-bold text-slate-900">{currentSchool?.phone || 'Phone Not Configured'}</span>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <span className="text-slate-400 font-bold block mb-1">Academic Session Cycle</span>
@@ -2246,7 +2274,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
             <div className="border-2 border-indigo-900 rounded-2xl overflow-hidden shadow-lg bg-gradient-to-b from-indigo-900 via-indigo-950 to-slate-950 text-white text-center p-5">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <SchoolIcon size={20} className="text-indigo-400" />
-                <span className="font-black text-sm uppercase tracking-wider">LSK ACADEMY</span>
+                <span className="font-black text-sm uppercase tracking-wider">{currentSchool?.name || 'School ERP'}</span>
               </div>
               <p className="text-[9px] text-indigo-300 uppercase tracking-widest mb-3">Student Identity Card</p>
 
@@ -3077,13 +3105,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
                   Official Institutional Fee Challan & Receipt
                 </span>
                 <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-950 font-serif mt-1">
-                  LSK ACADEMY
+                  {currentSchool?.name || 'Educational Institution'}
                 </h2>
                 <p className="text-[11px] text-slate-600 font-sans">
-                  CBSE Affiliated Senior Secondary School • Affiliation: 2130099
+                  {currentSchool?.affiliationNo ? `Affiliation: ${currentSchool.affiliationNo}` : 'Recognized Educational Institution'}
                 </p>
                 <p className="text-[10px] text-slate-500 font-sans">
-                  42-B, Shivaji Nagar, Bhopal, M.P. • Phone: +91 99887 76655
+                  {currentSchool?.address ? `${currentSchool.address} • Phone: ${currentSchool.phone || 'N/A'}` : (currentSchool?.phone ? `Phone: ${currentSchool.phone}` : '')}
                 </p>
               </div>
 
@@ -3102,7 +3130,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
                 </div>
                 <div className="text-right">
                   <span className="text-slate-500">Admission No:</span>{' '}
-                  <strong className="font-mono">{latestReceipt.admissionNo || 'LSK-ADM'}</strong>
+                  <strong className="font-mono">{latestReceipt.admissionNo || 'ADM'}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500">Class:</span>{' '}
@@ -3116,19 +3144,21 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
 
               <table className="w-full text-xs font-sans border-collapse mb-4">
                 <thead>
-                  <tr className="border-b-2 border-slate-800 bg-slate-100">
-                    <th className="py-2 text-left px-2">Description</th>
-                    <th className="py-2 text-right px-2">Amount Paid</th>
+                  <tr className="border-b border-slate-800 text-slate-600 font-bold">
+                    <th className="text-left py-2 px-2">PARTICULAR DETAILS</th>
+                    <th className="text-right py-2 px-2">AMOUNT</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr className="border-b border-slate-200">
-                    <td className="py-2.5 px-2 font-medium">{latestReceipt.feeTitle}</td>
-                    <td className="py-2.5 px-2 text-right font-bold">
+                <tbody className="divide-y divide-slate-200">
+                  <tr>
+                    <td className="py-2.5 px-2 font-medium">
+                      {latestReceipt.feeTitle || 'Academic Composite Institutional Fee'}
+                    </td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold">
                       ₹{Number(latestReceipt.amountPaid).toLocaleString('en-IN')}.00
                     </td>
                   </tr>
-                  <tr className="border-t-2 border-slate-800 font-black text-sm bg-emerald-50/50">
+                  <tr className="border-t-2 border-slate-800 font-black text-sm">
                     <td className="py-2.5 px-2">TOTAL RECEIVED</td>
                     <td className="py-2.5 px-2 text-right text-emerald-800">
                       ₹{Number(latestReceipt.amountPaid).toLocaleString('en-IN')}.00
@@ -3147,6 +3177,73 @@ export const PrincipalPortal: React.FC<{ userRole?: string }> = ({ userRole }) =
                   <span className="font-bold text-slate-900">Bursar / Accounts Signatory</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PARENT CREDENTIALS AUTO-GENERATED ================= */}
+      {showParentCredsModal && createdParentCreds && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-emerald-200 space-y-5 animate-slide-up relative">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                <CheckCircle2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Student Admitted Successfully!</h3>
+                <p className="text-xs text-emerald-600 font-bold">✓ Parent Login Credentials Auto-Generated</p>
+              </div>
+            </div>
+
+            <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-200 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-emerald-200/60">
+                <span className="text-slate-600 font-bold">Student Name:</span>
+                <span className="font-extrabold text-slate-900 uppercase">{createdParentCreds.studentName}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-emerald-200/60">
+                <span className="text-slate-600 font-bold">Parent / Guardian:</span>
+                <span className="font-bold text-slate-800">{createdParentCreds.parentName}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-emerald-200/60">
+                <span className="text-slate-600 font-bold">Parent Login ID (Mobile):</span>
+                <span className="font-mono font-black text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-lg text-sm">
+                  {createdParentCreds.loginId}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-bold">Auto-Password (Name+Phone):</span>
+                <span className="font-mono font-black text-emerald-800 bg-emerald-200 px-2.5 py-0.5 rounded-lg text-sm">
+                  {createdParentCreds.password}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              💡 Parents can log into the <strong>Mobile App</strong> or <strong>Web Portal</strong> using their <strong>Mobile Number</strong> as Login ID and the above password.
+            </p>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const msg = `🎓 *${currentSchool?.name || 'School ERP'}*\nDear ${createdParentCreds.parentName},\nYour ward ${createdParentCreds.studentName} has been enrolled successfully.\n\n📱 *Parent Portal / Mobile App Login Details:*\n- *Login ID (Mobile)*: ${createdParentCreds.loginId}\n- *Password*: ${createdParentCreds.password}\n- *School Code*: ${currentSchool?.code || ''}\n\nPlease keep these credentials secure.`;
+                  navigator.clipboard.writeText(msg);
+                  setCopiedParentCreds(true);
+                  setTimeout(() => setCopiedParentCreds(false), 2500);
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
+              >
+                {copiedParentCreds ? <Check size={16} /> : <Copy size={16} />}
+                <span>{copiedParentCreds ? 'Copied Details to Clipboard!' : '📋 Copy Parent Credentials'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowParentCredsModal(false)}
+                className="w-full py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition"
+              >
+                Close & Continue
+              </button>
             </div>
           </div>
         </div>

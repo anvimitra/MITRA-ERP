@@ -4,7 +4,7 @@ import { loginUser } from '../api';
 import { X, Sparkles, UserCheck, Shield, Users, Lock, Mail, Building2 } from 'lucide-react';
 
 interface Props {
-  currentSchool: School;
+  currentSchool?: School | null;
   onClose: () => void;
   onLoginSuccess: (user: User, school: School) => void;
 }
@@ -12,7 +12,7 @@ interface Props {
 export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [schoolCode, setSchoolCode] = useState(currentSchool.code || 'LSK01');
+  const [schoolCode, setSchoolCode] = useState(currentSchool?.code || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,21 +64,22 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
                 type="text"
                 value={schoolCode}
                 onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
-                placeholder="LSK01"
+                placeholder="e.g. DPA01 or SCH01"
                 className="w-full pl-9 pr-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-600 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1">Email Address</label>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Email or Mobile Number</label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
-                type="email"
+                type="text"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="parent.aryan@gmail.com"
+                placeholder="e.g. 9876543210 or user@school.edu"
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-600 focus:outline-none"
               />
             </div>

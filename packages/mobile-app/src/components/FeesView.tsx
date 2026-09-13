@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FeeItem, Student } from '../types';
-import { MOCK_FEES } from '../api';
+import { fetchStudentFeesLedger } from '../api';
 import { CreditCard, CheckCircle2, AlertCircle, Receipt, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface Props {
-  student: Student;
+  student?: Student | null;
+  fees?: FeeItem[];
 }
 
-export const FeesView: React.FC<Props> = ({ student }) => {
-  const [fees, setFees] = useState<FeeItem[]>(MOCK_FEES);
+export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
+  const [fees, setFees] = useState<FeeItem[]>(propFees || []);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [receiptModal, setReceiptModal] = useState<FeeItem | null>(null);
+
+  useEffect(() => {
+    if (propFees) {
+      setFees(propFees);
+    } else if (student?.id) {
+      fetchStudentFeesLedger(student.id).then(setFees).catch(() => setFees([]));
+    }
+  }, [student?.id, propFees]);
 
   const totalDue = fees
     .filter((f) => f.status === 'pending')
@@ -25,7 +34,7 @@ export const FeesView: React.FC<Props> = ({ student }) => {
             ? {
                 ...f,
                 status: 'paid',
-                receiptNo: `LSK-PAY-${Math.floor(100000 + Math.random() * 900000)}`,
+                receiptNo: `RCP-${Math.floor(100000 + Math.random() * 900000)}`,
                 paymentDate: new Date().toISOString().split('T')[0],
               }
             : f
@@ -65,8 +74,13 @@ export const FeesView: React.FC<Props> = ({ student }) => {
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
         <h3 className="font-bold text-xs text-slate-500 uppercase tracking-wider">Fee Invoices & Dues</h3>
 
-        <div className="space-y-3">
-          {fees.map((fee) => (
+        {fees.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-xs font-medium bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            No fee invoices or payment records found.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {fees.map((fee) => (
             <div
               key={fee.id}
               className={`p-3.5 rounded-xl border transition ${
@@ -111,7 +125,8 @@ export const FeesView: React.FC<Props> = ({ student }) => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Receipt View Modal */}
@@ -129,11 +144,11 @@ export const FeesView: React.FC<Props> = ({ student }) => {
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Student Name:</span>
-                <span className="font-bold text-slate-900">{student.firstName} {student.lastName}</span>
+                <span className="font-bold text-slate-900">{student ? `${student.firstName} ${student.lastName}` : 'N/A'}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Class:</span>
-                <span className="font-bold text-slate-900">{student.className}-{student.sectionName}</span>
+                <span className="font-bold text-slate-900">{student ? `${student.className}-${student.sectionName}` : 'N/A'}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Fee Particular:</span>

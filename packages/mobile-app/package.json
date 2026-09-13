@@ -1,7 +1,7 @@
 {
   "name": "@anvimitra/mobile-app",
   "version": "1.0.0",
-  "description": "ANVIMITRA-ERP All-In-One Mobile App for LSK Academy (Parent, Teacher, Principal & Student)",
+  "description": "MITRA-ERP All-In-One Mobile App (Parent, Teacher, Principal & Student)",
   "private": true,
   "type": "module",
   "scripts": {

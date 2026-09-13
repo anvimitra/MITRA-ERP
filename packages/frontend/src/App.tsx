@@ -129,7 +129,7 @@ export const App: React.FC = () => {
               <label className="block font-bold text-slate-400 mb-1">School Identification Code</label>
               <input
                 type="text"
-                placeholder="e.g. LSK01 or DPS01"
+                placeholder="e.g. DPA01 or SCH01"
                 value={loginSchoolCode}
                 onChange={(e) => setLoginSchoolCode(e.target.value.toUpperCase())}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono uppercase focus:outline-none focus:border-blue-500"
@@ -137,11 +137,11 @@ export const App: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-400 mb-1">Official Email Address</label>
+              <label className="block font-bold text-slate-400 mb-1">Official Email or Mobile Number</label>
               <input
-                type="email"
+                type="text"
                 required
-                placeholder="principal@lskacademy.edu"
+                placeholder="e.g. principal@school.edu or 9876543210"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
@@ -189,7 +189,7 @@ export const App: React.FC = () => {
       {/* Main Content Rendered strictly based on Authenticated Role */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {user.role === 'super_admin' && <SuperAdminPortal />}
-        {(user.role === 'principal' || user.role === 'accountant') && <PrincipalPortal userRole={user.role} />}
+        {(user.role === 'principal' || user.role === 'accountant') && <PrincipalPortal userRole={user.role} school={school} />}
         {user.role === 'teacher' && <TeacherPortal user={user} />}
         {user.role === 'parent' && <ParentPortal user={user} studentId={selectedStudentId} />}
         {user.role === 'student' && <StudentPortal user={user} />}

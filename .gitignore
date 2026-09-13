@@ -19,8 +19,17 @@ build/
 .mf/
 
 # Databases and local runtime data
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
 data/*.db
 data/*.sqlite
+packages/**/data/*.db
+packages/**/data/*.sqlite
+packages/**/local-storage/*.db
+packages/**/local-storage/*.sqlite
 local-storage/*.db
 local-storage/*.sqlite
 *.sqlite-journal

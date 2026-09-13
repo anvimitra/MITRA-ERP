@@ -3,7 +3,7 @@ import { AttendanceRecord, Student } from '../types';
 import { CheckCircle2, Clock, AlertCircle, Calendar, Filter } from 'lucide-react';
 
 interface Props {
-  student: Student;
+  student?: Student | null;
   attendance: AttendanceRecord[];
 }
 
@@ -20,6 +20,18 @@ export const AttendanceView: React.FC<Props> = ({ student, attendance }) => {
   const absentCount = attendance.filter((a) => a.status === 'absent').length;
   const total = attendance.length || 1;
   const percentage = Math.round((presentCount / total) * 100);
+
+  if (!student) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center min-h-[300px] bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
+        <Calendar className="w-10 h-10 text-slate-300 mb-2" />
+        <h3 className="font-bold text-slate-800 text-sm">No Student Attendance Data</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs">
+          Please log in or link a student account to view daily attendance logs.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-20">

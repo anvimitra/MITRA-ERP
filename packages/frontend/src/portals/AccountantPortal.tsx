@@ -25,9 +25,20 @@ import {
   PhoneCall,
 } from 'lucide-react';
 
-export const AccountantPortal: React.FC = () => {
+export const AccountantPortal: React.FC<{ school?: any }> = ({ school: initialSchool }) => {
+  const [currentSchool, setCurrentSchool] = useState<any>(initialSchool || null);
   const [structures, setStructures] = useState<FeeStructure[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (initialSchool) {
+      setCurrentSchool(initialSchool);
+    } else {
+      ApiService.getMe().then((res) => {
+        if (res?.school) setCurrentSchool(res.school);
+      }).catch(() => {});
+    }
+  }, [initialSchool]);
   const [payments, setPayments] = useState<any[]>([]);
   const [classesData, setClassesData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -678,13 +689,13 @@ export const AccountantPortal: React.FC = () => {
                   Official Institutional Fee Challan & Receipt
                 </span>
                 <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-950 font-serif mt-1">
-                  LSK ACADEMY
+                  {currentSchool?.name || 'Educational Institution'}
                 </h2>
                 <p className="text-[11px] text-slate-600 font-sans">
-                  CBSE Affiliated Senior Secondary School • Affiliation: 2130099
+                  {currentSchool?.affiliationNo ? `Affiliation: ${currentSchool.affiliationNo}` : 'Recognized Educational Institution'}
                 </p>
                 <p className="text-[10px] text-slate-500 font-sans">
-                  42-B, Shivaji Nagar, Bhopal, M.P. • Phone: +91 99887 76655
+                  {currentSchool?.address ? `${currentSchool.address} • Phone: ${currentSchool.phone || 'N/A'}` : (currentSchool?.phone ? `Phone: ${currentSchool.phone}` : '')}
                 </p>
               </div>
 
@@ -703,7 +714,7 @@ export const AccountantPortal: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span className="text-slate-500">Admission No:</span>{' '}
-                  <strong className="font-mono">{latestReceipt.admissionNo || 'LSK-ADM'}</strong>
+                  <strong className="font-mono">{latestReceipt.admissionNo || 'ADM'}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500">Class:</span>{' '}

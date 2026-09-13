@@ -32,206 +32,6 @@ export function setMobileToken(token: string | null) {
   }
 }
 
-// Default LSK Academy School Data
-export const LSK_SCHOOL_DEFAULT: School = {
-  id: 'school-lsk-01',
-  code: 'LSK01',
-  name: 'LSK Academy',
-  domain: 'lsk.anvimitra.com',
-  logoUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=150',
-  primaryColor: '#7c3aed',
-  secondaryColor: '#4c1d95',
-  phone: '+91 99887 76655',
-  email: 'info@lskacademy.edu',
-  address: '42-B, Shivaji Nagar, Bhopal, M.P.',
-  affiliationNo: 'CBSE/AFF/1032890',
-  principalName: 'Dr. Meena Joshi',
-  city: 'Bhopal',
-  state: 'Madhya Pradesh',
-  pincode: '462016',
-};
-
-export const DEFAULT_STUDENT: Student = {
-  id: 'lsk-stu-aryan-01',
-  admissionNo: 'LSK/2026/2001',
-  rollNo: 1,
-  firstName: 'Aryan',
-  lastName: 'Mishra',
-  className: 'Class 8',
-  sectionName: 'A',
-  bloodGroup: 'A+',
-  photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-  fatherName: 'Mr. Rohit Mishra',
-  motherName: 'Mrs. Anita Mishra',
-  parentPhone: '+91 98333 44556',
-};
-
-export const DEFAULT_STUDENTS_LIST: Student[] = [
-  DEFAULT_STUDENT,
-  {
-    id: 'lsk-stu-zara-02',
-    admissionNo: 'LSK/2026/2002',
-    rollNo: 2,
-    firstName: 'Zara',
-    lastName: 'Shaikh',
-    className: 'Class 8',
-    sectionName: 'A',
-    bloodGroup: 'B+',
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    fatherName: 'Mr. Imran Shaikh',
-    motherName: 'Mrs. Farida Shaikh',
-    parentPhone: '+91 98444 55667',
-  },
-  {
-    id: 'lsk-stu-dev-03',
-    admissionNo: 'LSK/2026/2003',
-    rollNo: 3,
-    firstName: 'Dev',
-    lastName: 'Tiwari',
-    className: 'Class 8',
-    sectionName: 'A',
-    bloodGroup: 'O+',
-    photoUrl: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=150',
-  },
-  {
-    id: 'lsk-stu-ish-04',
-    admissionNo: 'LSK/2026/2004',
-    rollNo: 4,
-    firstName: 'Ishita',
-    lastName: 'Rai',
-    className: 'Class 8',
-    sectionName: 'A',
-    bloodGroup: 'AB+',
-    photoUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-  },
-];
-
-export const MOCK_ATTENDANCE: AttendanceRecord[] = [
-  { id: '1', date: '2026-09-08', status: 'present', remarks: 'On time' },
-  { id: '2', date: '2026-09-07', status: 'present', remarks: 'On time' },
-  { id: '3', date: '2026-09-06', status: 'present', remarks: 'On time' },
-  { id: '4', date: '2026-09-05', status: 'late', remarks: 'Heavy traffic delay' },
-  { id: '5', date: '2026-09-04', status: 'present', remarks: 'On time' },
-  { id: '6', date: '2026-09-03', status: 'present', remarks: 'On time' },
-  { id: '7', date: '2026-09-02', status: 'absent', remarks: 'Fever sick leave' },
-  { id: '8', date: '2026-09-01', status: 'present', remarks: 'On time' },
-];
-
-export const MOCK_REPORTS: Record<string, ExamReport> = {
-  sa1: {
-    examId: 'lsk-exam-sa1',
-    examName: 'Summative Assessment 1 (SA1)',
-    examType: 'sa1',
-    academicYear: '2026-2027',
-    totalMarks: 448,
-    maxTotalMarks: 500,
-    percentage: 89.6,
-    overallGrade: 'A1',
-    resultStatus: 'PASSED',
-    subjects: [
-      { subjectName: 'Mathematics', subjectCode: 'LSK-MATH-8', marksObtained: 96, maxMarks: 100, grade: 'A1', remarks: 'Exceptional analytical ability' },
-      { subjectName: 'General Science', subjectCode: 'LSK-SCI-8', marksObtained: 91, maxMarks: 100, grade: 'A1', remarks: 'Great practical lab understanding' },
-      { subjectName: 'English Language', subjectCode: 'LSK-ENG-8', marksObtained: 88, maxMarks: 100, grade: 'A2', remarks: 'Excellent creative writing' },
-      { subjectName: 'Social Science', subjectCode: 'LSK-SST-8', marksObtained: 83, maxMarks: 100, grade: 'A2', remarks: 'Good grasp of Indian History' },
-      { subjectName: 'Hindi (Course B)', subjectCode: 'LSK-HIN-8', marksObtained: 90, maxMarks: 100, grade: 'A1', remarks: 'Very neat calligraphy & grammar' },
-    ],
-  },
-  weekly: {
-    examId: 'lsk-exam-weekly-01',
-    examName: 'Weekly Test 1 (Math & Science)',
-    examType: 'weekly',
-    academicYear: '2026-2027',
-    totalMarks: 48,
-    maxTotalMarks: 50,
-    percentage: 96.0,
-    overallGrade: 'A1',
-    resultStatus: 'PASSED',
-    subjects: [
-      { subjectName: 'Mathematics', subjectCode: 'LSK-MATH-8', marksObtained: 25, maxMarks: 25, grade: 'A1', remarks: 'Full marks' },
-      { subjectName: 'General Science', subjectCode: 'LSK-SCI-8', marksObtained: 23, maxMarks: 25, grade: 'A1', remarks: 'Good diagrams' },
-    ],
-  },
-  half_yearly: {
-    examId: 'lsk-exam-halfyearly',
-    examName: 'Half Yearly Examination 2026',
-    examType: 'half_yearly',
-    academicYear: '2026-2027',
-    totalMarks: 455,
-    maxTotalMarks: 500,
-    percentage: 91.0,
-    overallGrade: 'A1',
-    resultStatus: 'PASSED',
-    subjects: [
-      { subjectName: 'Mathematics', subjectCode: 'LSK-MATH-8', marksObtained: 98, maxMarks: 100, grade: 'A1', remarks: 'Brilliant conceptual speed' },
-      { subjectName: 'General Science', subjectCode: 'LSK-SCI-8', marksObtained: 92, maxMarks: 100, grade: 'A1', remarks: 'Outstanding experiment presentation' },
-      { subjectName: 'English Language', subjectCode: 'LSK-ENG-8', marksObtained: 86, maxMarks: 100, grade: 'A2', remarks: 'Well structured essays' },
-      { subjectName: 'Social Science', subjectCode: 'LSK-SST-8', marksObtained: 87, maxMarks: 100, grade: 'A2', remarks: 'Precise map work' },
-      { subjectName: 'Hindi (Course B)', subjectCode: 'LSK-HIN-8', marksObtained: 92, maxMarks: 100, grade: 'A1', remarks: 'High accuracy in literature questions' },
-    ],
-  },
-};
-
-export const MOCK_FEES: FeeItem[] = [
-  {
-    id: '1',
-    title: 'Tuition Fee - Quarter 1 (Apr - Jun)',
-    amount: 12000,
-    dueDate: '2026-04-15',
-    status: 'paid',
-    receiptNo: 'LSK-RCP-2026-400101',
-    paymentDate: '2026-04-10',
-  },
-  {
-    id: '2',
-    title: 'Examination & Activity Composite Fee',
-    amount: 3500,
-    dueDate: '2026-09-05',
-    status: 'pending',
-  },
-  {
-    id: '3',
-    title: 'Tuition Fee - Quarter 2 (Jul - Sep)',
-    amount: 12000,
-    dueDate: '2026-10-15',
-    status: 'pending',
-  },
-];
-
-export const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    title: 'Attendance Alert: Present',
-    message: 'Aryan Mishra marked PRESENT today at 08:05 AM. – LSK Academy',
-    channel: 'APP_PUSH_NOTIFICATION',
-    timestamp: 'Today, 08:06 AM',
-    read: false,
-  },
-  {
-    id: 'notif-2',
-    title: 'Fee Reminder: Exam & Activity Fee',
-    message: 'Fee of Rs. 3,500 is due on 05-Sep-2026. Please pay to avoid late fine.',
-    channel: 'APP_PUSH_NOTIFICATION',
-    timestamp: 'Yesterday',
-    read: true,
-  },
-  {
-    id: 'notif-3',
-    title: 'Report Card Published: SA1',
-    message: 'Summative Assessment 1 (SA1) results are now available. Aryan secured 89.6% (Grade A1).',
-    channel: 'APP_PUSH_NOTIFICATION',
-    timestamp: '3 days ago',
-    read: true,
-  },
-  {
-    id: 'notif-4',
-    title: 'Automated SMS Fallback Notice',
-    message: 'Absence SMS sent to parent contact (+91 98444 55667) for Zara Shaikh (App Inactive).',
-    channel: 'AUTOMATED_SMS_FALLBACK',
-    timestamp: '06-Sep-2026',
-    read: true,
-  },
-];
-
 // Helper for authenticated requests
 async function authFetch(endpoint: string, options: RequestInit = {}) {
   const token = getMobileToken();
@@ -249,7 +49,7 @@ async function authFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 // 1. Fetch School Details & Branding
-export async function fetchSchoolByCode(schoolCode: string): Promise<School> {
+export async function fetchSchoolByCode(schoolCode: string): Promise<School | null> {
   try {
     const res = await fetch(`${getApiBaseUrl()}/schools/branding/${schoolCode}`);
     if (res.ok) {
@@ -257,9 +57,9 @@ export async function fetchSchoolByCode(schoolCode: string): Promise<School> {
       return data.school;
     }
   } catch (err) {
-    console.warn('API fetchSchoolByCode offline, using fallback', err);
+    console.warn('API fetchSchoolByCode offline', err);
   }
-  return LSK_SCHOOL_DEFAULT;
+  return null;
 }
 
 // 2. Real Login to ERP with credentials
@@ -329,7 +129,7 @@ export async function fetchLiveStudents(): Promise<Student[]> {
   } catch (err) {
     console.warn('Live students offline:', err);
   }
-  return DEFAULT_STUDENTS_LIST;
+  return [];
 }
 
 // 5. Fetch Live Classes (Classes 1-12 & Sections A & B)
@@ -363,7 +163,7 @@ export async function fetchStudentAttendanceHistory(studentId: string): Promise<
   } catch (err) {
     console.warn('Student attendance offline:', err);
   }
-  return MOCK_ATTENDANCE;
+  return [];
 }
 
 // 7. Fetch Student Fees from ERP
@@ -392,7 +192,7 @@ export async function fetchStudentFeesLedger(studentId: string): Promise<FeeItem
   } catch (err) {
     console.warn('Student fees offline:', err);
   }
-  return MOCK_FEES;
+  return [];
 }
 
 // 8. Fetch Student Report Card from ERP
@@ -427,7 +227,7 @@ export async function fetchStudentExamReport(studentId: string, examId: string =
   } catch (err) {
     console.warn('Student report card offline:', err);
   }
-  return MOCK_REPORTS.sa1;
+  return null;
 }
 
 // 9. Submit Class Attendance to ERP
@@ -468,9 +268,9 @@ export async function fetchLiveNotices(): Promise<NotificationItem[]> {
       }
     }
   } catch (err) {
-    console.warn('Live notices offline, fallback to cached notices', err);
+    console.warn('Live notices offline', err);
   }
-  return MOCK_NOTIFICATIONS;
+  return [];
 }
 
 // 11. Broadcast Notice / Circular to School
@@ -585,32 +385,7 @@ export async function fetchCertificates(studentId?: string): Promise<Certificate
   } catch (err) {
     console.warn('Certificates offline:', err);
   }
-  return [
-    {
-      id: 'cert-1',
-      certificateType: 'BONAFIDE',
-      certificateNo: 'BON-2026-8401',
-      studentName: 'Aryan Mishra',
-      admissionNo: 'LSK/2026/2001',
-      issueDate: '2026-08-15',
-      academicYear: '2026-2027',
-      reason: 'Passport and Visa application verification',
-      conduct: 'Exemplary',
-      status: 'ISSUED',
-    },
-    {
-      id: 'cert-2',
-      certificateType: 'CHARACTER',
-      certificateNo: 'CHAR-2026-4022',
-      studentName: 'Aryan Mishra',
-      admissionNo: 'LSK/2026/2001',
-      issueDate: '2026-07-10',
-      academicYear: '2026-2027',
-      reason: 'State Talent Search Olympiad Registration',
-      conduct: 'Outstanding',
-      status: 'ISSUED',
-    },
-  ];
+  return [];
 }
 
 // 17. Fetch Official CBSE Admit Card
@@ -624,34 +399,7 @@ export async function fetchAdmitCard(studentId: string): Promise<any | null> {
   } catch (err) {
     console.warn('Admit Card offline:', err);
   }
-  return {
-    rollNo: 1,
-    rollCode: 'CBSE-LSK01-2026-0001',
-    admissionNo: 'LSK/2026/2001',
-    studentName: 'Aryan Mishra',
-    fatherName: 'Sanjay Mishra',
-    motherName: 'Sunita Mishra',
-    className: 'Class 8',
-    sectionName: 'A',
-    dob: '2012-04-12',
-    centerNumber: '8402',
-    centerName: 'LSK Academy Examination Center, Main Campus Block-A',
-    schoolName: 'LSK Academy',
-    schoolAffiliation: 'CBSE/AFF/1032890',
-    examTitle: 'Secondary School Examination 2026 (Annual Term)',
-    instructions: [
-      'Candidate must report to examination hall 30 minutes prior to test commencement.',
-      'Carry this printed Admit Card along with your School Digital ID Card.',
-      'Electronic gadgets, smartwatches, and study notes are strictly forbidden inside the hall.',
-      'Use only blue/black ballpoint pen for filling OMR sheets and answer booklets.',
-    ],
-    schedule: [
-      { subCode: 'MATH-8', subName: 'Mathematics Standard', examDate: '2026-10-10', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
-      { subCode: 'SCI-8', subName: 'Science Theory', examDate: '2026-10-12', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
-      { subCode: 'ENG-8', subName: 'English Language & Lit', examDate: '2026-10-14', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
-      { subCode: 'SST-8', subName: 'Social Science', examDate: '2026-10-16', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
-    ],
-  };
+  return null;
 }
 
 // 18. Fetch Student Transport
@@ -665,15 +413,7 @@ export async function fetchStudentTransport(studentId: string): Promise<StudentT
   } catch (err) {
     console.warn('Transport offline:', err);
   }
-  return {
-    id: 'tr-1',
-    studentId,
-    routeName: 'Route 1: City Center to School Campus',
-    stopName: 'Shivaji Nagar Square',
-    pickupTime: '07:30 AM',
-    dropTime: '02:30 PM',
-    vehicleNo: 'MP-04-E-1001',
-  };
+  return null;
 }
 
 // 19. Fetch Library Issues
@@ -692,26 +432,7 @@ export async function fetchLibraryIssues(studentId?: string): Promise<LibraryIss
   } catch (err) {
     console.warn('Library issues offline:', err);
   }
-  return [
-    {
-      id: 'lib-1',
-      bookTitle: 'NCERT Mathematics Class 8 Exemplar',
-      bookAuthor: 'NCERT Editorial Board',
-      issueDate: '2026-09-01',
-      dueDate: '2026-09-25',
-      fineAmount: 0,
-      status: 'ISSUED',
-    },
-    {
-      id: 'lib-2',
-      bookTitle: 'General Science Encyclopedia Vol 1',
-      bookAuthor: 'Oxford University Press',
-      issueDate: '2026-08-10',
-      dueDate: '2026-08-30',
-      fineAmount: 0,
-      status: 'RETURNED',
-    },
-  ];
+  return [];
 }
 
 // 20. Fetch Staff Leaves

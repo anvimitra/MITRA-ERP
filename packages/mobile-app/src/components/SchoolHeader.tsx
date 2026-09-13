@@ -3,7 +3,7 @@ import { School, User } from '../types';
 import { Bell, Sparkles, LogOut, RefreshCw } from 'lucide-react';
 
 interface Props {
-  school: School;
+  school?: School | null;
   user: User | null;
   unreadCount: number;
   hasUpdate?: boolean;
@@ -23,6 +23,10 @@ export const SchoolHeader: React.FC<Props> = ({
   onLogout,
   onCheckUpdate,
 }) => {
+  const schoolName = school?.name || 'MITRA-ERP';
+  const schoolCode = school?.code || 'MOBILE';
+  const logoUrl = school?.logoUrl || '/school-icon.svg';
+
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-r from-purple-700 via-purple-800 to-indigo-900 text-white shadow-lg pt-safe">
       <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
@@ -30,8 +34,8 @@ export const SchoolHeader: React.FC<Props> = ({
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md p-1.5 flex items-center justify-center border border-white/20 shadow-inner">
             <img
-              src={school.logoUrl || '/school-icon.svg'}
-              alt={school.name}
+              src={logoUrl}
+              alt={schoolName}
               className="w-full h-full object-contain rounded-lg"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
@@ -40,9 +44,9 @@ export const SchoolHeader: React.FC<Props> = ({
           </div>
           <div>
             <div className="flex items-center space-x-1.5">
-              <h1 className="font-bold text-base leading-tight tracking-tight text-white">{school.name}</h1>
+              <h1 className="font-bold text-base leading-tight tracking-tight text-white">{schoolName}</h1>
               <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-purple-950">
-                {school.code}
+                {schoolCode}
               </span>
             </div>
             <p className="text-xs text-purple-200 flex items-center space-x-1">

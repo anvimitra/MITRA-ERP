@@ -4,7 +4,7 @@ import { X, Printer, ShieldCheck, QrCode, Phone, Droplet, User, School as School
 
 interface Props {
   student: Student;
-  school: School;
+  school?: School | null;
   onClose: () => void;
 }
 
@@ -44,9 +44,9 @@ export const DigitalIdCardModal: React.FC<Props> = ({ student, school, onClose }
                   <SchoolIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-black text-xs leading-tight tracking-tight">{school.name}</h4>
+                  <h4 className="font-black text-xs leading-tight tracking-tight">{school?.name || 'School ERP'}</h4>
                   <span className="text-[9px] text-purple-200 font-semibold tracking-wider uppercase">
-                    Affiliated to CBSE • {school.code}
+                    Affiliated to CBSE {school?.code ? `• ${school.code}` : ''}
                   </span>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export const DigitalIdCardModal: React.FC<Props> = ({ student, school, onClose }
                   <span className="text-slate-400 block font-medium">Parent / Emergency Contact</span>
                   <span className="font-bold text-slate-800 flex items-center space-x-1">
                     <Phone className="w-2.5 h-2.5 text-purple-600" />
-                    <span>{student.parentPhone || '+91 98333 44556'}</span>
+                    <span>{student.parentPhone || 'N/A'}</span>
                   </span>
                 </div>
               </div>
@@ -108,7 +108,7 @@ export const DigitalIdCardModal: React.FC<Props> = ({ student, school, onClose }
                   ||||||||||||||||||||||
                 </div>
                 <span className="text-[9px] font-mono font-bold text-slate-500 mt-1">
-                  {student.admissionNo.replace(/\//g, '')}
+                  {(student.admissionNo || '').replace(/\//g, '')}
                 </span>
               </div>
             </div>

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Student, AttendanceRecord, FeeItem, ExamReport, CertificateItem, StudentTransportItem, LibraryIssueItem } from '../types';
+import { Student, AttendanceRecord, FeeItem, ExamReport, CertificateItem, StudentTransportItem, LibraryIssueItem, School } from '../types';
 import { fetchStudentTransport, fetchCertificates, fetchLibraryIssues, fetchAdmitCard } from '../api';
 import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download } from 'lucide-react';
 import { TabType } from './BottomNavBar';
 
 interface Props {
-  student: Student;
+  student?: Student | null;
+  school?: School | null;
   attendance: AttendanceRecord[];
   fees: FeeItem[];
-  latestReport: ExamReport;
+  latestReport: ExamReport | null;
   onChangeTab: (tab: TabType) => void;
   onOpenIdCard?: () => void;
   onCheckUpdate?: () => void;
@@ -16,6 +17,7 @@ interface Props {
 
 export const ParentView: React.FC<Props> = ({
   student,
+  school,
   attendance,
   fees,
   latestReport,
@@ -36,11 +38,27 @@ export const ParentView: React.FC<Props> = ({
   const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
 
   useEffect(() => {
-    fetchStudentTransport(student.id).then(setTransport).catch(() => {});
-    fetchCertificates(student.id).then(setCerts).catch(() => {});
-    fetchLibraryIssues(student.id).then(setBooks).catch(() => {});
-    fetchAdmitCard(student.id).then(setAdmitCard).catch(() => {});
-  }, [student.id]);
+    if (student?.id) {
+      fetchStudentTransport(student.id).then(setTransport).catch(() => {});
+      fetchCertificates(student.id).then(setCerts).catch(() => {});
+      fetchLibraryIssues(student.id).then(setBooks).catch(() => {});
+      fetchAdmitCard(student.id).then(setAdmitCard).catch(() => {});
+    }
+  }, [student?.id]);
+
+  if (!student) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center min-h-[300px] bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
+        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 mb-3">
+          <Sparkles className="w-8 h-8" />
+        </div>
+        <h3 className="font-bold text-slate-800 text-sm">No Student Linked</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+          No student record is currently linked to this account. When school admits your ward, their profile and updates will appear here automatically.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-20">
@@ -419,7 +437,7 @@ export const ParentView: React.FC<Props> = ({
             </div>
 
             <div className="text-center space-y-1">
-              <h3 className="font-black text-sm uppercase">LSK Academy</h3>
+              <h3 className="font-black text-sm uppercase">{school?.name || 'School ERP'}</h3>
               <p className="text-[10px] text-slate-500">Ref: {selectedCert.certificateNo}</p>
             </div>
 

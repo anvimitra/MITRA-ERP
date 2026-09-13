@@ -13,10 +13,22 @@ authRoutes.post('/login', async (c) => {
     return c.json({ error: 'Email and password are required' }, 400);
   }
 
-  // Find user by email
-  const user = db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+  const cleanIdentifier = String(email || '').trim();
+  const digitsOnly = cleanIdentifier.replace(/\D/g, '');
+
+  // Find user by email or normalized phone number
+  let user = db.select().from(schema.users).where(eq(schema.users.email, cleanIdentifier)).get();
+  if (!user && digitsOnly.length >= 10) {
+    const allUsers = db.select().from(schema.users).all();
+    user = allUsers.find((u: any) => {
+      const uPhone = (u.phone || '').replace(/\D/g, '');
+      const uEmail = (u.email || '').replace(/\D/g, '');
+      return uPhone === digitsOnly || uEmail === digitsOnly || (uPhone.length >= 10 && uPhone.endsWith(digitsOnly.slice(-10)));
+    });
+  }
+
   if (!user) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    return c.json({ error: 'Invalid login credentials. Please check your email or mobile number.' }, 401);
   }
 
   if (user.isActive === 0) {
@@ -26,7 +38,7 @@ authRoutes.post('/login', async (c) => {
   // Validate password
   const isValid = comparePassword(password, user.passwordHash);
   if (!isValid) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    return c.json({ error: 'Invalid login credentials. Please check your password.' }, 401);
   }
 
   // If schoolCode provided, verify school match (except for super_admin)
@@ -52,7 +64,16 @@ authRoutes.post('/login', async (c) => {
   let linkedStudents: any[] = [];
   let studentRecord: any = null;
   if (user.role === 'parent') {
-    const parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
+    let parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
+    if (!parentRecord && user.phone) {
+      // Fallback matching by phone
+      const allParents = db.select().from(schema.parents).all();
+      parentRecord = allParents.find((p: any) => {
+        const pPhone = (p.primaryPhone || '').replace(/\D/g, '');
+        const uPhone = (user.phone || '').replace(/\D/g, '');
+        return pPhone && uPhone && pPhone.endsWith(uPhone.slice(-10));
+      });
+    }
     if (parentRecord) {
       linkedStudents = db
         .select()

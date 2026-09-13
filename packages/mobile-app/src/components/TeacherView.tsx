@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Student, StaffLeaveItem } from '../types';
-import { DEFAULT_STUDENTS_LIST, submitClassAttendance, fetchLiveStudents, fetchLiveClasses, fetchStaffLeaves, applyStaffLeave } from '../api';
+import { submitClassAttendance, fetchLiveStudents, fetchLiveClasses, fetchStaffLeaves, applyStaffLeave } from '../api';
 import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck, RefreshCw, Briefcase, Plus } from 'lucide-react';
 
 interface Props {
@@ -21,7 +21,7 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Marks Entry state
-  const [selectedExam, setSelectedExam] = useState('lsk-exam-sa1');
+  const [selectedExam, setSelectedExam] = useState('exam-sa1');
   const [selectedSubject, setSelectedSubject] = useState('Mathematics');
 
   // Leaves state
@@ -63,22 +63,10 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           }))
         );
       } else {
-        setStudents(
-          DEFAULT_STUDENTS_LIST.map((s) => ({
-            ...s,
-            status: 'present',
-            marks: 85,
-          }))
-        );
+        setStudents([]);
       }
     } catch {
-      setStudents(
-        DEFAULT_STUDENTS_LIST.map((s) => ({
-          ...s,
-          status: 'present',
-          marks: 85,
-        }))
-      );
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -290,12 +278,12 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
                 onChange={(e) => setSelectedExam(e.target.value)}
                 className="w-full text-xs font-semibold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800"
               >
-                <option value="lsk-exam-sa1">SA1 Exam</option>
-                <option value="lsk-exam-sa2">SA2 Exam</option>
-                <option value="lsk-exam-sa3">SA3 Exam</option>
-                <option value="lsk-exam-halfyearly">Half Yearly Exam</option>
-                <option value="lsk-exam-yearly">Yearly Exam</option>
-                <option value="lsk-exam-weekly-01">Weekly Test 1</option>
+                <option value="exam-sa1">SA1 Exam</option>
+                <option value="exam-sa2">SA2 Exam</option>
+                <option value="exam-sa3">SA3 Exam</option>
+                <option value="exam-halfyearly">Half Yearly Exam</option>
+                <option value="exam-yearly">Yearly Exam</option>
+                <option value="exam-weekly-01">Weekly Test 1</option>
               </select>
             </div>
 
@@ -306,7 +294,11 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
                 onChange={(e) => setSelectedSubject(e.target.value)}
                 className="w-full text-xs font-semibold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 font-bold"
               >
-                <option value="lsk-sub-math">Mathematics (Allocated)</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Science">General Science</option>
+                <option value="English">English Language</option>
+                <option value="Social Studies">Social Studies</option>
+                <option value="Hindi">Hindi</option>
               </select>
             </div>
           </div>

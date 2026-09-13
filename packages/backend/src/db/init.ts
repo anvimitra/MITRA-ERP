@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 let globalDbInstance: DatabaseSync | null = null;
 
@@ -507,6 +508,22 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     } catch {
       // Column already exists
     }
+  }
+
+  // Ensure default Super Admin root account exists
+  try {
+    const adminRow = sqlite.prepare("SELECT id FROM users WHERE role = 'super_admin' LIMIT 1").get();
+    if (!adminRow) {
+      const now = new Date().toISOString();
+      const adminPassHash = bcrypt.hashSync('Admin@123', 10);
+      sqlite.prepare(`
+        INSERT INTO users (id, school_id, role, name, email, phone, password_hash, app_installed, is_active, created_at)
+        VALUES ('user-super-admin-01', NULL, 'super_admin', 'Super Administrator', 'admin@anvimitra.com', '+91 99999 88888', ?, 0, 1, ?)
+      `).run(adminPassHash, now);
+      console.log('✅ Default Super Admin root account verified: admin@anvimitra.com');
+    }
+  } catch (err) {
+    console.warn('Super Admin initialization check:', err);
   }
 
   globalDbInstance = sqlite;

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db, schema, eq } from '../db/index.js';
 import crypto from 'crypto';
-import { verifyToken } from '../services/auth.js';
+import { verifyToken, hashPassword } from '../services/auth.js';
 
 export const schoolRoutes = new Hono();
 
@@ -99,6 +99,8 @@ schoolRoutes.post('/', async (c) => {
     address,
     affiliationNo,
     principalName,
+    principalEmail,
+    principalPassword,
     city,
     state,
     pincode,
@@ -120,6 +122,7 @@ schoolRoutes.post('/', async (c) => {
   const apiSyncKey = `ANVI_SYNC_${crypto.randomBytes(16).toString('hex')}`;
   const now = new Date().toISOString();
 
+  // 1. Insert School
   db.insert(schema.schools).values({
     id: schoolId,
     name,
@@ -144,10 +147,54 @@ schoolRoutes.post('/', async (c) => {
     createdAt: now,
   }).run();
 
+  // 2. Create Principal Account with Super Admin specified credentials
+  const pEmail = principalEmail || email || `principal@${code.toLowerCase()}.edu`;
+  const pPassword = principalPassword || 'School@123';
+  const principalUserId = `user-principal-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+
+  db.insert(schema.users).values({
+    id: principalUserId,
+    schoolId,
+    role: 'principal',
+    name: principalName || `${name} Principal`,
+    email: pEmail,
+    phone: phone || '',
+    passwordHash: hashPassword(pPassword),
+    appInstalled: 0,
+    isActive: 1,
+    createdAt: now,
+  }).run();
+
+  // 3. Auto-initialize Classes 1 to 12 with Sections A & B for this school
+  try {
+    for (let grade = 1; grade <= 12; grade++) {
+      const classId = `cls-${code.toLowerCase()}-${grade}`;
+      db.insert(schema.classes).values({
+        id: classId,
+        schoolId,
+        name: `Class ${grade}`,
+        gradeLevel: grade,
+      }).run();
+
+      db.insert(schema.sections).values([
+        { id: `sec-${code.toLowerCase()}-${grade}-a`, schoolId, classId, name: 'A' },
+        { id: `sec-${code.toLowerCase()}-${grade}-b`, schoolId, classId, name: 'B' },
+      ]).run();
+    }
+  } catch (err) {
+    console.warn('Auto class initialization check:', err);
+  }
+
   return c.json({
-    message: 'School created successfully',
+    message: 'School created successfully with Principal credentials & standard classes 1 to 12',
     schoolId,
     apiSyncKey,
+    principalCredentials: {
+      schoolCode: code.toUpperCase(),
+      email: pEmail,
+      password: pPassword,
+      name: principalName || `${name} Principal`,
+    },
   }, 201);
 });
 

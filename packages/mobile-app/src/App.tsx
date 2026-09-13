@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { School, User, Student, AttendanceRecord, FeeItem, NotificationItem, AppUpdateInfo, ExamReport } from './types';
 import {
-  LSK_SCHOOL_DEFAULT,
-  DEFAULT_STUDENT,
-  DEFAULT_STUDENTS_LIST,
-  MOCK_ATTENDANCE,
-  MOCK_FEES,
-  MOCK_REPORTS,
-  MOCK_NOTIFICATIONS,
   fetchSchoolByCode,
   checkAppUpdate,
   fetchLiveNotices,
@@ -31,46 +24,51 @@ import { NotificationsView } from './components/NotificationsView';
 import { LoginModal } from './components/LoginModal';
 import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
+import { LogIn, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [school, setSchool] = useState<School>(LSK_SCHOOL_DEFAULT);
-  const [user, setUser] = useState<User | null>({
-    id: 'user-parent-aryan-lsk',
-    schoolId: 'school-lsk-01',
-    role: 'parent',
-    name: 'Rohit Mishra (Aryan\'s Father)',
-    email: 'parent.aryan@gmail.com',
-    phone: '+91 98333 44556',
-    appInstalled: 1,
+  const [school, setSchool] = useState<School | null>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_school');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_user');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
   });
 
-  const [student, setStudent] = useState<Student>(() => {
+  const [student, setStudent] = useState<Student | null>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_student');
       if (cached) return JSON.parse(cached);
     } catch {}
-    return DEFAULT_STUDENT;
+    return null;
   });
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_attendance');
       if (cached) return JSON.parse(cached);
     } catch {}
-    return MOCK_ATTENDANCE;
+    return [];
   });
   const [fees, setFees] = useState<FeeItem[]>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_fees');
       if (cached) return JSON.parse(cached);
     } catch {}
-    return MOCK_FEES;
+    return [];
   });
-  const [latestReport, setLatestReport] = useState<ExamReport>(() => {
+  const [latestReport, setLatestReport] = useState<ExamReport | null>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_report');
       if (cached) return JSON.parse(cached);
     } catch {}
-    return MOCK_REPORTS['sa1'];
+    return null;
   });
   const [enrolledStudentsCount, setEnrolledStudentsCount] = useState<number>(0);
   const [classesCount, setClassesCount] = useState<number>(12);
@@ -78,7 +76,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [showLogin, setShowLogin] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showIdCard, setShowIdCard] = useState(false);
@@ -127,23 +125,32 @@ export const App: React.FC = () => {
     fetchMe().then(async (res) => {
       if (res && res.user) {
         setUser(res.user);
-        if (res.school) setSchool(res.school);
+        localStorage.setItem('anvimitra_cached_user', JSON.stringify(res.user));
+        if (res.school) {
+          setSchool(res.school);
+          localStorage.setItem('anvimitra_cached_school', JSON.stringify(res.school));
+        }
         if (res.linkedStudents && res.linkedStudents.length > 0) {
           setStudent(res.linkedStudents[0]);
           refreshUserData(res.user, res.linkedStudents[0]);
+        } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher') {
+          refreshUserData(res.user);
         } else {
           const liveStus = await fetchLiveStudents();
-          if (liveStus.length > 0) {
+          if (liveStus && liveStus.length > 0) {
             setStudent(liveStus[0]);
             refreshUserData(res.user, liveStus[0]);
           }
         }
       } else {
-        // Fallback load school branding
-        fetchSchoolByCode('LSK01').then((s) => {
-          if (s) setSchool(s);
-        });
+        const token = localStorage.getItem('anvimitra_mobile_token');
+        if (!token) {
+          setShowLogin(true);
+        }
       }
+    }).catch(() => {
+      const token = localStorage.getItem('anvimitra_mobile_token');
+      if (!token) setShowLogin(true);
     });
 
     // 2. Real-time Auto-Update Detection
@@ -180,22 +187,27 @@ export const App: React.FC = () => {
       setUpdateInfo(info);
       setShowUpdateBanner(true);
     } else {
-      alert('✓ Your Mobile App is already running the latest version (v1.2.0)!');
+      alert('✓ Your Mobile App is already running the latest version!');
     }
   };
 
   const handleLoginSuccess = async (newUser: User, newSchool: School, linkedStudents?: any[]) => {
     setUser(newUser);
     setSchool(newSchool);
+    localStorage.setItem('anvimitra_cached_user', JSON.stringify(newUser));
+    localStorage.setItem('anvimitra_cached_school', JSON.stringify(newSchool));
 
     if (linkedStudents && linkedStudents.length > 0) {
       setStudent(linkedStudents[0]);
       refreshUserData(newUser, linkedStudents[0]);
     } else {
       const liveStudents = await fetchLiveStudents();
-      if (liveStudents.length > 0) {
+      if (liveStudents && liveStudents.length > 0) {
         setStudent(liveStudents[0]);
         refreshUserData(newUser, liveStudents[0]);
+      } else {
+        setStudent(null);
+        refreshUserData(newUser);
       }
     }
 
@@ -210,7 +222,17 @@ export const App: React.FC = () => {
 
   const handleLogout = () => {
     setMobileToken(null);
+    localStorage.removeItem('anvimitra_cached_user');
+    localStorage.removeItem('anvimitra_cached_school');
+    localStorage.removeItem('anvimitra_cached_student');
+    localStorage.removeItem('anvimitra_cached_attendance');
+    localStorage.removeItem('anvimitra_cached_fees');
+    localStorage.removeItem('anvimitra_cached_report');
     setUser(null);
+    setStudent(null);
+    setAttendance([]);
+    setFees([]);
+    setLatestReport(null);
     setShowLogin(true);
   };
 
@@ -254,11 +276,29 @@ export const App: React.FC = () => {
               </button>
               <NotificationsView notifications={notifications} onMarkAllRead={handleMarkAllRead} />
             </div>
+          ) : !user ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-purple-100 flex items-center justify-center text-purple-700 mb-4 shadow-inner">
+                <Sparkles className="w-10 h-10" />
+              </div>
+              <h2 className="text-xl font-black text-slate-800">Welcome to MITRA-ERP</h2>
+              <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
+                Log in with your registered Official Email or Mobile Number to access your institutional dashboard.
+              </p>
+              <button
+                onClick={() => setShowLogin(true)}
+                className="mt-6 px-6 py-3 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-bold rounded-2xl shadow-lg shadow-purple-600/30 active:scale-98 transition flex items-center space-x-2"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to School ERP</span>
+              </button>
+            </div>
           ) : (
             <>
               {activeTab === 'home' && (
                 <ParentView
                   student={student}
+                  school={school}
                   attendance={attendance}
                   fees={fees}
                   latestReport={latestReport}
@@ -316,7 +356,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Digital Student Identity Card Modal */}
-        {showIdCard && (
+        {showIdCard && student && (
           <DigitalIdCardModal
             student={student}
             school={school}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { School, SMSLogItem } from '../types';
 import { ApiService } from '../api';
-import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X } from 'lucide-react';
+import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check } from 'lucide-react';
 
 export const SuperAdminPortal: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
@@ -34,6 +34,17 @@ export const SuperAdminPortal: React.FC = () => {
   const [tagline, setTagline] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
 
+  const [principalEmail, setPrincipalEmail] = useState('');
+  const [principalPassword, setPrincipalPassword] = useState('');
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    schoolCode: string;
+    email: string;
+    password: string;
+    name: string;
+  } | null>(null);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [copiedCreds, setCopiedCreds] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -55,7 +66,7 @@ export const SuperAdminPortal: React.FC = () => {
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createSchool({
+      const res = await ApiService.createSchool({
         name,
         code,
         domain,
@@ -65,6 +76,8 @@ export const SuperAdminPortal: React.FC = () => {
         address,
         affiliationNo,
         principalName,
+        principalEmail,
+        principalPassword,
         city,
         state: stateName,
         pincode,
@@ -73,7 +86,7 @@ export const SuperAdminPortal: React.FC = () => {
         tagline,
         logoUrl,
       });
-      alert('✅ New School Tenant created successfully with full profile!');
+
       setShowAddModal(false);
       setName('');
       setCode('');
@@ -83,6 +96,8 @@ export const SuperAdminPortal: React.FC = () => {
       setAddress('');
       setAffiliationNo('');
       setPrincipalName('');
+      setPrincipalEmail('');
+      setPrincipalPassword('');
       setCity('');
       setStateName('');
       setPincode('');
@@ -91,6 +106,13 @@ export const SuperAdminPortal: React.FC = () => {
       setTagline('');
       setLogoUrl('');
       loadData();
+
+      if (res.principalCredentials) {
+        setCreatedCredentials(res.principalCredentials);
+        setShowCredentialsModal(true);
+      } else {
+        alert('✅ New School Tenant created successfully with full profile!');
+      }
     } catch (err: any) {
       alert('Error creating school: ' + err.message);
     }
@@ -614,6 +636,53 @@ export const SuperAdminPortal: React.FC = () => {
                 </div>
               </div>
 
+              {/* Section 4: Principal Login Credentials */}
+              <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-purple-900 uppercase tracking-wider block">
+                    4. Principal Access Credentials (Admin Sign-In) *
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randPass = 'Princ@' + Math.floor(1000 + Math.random() * 9000);
+                      setPrincipalPassword(randPass);
+                    }}
+                    className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded-lg transition"
+                  >
+                    ⚡ Generate Password
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal Official Email (Login ID) *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder={code ? `principal@${code.toLowerCase()}.school.edu` : 'principal@school.edu'}
+                      value={principalEmail}
+                      onChange={(e) => setPrincipalEmail(e.target.value)}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Initial Password *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Princ@2026 or Secret#123"
+                      value={principalPassword}
+                      onChange={(e) => setPrincipalPassword(e.target.value)}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-purple-700">
+                  Super Admin explicitly creates this login. Principal uses School Code + this Email & Password to access their ERP.
+                </p>
+              </div>
+
               <div className="pt-3 flex gap-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -630,6 +699,69 @@ export const SuperAdminPortal: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PRINCIPAL CREDENTIALS GENERATED ================= */}
+      {showCredentialsModal && createdCredentials && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-purple-200 space-y-5 animate-slide-up relative">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-black shadow-lg shadow-purple-500/30">
+                <Key size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">School & Principal Provisioned!</h3>
+                <p className="text-xs text-emerald-600 font-bold">✓ Initialized with Classes 1-12 (A & B)</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 font-mono text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px] font-bold">School Tenant Code:</span>
+                <span className="font-black text-purple-700 bg-purple-100 px-2.5 py-1 rounded-lg text-sm">
+                  {createdCredentials.schoolCode}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px] font-bold">Principal Name:</span>
+                <span className="font-bold text-slate-800">{createdCredentials.name}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px] font-bold">Principal Login ID:</span>
+                <span className="font-bold text-slate-900">{createdCredentials.email}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-sans text-[11px] font-bold">Principal Password:</span>
+                <span className="font-black text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">
+                  {createdCredentials.password}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const credsText = `=== ANVIMITRA ERP - PRINCIPAL LOGIN CREDENTIALS ===\nSchool Code: ${createdCredentials.schoolCode}\nLogin Email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}\nPortal URL: ${window.location.origin}`;
+                  navigator.clipboard.writeText(credsText);
+                  setCopiedCreds(true);
+                  setTimeout(() => setCopiedCreds(false), 2500);
+                }}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition"
+              >
+                {copiedCreds ? <Check size={16} /> : <Copy size={16} />}
+                <span>{copiedCreds ? 'Copied to Clipboard!' : 'Copy Principal Credentials'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCredentialsModal(false)}
+                className="w-full py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

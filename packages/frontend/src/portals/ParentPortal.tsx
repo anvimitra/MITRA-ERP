@@ -78,12 +78,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
         const tt = await ApiService.getTimetableByClass(child.classId, child.sectionId).catch(() => ({ periods: [] }));
         setTimetable(tt.periods || []);
       } else {
-        // Fallback: try loading for Class 10 / Section A or Class 8 / Section A
-        const isLSK = studentId.includes('lsk') || studentId.includes('aryan') || studentId.includes('zara');
-        const classId = isLSK ? 'class-school-lsk-01-8' : 'class-10';
-        const secId = isLSK ? 'sec-class-school-lsk-01-8-a' : 'sec-10-a';
-        const tt = await ApiService.getTimetableByClass(classId, secId).catch(() => ({ periods: [] }));
-        setTimetable(tt.periods || []);
+        setTimetable([]);
       }
 
       // Load Transport Details

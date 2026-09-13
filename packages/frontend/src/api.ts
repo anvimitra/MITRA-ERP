@@ -95,8 +95,18 @@ export class ApiService {
     return this.request<{ schools: School[] }>('/schools');
   }
 
-  static async createSchool(schoolData: Partial<School>) {
-    return this.request<{ schoolId: string; apiSyncKey: string }>('/schools', {
+  static async createSchool(schoolData: any) {
+    return this.request<{
+      schoolId: string;
+      apiSyncKey: string;
+      message?: string;
+      principalCredentials?: {
+        schoolCode: string;
+        email: string;
+        password: string;
+        name: string;
+      };
+    }>('/schools', {
       method: 'POST',
       body: JSON.stringify(schoolData),
     });
@@ -241,7 +251,17 @@ export class ApiService {
   }
 
   static async createStudent(data: any) {
-    return this.request<{ success: boolean; message: string; studentId: string }>('/students', {
+    return this.request<{
+      success: boolean;
+      message: string;
+      studentId: string;
+      parentCredentials?: {
+        loginId: string;
+        password: string;
+        parentName: string;
+        studentName: string;
+      };
+    }>('/students', {
       method: 'POST',
       body: JSON.stringify(data),
     });

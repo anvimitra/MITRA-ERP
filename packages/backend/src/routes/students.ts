@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
-import { verifyToken } from '../services/auth.js';
+import { verifyToken, hashPassword } from '../services/auth.js';
 import crypto from 'crypto';
 
 export const studentRoutes = new Hono();
@@ -120,19 +120,87 @@ studentRoutes.post('/', async (c) => {
 
   const studentId = `stu-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   let parentId = null;
+  let parentCredentials = null;
 
-  // Create parent record if phone or fatherName provided
-  if (primaryPhone || fatherName) {
-    parentId = `par-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
-    db.insert(schema.parents).values({
-      id: parentId,
-      schoolId: user.schoolId,
-      fatherName: fatherName || '',
-      motherName: motherName || '',
-      primaryPhone: primaryPhone || '',
-      email: email || '',
-      address: address || '',
-    }).run();
+  // Auto-generate Parent Credentials & Account
+  if (primaryPhone || fatherName || motherName) {
+    const pName = (fatherName || motherName || 'PARENT').trim();
+    // Clean name letters only
+    const lettersOnly = pName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const namePrefix = (lettersOnly.length >= 4 ? lettersOnly.slice(0, 4) : lettersOnly.padEnd(4, 'P')).toUpperCase();
+
+    // Clean phone: extract digits only
+    const cleanPhone = (primaryPhone || '').replace(/\D/g, '');
+    const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+
+    // Auto password formula: First 4 uppercase letters of parent name + Last 4 digits of mobile
+    const autoPassword = `${namePrefix}${phoneSuffix}`;
+
+    let parentUserId: string | null = null;
+    if (cleanPhone.length >= 10) {
+      const allUsers = db.select().from(schema.users).all();
+      const existingParentUser = allUsers.find((u: any) => {
+        const uPhone = (u.phone || '').replace(/\D/g, '');
+        return uPhone === cleanPhone || (uPhone.length >= 10 && uPhone.endsWith(cleanPhone.slice(-10)));
+      });
+
+      if (existingParentUser) {
+        parentUserId = existingParentUser.id;
+      } else {
+        parentUserId = `user-parent-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+        db.insert(schema.users).values({
+          id: parentUserId,
+          schoolId: user.schoolId,
+          role: 'parent',
+          name: pName,
+          email: `${cleanPhone}@parent.school`,
+          phone: cleanPhone,
+          passwordHash: hashPassword(autoPassword),
+          appInstalled: 0,
+          isActive: 1,
+          createdAt: new Date().toISOString(),
+        }).run();
+      }
+
+      parentCredentials = {
+        loginId: cleanPhone,
+        password: autoPassword,
+        parentName: pName,
+        studentName: `${firstName} ${lastName || ''}`.trim(),
+      };
+    }
+
+    // Check existing parent record or create new
+    let parentRecord: any = null;
+    if (parentUserId) {
+      parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, parentUserId)).get();
+    }
+    if (!parentRecord && cleanPhone) {
+      const allParents = db.select().from(schema.parents).all();
+      parentRecord = allParents.find((p: any) => {
+        const pPhone = (p.primaryPhone || '').replace(/\D/g, '');
+        return pPhone === cleanPhone || (pPhone.length >= 10 && pPhone.endsWith(cleanPhone.slice(-10)));
+      });
+    }
+
+    if (parentRecord) {
+      parentId = parentRecord.id;
+      if (parentUserId && !parentRecord.userId) {
+        db.update(schema.parents).set({ userId: parentUserId }).where(eq(schema.parents.id, parentId)).run();
+      }
+    } else {
+      parentId = `par-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+      db.insert(schema.parents).values({
+        id: parentId,
+        schoolId: user.schoolId,
+        userId: parentUserId,
+        fatherName: fatherName || '',
+        motherName: motherName || '',
+        primaryPhone: primaryPhone || '',
+        email: email || '',
+        address: address || '',
+      }).run();
+    }
   }
 
   db.insert(schema.students).values({
@@ -160,6 +228,7 @@ studentRoutes.post('/', async (c) => {
     success: true,
     message: 'Student admitted successfully',
     studentId,
+    parentCredentials,
   });
 });
 
