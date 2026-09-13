@@ -17,6 +17,7 @@ import { BottomNavBar, TabType } from './components/BottomNavBar';
 import { ParentView } from './components/ParentView';
 import { TeacherView } from './components/TeacherView';
 import { PrincipalView } from './components/PrincipalView';
+import { SuperAdminView } from './components/SuperAdminView';
 import { AttendanceView } from './components/AttendanceView';
 import { ReportCardView } from './components/ReportCardView';
 import { FeesView } from './components/FeesView';
@@ -130,6 +131,18 @@ export const App: React.FC = () => {
           setSchool(res.school);
           localStorage.setItem('anvimitra_cached_school', JSON.stringify(res.school));
         }
+
+        // Set role-appropriate initial tab
+        if (res.user.role === 'super_admin') {
+          setActiveTab('schools');
+        } else if (res.user.role === 'principal' || res.user.role === 'accountant') {
+          setActiveTab('overview');
+        } else if (res.user.role === 'teacher') {
+          setActiveTab('attendance');
+        } else {
+          setActiveTab('home');
+        }
+
         if (res.linkedStudents && res.linkedStudents.length > 0) {
           setStudent(res.linkedStudents[0]);
           refreshUserData(res.user, res.linkedStudents[0]);
@@ -211,10 +224,12 @@ export const App: React.FC = () => {
       }
     }
 
-    if (newUser.role === 'teacher') {
-      setActiveTab('teacher');
+    if (newUser.role === 'super_admin') {
+      setActiveTab('schools');
     } else if (newUser.role === 'principal' || newUser.role === 'accountant') {
-      setActiveTab('principal');
+      setActiveTab('overview');
+    } else if (newUser.role === 'teacher') {
+      setActiveTab('attendance');
     } else {
       setActiveTab('home');
     }
@@ -294,45 +309,71 @@ export const App: React.FC = () => {
               </button>
             </div>
           ) : (
-            <>
-              {activeTab === 'home' && (
-                <ParentView
-                  student={student}
-                  school={school}
-                  attendance={attendance}
-                  fees={fees}
-                  latestReport={latestReport}
-                  onChangeTab={setActiveTab}
-                  onOpenIdCard={() => setShowIdCard(true)}
-                  onCheckUpdate={handleManualCheckUpdate}
-                />
-              )}
+            user.role === 'super_admin' ? (
+              <SuperAdminView
+                user={user}
+                activeSubTab={(activeTab === 'add_school' || activeTab === 'system') ? activeTab : 'schools'}
+                onSubTabChange={(t) => setActiveTab(t as TabType)}
+              />
+            ) : user.role === 'principal' || user.role === 'accountant' ? (
+              <PrincipalView
+                principal={user}
+                school={
+                  school || {
+                    id: user.schoolId || 'school-1',
+                    name: 'School',
+                    code: 'SCH',
+                    domain: '',
+                    logoUrl: '',
+                    primaryColor: '#2563eb',
+                    secondaryColor: '#1e40af',
+                  }
+                }
+                activeSubTab={
+                  activeTab === 'students' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
+                    ? activeTab
+                    : 'overview'
+                }
+                onSubTabChange={(t) => setActiveTab(t as TabType)}
+              />
+            ) : user.role === 'teacher' ? (
+              <TeacherView
+                teacher={user}
+                activeSubTab={
+                  activeTab === 'marks' || activeTab === 'leaves' || activeTab === 'notices'
+                    ? activeTab
+                    : 'attendance'
+                }
+                onSubTabChange={(t) => setActiveTab(t as TabType)}
+              />
+            ) : (
+              <>
+                {activeTab === 'home' && (
+                  <ParentView
+                    student={student}
+                    school={school}
+                    attendance={attendance}
+                    fees={fees}
+                    latestReport={latestReport}
+                    onChangeTab={setActiveTab}
+                    onOpenIdCard={() => setShowIdCard(true)}
+                    onCheckUpdate={handleManualCheckUpdate}
+                  />
+                )}
 
-              {activeTab === 'attendance' && (
-                <AttendanceView student={student} attendance={attendance} />
-              )}
+                {activeTab === 'attendance' && (
+                  <AttendanceView student={student} attendance={attendance} />
+                )}
 
-              {activeTab === 'report' && (
-                <ReportCardView student={student} school={school} />
-              )}
+                {activeTab === 'report' && (
+                  <ReportCardView student={student} school={school} />
+                )}
 
-              {activeTab === 'fees' && (
-                <FeesView student={student} />
-              )}
-
-              {activeTab === 'teacher' && user?.role === 'teacher' && (
-                <TeacherView teacher={user} />
-              )}
-
-              {activeTab === 'principal' && (user?.role === 'principal' || user?.role === 'accountant') && (
-                <PrincipalView
-                  principal={user}
-                  school={school}
-                  studentCount={enrolledStudentsCount}
-                  classCount={classesCount}
-                />
-              )}
-            </>
+                {activeTab === 'fees' && (
+                  <FeesView student={student} />
+                )}
+              </>
+            )
           )}
         </main>
 

@@ -1,4 +1,4 @@
-export type Role = 'parent' | 'teacher' | 'principal' | 'student';
+export type Role = 'parent' | 'teacher' | 'principal' | 'accountant' | 'student' | 'super_admin';
 
 export interface School {
   id: string;
@@ -19,6 +19,9 @@ export interface School {
   website?: string;
   establishedYear?: string;
   tagline?: string;
+  apiSyncKey?: string;
+  studentCount?: number;
+  teacherCount?: number;
 }
 
 export interface User {
@@ -203,3 +206,59 @@ export interface StaffLeaveItem {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   reviewRemarks?: string;
 }
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'teacher' | 'principal' | 'accountant' | 'super_admin';
+  appInstalled?: number;
+  isActive: number;
+  createdAt: string;
+}
+
+export interface FeeStructureItem {
+  id: string;
+  schoolId?: string;
+  classId: string;
+  title: string;
+  amount: number;
+  dueDate?: string;
+  academicYear?: string;
+}
+
+export interface FeePaymentRecord {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  feeStructureId: string;
+  feeTitle?: string;
+  amountPaid: number;
+  paymentDate: string;
+  paymentMode: string;
+  receiptNo: string;
+  status: string;
+  remarks?: string;
+}
+
+export interface ExamItem {
+  id: string;
+  name: string;
+  examType: string;
+  academicYear?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface MarksSheetStudent {
+  studentId: string;
+  admissionNo: string;
+  rollNo?: number | null;
+  name: string;
+  marksObtained: number | '';
+  maxMarks: number;
+  grade: string;
+  remarks: string;
+}
+

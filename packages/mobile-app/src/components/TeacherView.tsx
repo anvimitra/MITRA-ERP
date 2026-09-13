@@ -1,28 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { User, Student, StaffLeaveItem } from '../types';
-import { submitClassAttendance, fetchLiveStudents, fetchLiveClasses, fetchStaffLeaves, applyStaffLeave } from '../api';
-import { Check, X, Clock, Send, ShieldAlert, CheckCircle2, BookOpen, UserCheck, RefreshCw, Briefcase, Plus } from 'lucide-react';
+import { User, Student, StaffLeaveItem, ExamItem, NotificationItem } from '../types';
+import {
+  submitClassAttendance,
+  fetchLiveStudents,
+  fetchLiveClasses,
+  fetchStaffLeaves,
+  applyStaffLeave,
+  fetchExamsList,
+  fetchMarksSheet,
+  saveExamMarks,
+  fetchLiveNotices,
+} from '../api';
+import {
+  Check,
+  X,
+  Clock,
+  Send,
+  ShieldAlert,
+  CheckCircle2,
+  BookOpen,
+  UserCheck,
+  RefreshCw,
+  Briefcase,
+  Plus,
+  BellRing,
+  Layers,
+  Save,
+} from 'lucide-react';
 
 interface Props {
   teacher: User;
+  activeSubTab?: 'attendance' | 'marks' | 'leaves' | 'notices';
+  onSubTabChange?: (tab: 'attendance' | 'marks' | 'leaves' | 'notices') => void;
 }
 
-export const TeacherView: React.FC<Props> = ({ teacher }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'marks' | 'leaves'>('attendance');
+export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTab, onSubTabChange }) => {
+  const [internalTab, setInternalTab] = useState<'attendance' | 'marks' | 'leaves' | 'notices'>('attendance');
+  const activeSubTab = externalTab || internalTab;
+  const setActiveSubTab = (tab: 'attendance' | 'marks' | 'leaves' | 'notices') => {
+    setInternalTab(tab);
+    if (onSubTabChange) onSubTabChange(tab);
+  };
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [classList, setClassList] = useState<any[]>([]);
+  const [sectionList, setSectionList] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [students, setStudents] = useState<
-    Array<Student & { status: 'present' | 'absent' | 'late'; marks?: number; remarks?: string }>
+    Array<Student & { status: 'present' | 'absent' | 'late'; marks?: number | ''; remarks?: string }>
   >([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Marks Entry state
+  const [exams, setExams] = useState<ExamItem[]>([]);
   const [selectedExam, setSelectedExam] = useState('exam-sa1');
   const [selectedSubject, setSelectedSubject] = useState('Mathematics');
+  const [savingMarks, setSavingMarks] = useState(false);
 
   // Leaves state
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
@@ -33,9 +69,19 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
   const [leaveReason, setLeaveReason] = useState('');
   const [submittingLeave, setSubmittingLeave] = useState(false);
 
+  // Notices state
+  const [notices, setNotices] = useState<NotificationItem[]>([]);
+
   useEffect(() => {
     loadClassData();
     fetchStaffLeaves().then(setLeaves).catch(() => {});
+    fetchExamsList().then((list) => {
+      if (list && list.length > 0) {
+        setExams(list);
+        setSelectedExam(list[0].id);
+      }
+    }).catch(() => {});
+    fetchLiveNotices().then(setNotices).catch(() => {});
   }, []);
 
   const loadClassData = async () => {
@@ -48,8 +94,10 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
 
       if (classesData?.classes?.length > 0) {
         setClassList(classesData.classes);
-        setSelectedClassId(classesData.classes[0].id);
+        const defaultClass = classesData.classes[0].id;
+        setSelectedClassId(defaultClass);
         if (classesData.sections?.length > 0) {
+          setSectionList(classesData.sections);
           setSelectedSectionId(classesData.sections[0].id);
         }
       }
@@ -59,7 +107,7 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           studentsData.map((s) => ({
             ...s,
             status: 'present',
-            marks: 85,
+            marks: '',
           }))
         );
       } else {
@@ -72,18 +120,47 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
     }
   };
 
+  // Load marks sheet when exam or subject or class changes
+  const loadMarksSheetData = async (examId: string, classId: string, sectionId: string, subject: string) => {
+    if (!examId || !classId) return;
+    try {
+      const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
+      if (sheet && sheet.length > 0) {
+        setStudents((prev) =>
+          prev.map((s) => {
+            const entry = sheet.find((sh) => sh.studentId === s.id);
+            return {
+              ...s,
+              marks: entry && entry.marksObtained !== '' ? entry.marksObtained : s.marks ?? '',
+            };
+          })
+        );
+      }
+    } catch (err) {
+      console.warn('Marks sheet fetch error', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'marks' && selectedClassId) {
+      loadMarksSheetData(selectedExam, selectedClassId, selectedSectionId, selectedSubject);
+    }
+  }, [activeSubTab, selectedExam, selectedClassId, selectedSectionId, selectedSubject]);
+
   const toggleStatus = (id: string, newStatus: 'present' | 'absent' | 'late') => {
     setStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
     );
   };
 
-  const updateStudentMarks = (id: string, val: number) => {
+  const updateStudentMarks = (id: string, val: string) => {
+    const num = val === '' ? '' : Math.min(100, Math.max(0, parseInt(val) || 0));
     setStudents((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, marks: Math.min(100, Math.max(0, val)) } : s))
+      prev.map((s) => (s.id === id ? { ...s, marks: num } : s))
     );
   };
 
+  // Save Attendance to ERP
   const handleSubmitAttendance = async () => {
     setIsSubmitting(true);
     setFeedback(null);
@@ -96,12 +173,71 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
       }));
 
       await submitClassAttendance(selectedClassId || 'class-1', selectedSectionId || 'sec-a', selectedDate, records);
-
       setFeedback('✅ Attendance recorded successfully! Instant In-App Notifications dispatched to all parents.');
     } catch (err: any) {
       setFeedback(err.message || 'Error recording attendance.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Real Save Exam Marks to ERP
+  const handleSaveMarks = async () => {
+    setSavingMarks(true);
+    setFeedback(null);
+
+    try {
+      const marksList = students.map((s) => ({
+        studentId: s.id,
+        marksObtained: typeof s.marks === 'number' ? s.marks : 0,
+        maxMarks: 100,
+        remarks: 'Recorded by Teacher via Mobile App',
+      }));
+
+      await saveExamMarks(
+        selectedExam || 'exam-sa1',
+        selectedClassId || 'class-1',
+        selectedSectionId || 'sec-a',
+        selectedSubject,
+        marksList
+      );
+
+      setFeedback(`✅ Subject marks for ${selectedSubject} saved to Cloud ERP database successfully!`);
+    } catch (err: any) {
+      setFeedback(err.message || 'Failed to save subject marks.');
+    } finally {
+      setSavingMarks(false);
+    }
+  };
+
+  // Apply Leave
+  const handleApplyLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveReason.trim()) return;
+    setSubmittingLeave(true);
+    try {
+      const start = new Date(leaveStartDate);
+      const end = new Date(leaveEndDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+
+      await applyStaffLeave({
+        leaveType,
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        totalDays,
+        reason: leaveReason.trim(),
+      });
+
+      setShowApplyModal(false);
+      setLeaveReason('');
+      setFeedback('✅ Leave application submitted to Principal for review.');
+      const updated = await fetchStaffLeaves();
+      setLeaves(updated || []);
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit leave.');
+    } finally {
+      setSubmittingLeave(false);
     }
   };
 
@@ -115,50 +251,59 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           </div>
           <div>
             <h2 className="font-extrabold text-base leading-tight">{teacher.name}</h2>
-            <p className="text-xs text-purple-200">Designated Class Teacher: <span className="font-bold text-amber-300">Class 8-A</span></p>
-            <p className="text-[11px] text-purple-300">Subject Allocated: <span className="font-bold text-emerald-300">Mathematics</span></p>
+            <p className="text-xs text-purple-200">
+              Role: <span className="font-bold text-amber-300">Faculty / Teacher</span>
+            </p>
+            <p className="text-[11px] text-purple-300">
+              Department: <span className="font-bold text-emerald-300">Academic Staff</span>
+            </p>
           </div>
         </div>
 
-        {/* RBAC Notice */}
-        <div className="mt-3 p-2 bg-purple-950/60 rounded-xl text-[11px] text-purple-200 border border-purple-800 flex items-center space-x-2">
-          <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>Strict RBAC: You are permitted to record attendance exclusively for Class 8-A.</span>
+        {/* Sub Tabs */}
+        <div className="grid grid-cols-4 gap-1 mt-3 pt-3 border-t border-white/10 text-[10px] font-bold">
+          <button
+            onClick={() => setActiveSubTab('attendance')}
+            className={`py-1.5 px-1 rounded-xl transition text-center ${
+              activeSubTab === 'attendance' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Attendance
+          </button>
+          <button
+            onClick={() => setActiveSubTab('marks')}
+            className={`py-1.5 px-1 rounded-xl transition text-center ${
+              activeSubTab === 'marks' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Marks Entry
+          </button>
+          <button
+            onClick={() => setActiveSubTab('leaves')}
+            className={`py-1.5 px-1 rounded-xl transition text-center ${
+              activeSubTab === 'leaves' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Leaves
+          </button>
+          <button
+            onClick={() => setActiveSubTab('notices')}
+            className={`py-1.5 px-1 rounded-xl transition text-center ${
+              activeSubTab === 'notices' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Circulars
+          </button>
         </div>
       </div>
 
-      {/* Sub tabs: Attendance vs Marks */}
-      <div className="flex bg-slate-200 p-1 rounded-xl">
-        <button
-          onClick={() => setActiveSubTab('attendance')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
-            activeSubTab === 'attendance' ? 'bg-white text-purple-800 shadow-sm' : 'text-slate-600'
-          }`}
-        >
-          Daily Attendance (8-A)
-        </button>
-        <button
-          onClick={() => setActiveSubTab('marks')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
-            activeSubTab === 'marks' ? 'bg-white text-purple-800 shadow-sm' : 'text-slate-600'
-          }`}
-        >
-          Subject Marks
-        </button>
-        <button
-          onClick={() => setActiveSubTab('leaves')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
-            activeSubTab === 'leaves' ? 'bg-white text-purple-800 shadow-sm' : 'text-slate-600'
-          }`}
-        >
-          Faculty Leaves
-        </button>
-      </div>
-
       {feedback && (
-        <div className="p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 bg-emerald-50 text-emerald-900 border border-emerald-300">
+        <div className="p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-sm">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-          <div>{feedback}</div>
+          <div className="flex-1">{feedback}</div>
+          <button onClick={() => setFeedback(null)} className="text-emerald-700 hover:text-emerald-900">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -168,10 +313,10 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-slate-800">Class Roll Call</h3>
+                <h3 className="font-bold text-sm text-slate-800">Daily Attendance Roll Call</h3>
                 {loading && <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin" />}
               </div>
-              <p className="text-xs text-slate-500">Tap status button to toggle presence</p>
+              <p className="text-xs text-slate-500">Tap status badge to mark Present, Absent, or Late</p>
             </div>
             <div className="flex items-center gap-2">
               {classList.length > 0 && (
@@ -197,72 +342,80 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           </div>
 
           <div className="space-y-2">
-            {students.map((stu) => (
-              <div
-                key={stu.id}
-                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-900 text-xs font-black flex items-center justify-center">
-                    {stu.rollNo}
-                  </span>
-                  <div>
-                    <h4 className="font-bold text-xs text-slate-800">
-                      {stu.firstName} {stu.lastName}
-                    </h4>
-                    <p className="text-[10px] text-slate-400">Adm #{stu.admissionNo}</p>
+            {students.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs">
+                {loading ? 'Loading class students...' : 'No students found in this class.'}
+              </div>
+            ) : (
+              students.map((stu) => (
+                <div
+                  key={stu.id}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <img
+                      src={stu.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                      alt=""
+                      className="w-8 h-8 rounded-lg object-cover"
+                    />
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800">
+                        {stu.firstName} {stu.lastName}
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        Roll #{stu.rollNo || '-'} • Adm: {stu.admissionNo}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Attendance Toggle Buttons */}
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => toggleStatus(stu.id, 'present')}
+                      className={`p-1.5 rounded-lg text-xs font-black transition ${
+                        stu.status === 'present'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      title="Present"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleStatus(stu.id, 'late')}
+                      className={`p-1.5 rounded-lg text-xs font-black transition ${
+                        stu.status === 'late'
+                          ? 'bg-amber-500 text-white shadow'
+                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      title="Late"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleStatus(stu.id, 'absent')}
+                      className={`p-1.5 rounded-lg text-xs font-black transition ${
+                        stu.status === 'absent'
+                          ? 'bg-rose-600 text-white shadow'
+                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      title="Absent"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                {/* Status Toggle Buttons */}
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => toggleStatus(stu.id, 'present')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition ${
-                      stu.status === 'present'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                    }`}
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>P</span>
-                  </button>
-
-                  <button
-                    onClick={() => toggleStatus(stu.id, 'late')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition ${
-                      stu.status === 'late'
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                    }`}
-                  >
-                    <Clock className="w-3 h-3" />
-                    <span>L</span>
-                  </button>
-
-                  <button
-                    onClick={() => toggleStatus(stu.id, 'absent')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition ${
-                      stu.status === 'absent'
-                        ? 'bg-rose-600 text-white shadow-sm'
-                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                    }`}
-                  >
-                    <X className="w-3 h-3" />
-                    <span>A</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <button
             onClick={handleSubmitAttendance}
-            disabled={isSubmitting}
-            className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2"
+            disabled={isSubmitting || students.length === 0}
+            className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50 mt-3"
           >
             <Send className="w-4 h-4" />
-            <span>{isSubmitting ? 'Recording Attendance...' : 'Submit Attendance & Notify Parents'}</span>
+            <span>{isSubmitting ? 'Recording & Notifying Parents...' : 'Submit Attendance & Notify Parents'}</span>
           </button>
         </div>
       )}
@@ -272,23 +425,33 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Exam Type</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Select Exam</label>
               <select
                 value={selectedExam}
                 onChange={(e) => setSelectedExam(e.target.value)}
                 className="w-full text-xs font-semibold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800"
               >
-                <option value="exam-sa1">SA1 Exam</option>
-                <option value="exam-sa2">SA2 Exam</option>
-                <option value="exam-sa3">SA3 Exam</option>
-                <option value="exam-halfyearly">Half Yearly Exam</option>
-                <option value="exam-yearly">Yearly Exam</option>
-                <option value="exam-weekly-01">Weekly Test 1</option>
+                {exams.length > 0 ? (
+                  exams.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="exam-sa1">SA1 Exam</option>
+                    <option value="exam-sa2">SA2 Exam</option>
+                    <option value="exam-sa3">SA3 Exam</option>
+                    <option value="exam-halfyearly">Half Yearly Exam</option>
+                    <option value="exam-yearly">Yearly Exam</option>
+                    <option value="exam-weekly-01">Weekly Test 1</option>
+                  </>
+                )}
               </select>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Permitted Subject</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Subject</label>
               <select
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
@@ -304,39 +467,47 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
           </div>
 
           <div className="space-y-2 mt-2">
-            {students.map((stu) => (
-              <div
-                key={stu.id}
-                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
-              >
-                <div>
-                  <h4 className="font-bold text-xs text-slate-800">
-                    {stu.firstName} {stu.lastName}
-                  </h4>
-                  <p className="text-[10px] text-slate-400">Roll #{stu.rollNo}</p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={stu.marks ?? 0}
-                    onChange={(e) => updateStudentMarks(stu.id, parseInt(e.target.value) || 0)}
-                    className="w-16 p-1 text-center font-black text-sm text-purple-900 bg-white border border-slate-300 rounded-lg shadow-inner"
-                  />
-                  <span className="text-xs text-slate-400 font-semibold">/ 100</span>
-                </div>
+            {students.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs">
+                No students enrolled to grade.
               </div>
-            ))}
+            ) : (
+              students.map((stu) => (
+                <div
+                  key={stu.id}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
+                >
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-800">
+                      {stu.firstName} {stu.lastName}
+                    </h4>
+                    <p className="text-[10px] text-slate-400">Roll #{stu.rollNo || '-'} • Adm: {stu.admissionNo}</p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="--"
+                      value={stu.marks ?? ''}
+                      onChange={(e) => updateStudentMarks(stu.id, e.target.value)}
+                      className="w-16 p-1 text-center font-black text-sm text-purple-900 bg-white border border-slate-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    />
+                    <span className="text-xs text-slate-400 font-semibold">/ 100</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <button
-            onClick={() => setFeedback('Subject marks for Mathematics saved & locked!')}
-            className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2"
+            onClick={handleSaveMarks}
+            disabled={savingMarks || students.length === 0}
+            className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50"
           >
-            <BookOpen className="w-4 h-4" />
-            <span>Save Subject Marks</span>
+            <Save className="w-4 h-4" />
+            <span>{savingMarks ? 'Saving Marks to ERP...' : 'Save & Lock Subject Marks'}</span>
           </button>
         </div>
       )}
@@ -370,19 +541,26 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
                     <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-purple-100 text-purple-800">
                       {l.leaveType} LEAVE
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                      l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                      l.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
-                      'bg-amber-100 text-amber-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        l.status === 'APPROVED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : l.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
                       {l.status}
                     </span>
                   </div>
-                  <p className="font-bold text-slate-800">{l.startDate} to {l.endDate} ({l.totalDays} days)</p>
-                  <p className="text-slate-600 text-[11px]"><span className="text-slate-400">Reason:</span> {l.reason}</p>
+
+                  <p className="text-slate-700 font-medium">{l.reason}</p>
+                  <p className="text-[10px] text-slate-400">
+                    {l.startDate} to {l.endDate} ({l.totalDays} Days)
+                  </p>
                   {l.reviewRemarks && (
-                    <p className="text-[10px] bg-slate-50 p-1.5 rounded-lg border text-slate-500 italic">
-                      <strong>Principal:</strong> {l.reviewRemarks}
+                    <p className="text-[10px] text-purple-700 bg-purple-50 p-1.5 rounded-lg">
+                      Principal Note: {l.reviewRemarks}
                     </p>
                   )}
                 </div>
@@ -392,107 +570,103 @@ export const TeacherView: React.FC<Props> = ({ teacher }) => {
         </div>
       )}
 
-      {/* MODAL: APPLY LEAVE */}
+      {/* NOTICES & CIRCULARS */}
+      {activeSubTab === 'notices' && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+            <BellRing className="w-4 h-4 text-purple-600" />
+            <span>Official School Circulars ({notices.length})</span>
+          </h3>
+
+          <div className="space-y-2">
+            {notices.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs bg-white rounded-2xl border p-4">
+                No active circulars from the Principal.
+              </div>
+            ) : (
+              notices.map((n) => (
+                <div key={n.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <strong className="text-slate-900 font-bold">{n.title}</strong>
+                    <span className="text-[10px] text-slate-400">{n.timestamp}</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">{n.message}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* APPLY LEAVE MODAL */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-sm w-full bg-white rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-200">
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-xs font-black uppercase text-purple-900">Apply Faculty Leave</span>
-              <button onClick={() => setShowApplyModal(false)} className="text-slate-400 p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-black text-base text-slate-900">Apply for Faculty Leave</h3>
+              <button onClick={() => setShowApplyModal(false)} className="p-1.5 text-slate-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!leaveReason.trim()) return;
-                setSubmittingLeave(true);
-                try {
-                  await applyStaffLeave({
-                    leaveType,
-                    startDate: leaveStartDate,
-                    endDate: leaveEndDate,
-                    totalDays: 1,
-                    reason: leaveReason,
-                  });
-                  setFeedback('✅ Leave application submitted to Principal!');
-                  setShowApplyModal(false);
-                  setLeaveReason('');
-                  fetchStaffLeaves().then(setLeaves).catch(() => {});
-                } catch (err: any) {
-                  alert(err.message || 'Failed to submit leave.');
-                } finally {
-                  setSubmittingLeave(false);
-                }
-              }}
-              className="space-y-3 text-xs"
-            >
+            <form onSubmit={handleApplyLeave} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Leave Type</label>
+                <label className="font-bold text-slate-600 block mb-1">Leave Type</label>
                 <select
                   value={leaveType}
                   onChange={(e) => setLeaveType(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold"
                 >
                   <option value="CASUAL">Casual Leave (CL)</option>
-                  <option value="SICK">Medical / Sick Leave (ML)</option>
+                  <option value="SICK">Medical / Sick Leave</option>
                   <option value="EARNED">Earned Leave (EL)</option>
-                  <option value="DUTY">Official Duty (OD)</option>
+                  <option value="DUTY">On Duty (OD)</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">From</label>
+                  <label className="font-bold text-slate-600 block mb-1">Start Date</label>
                   <input
                     type="date"
                     required
                     value={leaveStartDate}
                     onChange={(e) => setLeaveStartDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                    className="w-full p-2 border rounded-xl bg-slate-50"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">To</label>
+                  <label className="font-bold text-slate-600 block mb-1">End Date</label>
                   <input
                     type="date"
                     required
                     value={leaveEndDate}
                     onChange={(e) => setLeaveEndDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold"
+                    className="w-full p-2 border rounded-xl bg-slate-50"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Reason</label>
+                <label className="font-bold text-slate-600 block mb-1">Reason for Leave *</label>
                 <textarea
-                  required
                   rows={3}
+                  required
+                  placeholder="State the reason for your absence..."
                   value={leaveReason}
                   onChange={(e) => setLeaveReason(e.target.value)}
-                  placeholder="State reason for absence..."
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2"
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-600"
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowApplyModal(false)}
-                  className="px-3 py-2 text-slate-600 font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingLeave}
-                  className="px-4 py-2 bg-purple-700 text-white font-bold rounded-xl shadow disabled:opacity-50"
-                >
-                  {submittingLeave ? 'Submitting...' : 'Submit Leave'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={submittingLeave}
+                className="w-full py-3 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 mt-4"
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>{submittingLeave ? 'Submitting...' : 'Submit Leave to Principal'}</span>
+              </button>
             </form>
           </div>
         </div>

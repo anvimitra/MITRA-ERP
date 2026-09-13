@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent } from './types';
 
 // Canonical Live Production Render API Endpoint
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -530,4 +530,318 @@ export async function reviewStaffLeave(leaveId: string, data: { status: string; 
   }
   return resData;
 }
+
+// 23. Create Student (With Auto Parent Credentials Generation)
+export async function createStudent(studentData: any): Promise<{
+  success: boolean;
+  message: string;
+  studentId: string;
+  parentCredentials?: {
+    loginId: string;
+    password: string;
+    parentName: string;
+    studentName: string;
+  };
+}> {
+  const res = await authFetch('/students', {
+    method: 'POST',
+    body: JSON.stringify(studentData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to enroll student');
+  }
+  return data;
+}
+
+// 24. Update Student
+export async function updateStudent(studentId: string, studentData: any) {
+  const res = await authFetch(`/students/${studentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(studentData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update student details');
+  }
+  return data;
+}
+
+// 25. Delete Student
+export async function deleteStudent(studentId: string) {
+  const res = await authFetch(`/students/${studentId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to remove student');
+  }
+  return data;
+}
+
+// 26. Fetch Staff / Faculty Members
+export async function fetchStaffMembers(): Promise<StaffMember[]> {
+  try {
+    const res = await authFetch('/teachers');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.staff)) {
+        return data.staff;
+      }
+    }
+  } catch (err) {
+    console.warn('Staff members offline:', err);
+  }
+  return [];
+}
+
+// 27. Create Staff Member
+export async function createStaffMember(staffData: {
+  name: string;
+  email: string;
+  phone?: string;
+  role?: string;
+  password: string;
+}) {
+  const res = await authFetch('/teachers', {
+    method: 'POST',
+    body: JSON.stringify(staffData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to recruit staff member');
+  }
+  return data;
+}
+
+// 28. Update Staff Member
+export async function updateStaffMember(staffId: string, staffData: any) {
+  const res = await authFetch(`/teachers/${staffId}`, {
+    method: 'PUT',
+    body: JSON.stringify(staffData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update staff member');
+  }
+  return data;
+}
+
+// 29. Deactivate / Delete Staff Member
+export async function deleteStaffMember(staffId: string) {
+  const res = await authFetch(`/teachers/${staffId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to deactivate staff member');
+  }
+  return data;
+}
+
+// 30. Fetch Fee Structures
+export async function fetchFeeStructures(): Promise<FeeStructureItem[]> {
+  try {
+    const res = await authFetch('/fees/structures');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.structures)) {
+        return data.structures;
+      }
+    }
+  } catch (err) {
+    console.warn('Fee structures offline:', err);
+  }
+  return [];
+}
+
+// 31. Create Fee Structure
+export async function createFeeStructure(data: {
+  classId: string;
+  title: string;
+  amount: number;
+  dueDate?: string;
+  academicYear?: string;
+}) {
+  const res = await authFetch('/fees/structures', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to create fee structure');
+  }
+  return resData;
+}
+
+// 32. Collect Fee Payment
+export async function collectFeePayment(paymentData: {
+  studentId: string;
+  feeStructureId: string;
+  amountPaid: number;
+  paymentMode: string;
+  remarks?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  payment: {
+    id: string;
+    receiptNo: string;
+    amountPaid: number;
+    paymentDate: string;
+    status: string;
+  };
+}> {
+  const res = await authFetch('/fees/collect', {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to record fee payment');
+  }
+  return data;
+}
+
+// 33. Fetch All Fee Payments
+export async function fetchFeePayments(): Promise<FeePaymentRecord[]> {
+  try {
+    const res = await authFetch('/fees/payments');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.payments)) {
+        return data.payments;
+      }
+    }
+  } catch (err) {
+    console.warn('Fee payments offline:', err);
+  }
+  return [];
+}
+
+// 34. Send Fee Reminder Notice
+export async function sendFeeReminder(data: {
+  studentId: string;
+  dueAmount: number;
+  dueDate: string;
+}) {
+  const res = await authFetch('/fees/send-reminder', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to dispatch fee reminder');
+  }
+  return resData;
+}
+
+// 35. Fetch Exams List
+export async function fetchExamsList(): Promise<ExamItem[]> {
+  try {
+    const res = await authFetch('/exams');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.exams)) {
+        return data.exams;
+      }
+    }
+  } catch (err) {
+    console.warn('Exams list offline:', err);
+  }
+  return [];
+}
+
+// 36. Fetch Marks Sheet for a class & subject
+export async function fetchMarksSheet(
+  examId: string,
+  classId: string,
+  sectionId: string,
+  subjectId: string
+): Promise<MarksSheetStudent[]> {
+  try {
+    const query = new URLSearchParams({ examId, classId, sectionId, subjectId }).toString();
+    const res = await authFetch(`/exams/marks-sheet?${query}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.students)) {
+        return data.students;
+      }
+    }
+  } catch (err) {
+    console.warn('Marks sheet offline:', err);
+  }
+  return [];
+}
+
+// 37. Save Exam Marks
+export async function saveExamMarks(
+  examId: string,
+  classId: string,
+  sectionId: string,
+  subjectId: string,
+  marksList: Array<{ studentId: string; marksObtained: number; maxMarks: number; remarks?: string }>
+) {
+  const res = await authFetch('/exams/marks', {
+    method: 'POST',
+    body: JSON.stringify({ examId, classId, sectionId, subjectId, marksList }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to save subject marks');
+  }
+  return data;
+}
+
+// 38. Super Admin: Fetch Schools
+export async function fetchSchools(): Promise<School[]> {
+  try {
+    const res = await authFetch('/schools');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.schools)) {
+        return data.schools;
+      }
+    }
+  } catch (err) {
+    console.warn('Schools offline:', err);
+  }
+  return [];
+}
+
+// 39. Super Admin: Create School
+export async function createSchool(schoolData: any): Promise<{
+  success: boolean;
+  message: string;
+  schoolId: string;
+  principalCredentials?: {
+    email: string;
+    password: string;
+    name: string;
+    schoolCode: string;
+  };
+}> {
+  const res = await authFetch('/schools', {
+    method: 'POST',
+    body: JSON.stringify(schoolData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create school tenant');
+  }
+  return data;
+}
+
+// 40. Super Admin: Delete School
+export async function deleteSchool(schoolId: string) {
+  const res = await authFetch(`/schools/${schoolId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to remove school');
+  }
+  return data;
+}
+
 
