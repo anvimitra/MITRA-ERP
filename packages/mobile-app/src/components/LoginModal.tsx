@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, School } from '../types';
-import { loginUser } from '../api';
-import { X, Sparkles, UserCheck, Shield, Users, Lock, Mail, Building2 } from 'lucide-react';
+import { loginUser, getApiBaseUrl, checkServerHealth, PRODUCTION_RENDER_API_URL } from '../api';
+import { X, Sparkles, Lock, Mail, Building2, Globe, CheckCircle2, AlertCircle, RefreshCw, Settings2 } from 'lucide-react';
 
 interface Props {
   currentSchool?: School | null;
@@ -16,6 +16,39 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Server health & endpoint state
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+  const [checkingServer, setCheckingServer] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [customApiUrl, setCustomApiUrl] = useState(localStorage.getItem('anvimitra_api_url') || '');
+
+  const verifyServer = async () => {
+    setCheckingServer(true);
+    try {
+      const res = await checkServerHealth();
+      setServerOnline(res.online);
+    } catch {
+      setServerOnline(false);
+    } finally {
+      setCheckingServer(false);
+    }
+  };
+
+  useEffect(() => {
+    verifyServer();
+  }, []);
+
+  const handleSaveCustomServer = () => {
+    const trimmed = customApiUrl.trim();
+    if (trimmed) {
+      localStorage.setItem('anvimitra_api_url', trimmed);
+    } else {
+      localStorage.removeItem('anvimitra_api_url');
+    }
+    setShowServerConfig(false);
+    verifyServer();
+  };
+
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -25,12 +58,14 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
       const res = await loginUser(email, password, schoolCode);
       onLoginSuccess(res.user, res.school);
       onClose();
-    } catch {
-      setError('Invalid credentials or school code');
+    } catch (err: any) {
+      setError(err?.message || 'Invalid credentials or school code');
     } finally {
       setLoading(false);
     }
   };
+
+  const currentApiUrl = getApiBaseUrl();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -48,16 +83,89 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
           </button>
         </div>
 
+        {/* Server Connection Status Banner */}
+        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between text-[11px]">
+          <div className="flex items-center space-x-2 truncate">
+            {checkingServer ? (
+              <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin flex-shrink-0" />
+            ) : serverOnline === true ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            ) : serverOnline === false ? (
+              <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+            )}
+            <div className="truncate">
+              <span className="font-bold text-slate-800">
+                {checkingServer
+                  ? 'Connecting to Cloud ERP...'
+                  : serverOnline
+                  ? 'Cloud ERP Connected'
+                  : 'ERP Server Connecting...'}
+              </span>
+              <span className="text-slate-400 text-[10px] block truncate">
+                {currentApiUrl.replace(/^https?:\/\//, '')}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="p-1 text-slate-400 hover:text-purple-700 transition"
+            title="Configure Server Endpoint"
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Optional Server Config Drawer */}
+        {showServerConfig && (
+          <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
+            <label className="font-bold text-purple-900 block">Cloud / Local Server Endpoint</label>
+            <input
+              type="text"
+              value={customApiUrl}
+              onChange={(e) => setCustomApiUrl(e.target.value)}
+              placeholder={PRODUCTION_RENDER_API_URL}
+              className="w-full px-2.5 py-1.5 text-xs bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+            />
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomApiUrl('');
+                  localStorage.removeItem('anvimitra_api_url');
+                  setShowServerConfig(false);
+                  verifyServer();
+                }}
+                className="text-[10px] text-purple-700 hover:underline font-semibold"
+              >
+                Reset to Default Render Cloud
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomServer}
+                className="px-3 py-1 bg-purple-700 text-white rounded-lg text-xs font-bold shadow-sm"
+              >
+                Save & Connect
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="p-2.5 rounded-xl bg-rose-50 text-rose-800 text-xs font-semibold border border-rose-200">
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
         {/* Credentials Form */}
         <form onSubmit={handleManualLogin} className="space-y-3">
           <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1">School Tenant Code</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[11px] font-bold text-slate-600">School Tenant Code</label>
+              <span className="text-[10px] text-slate-400">(Optional for Super Admin)</span>
+            </div>
             <div className="relative">
               <Building2 className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
@@ -71,7 +179,7 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-600 block mb-1">Email or Mobile Number</label>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Official Email or Mobile Number</label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
@@ -91,6 +199,7 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
               <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -102,10 +211,10 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 mt-2"
+            className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 mt-2 disabled:opacity-60"
           >
             <Sparkles className="w-4 h-4" />
-            <span>{loading ? 'Authenticating...' : 'Sign In to Mobile ERP'}</span>
+            <span>{loading ? 'Authenticating with ERP Cloud...' : 'Sign In to Mobile ERP'}</span>
           </button>
         </form>
       </div>

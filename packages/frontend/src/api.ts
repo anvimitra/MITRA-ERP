@@ -15,7 +15,28 @@ import {
   Student,
 } from './types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
+
+function getApiBase(): string {
+  const customUrl = localStorage.getItem('anvimitra_api_url');
+  if (customUrl && customUrl.trim()) return customUrl.trim();
+
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const { hostname, port } = window.location;
+    // Local Vite dev server on PC
+    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '5173') {
+      return 'http://localhost:4000/api';
+    }
+    // Cloudflare Pages (*.pages.dev), Workers, or custom domains
+    return PRODUCTION_RENDER_API_URL;
+  }
+  return PRODUCTION_RENDER_API_URL;
+}
+
+const API_BASE = getApiBase();
 
 export class ApiService {
   private static token: string | null = localStorage.getItem('anvimitra_token');

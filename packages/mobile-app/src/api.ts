@@ -1,23 +1,43 @@
 import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem } from './types';
 
-// Dynamic API Base URL detection
-export function getApiBaseUrl(): string {
-  const customUrl = localStorage.getItem('anvimitra_api_url');
-  if (customUrl) return customUrl;
+// Canonical Live Production Render API Endpoint
+export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
 
+// Dynamic API Base URL detection - Guaranteed cloud connectivity for mobile devices
+export function getApiBaseUrl(): string {
+  // 1. Explicit user override from settings
+  const customUrl = localStorage.getItem('anvimitra_api_url');
+  if (customUrl && customUrl.trim()) return customUrl.trim();
+
+  // 2. Vite build-time environment variable
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
+  // 3. Detect Capacitor Native App (Android/iOS APK)
+  // In Capacitor, hostname is 'localhost' or 'capacitor:', but there is NO local server on the phone!
+  // Any phone MUST connect directly to the Cloud Render backend.
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const { hostname, port, protocol } = window.location;
+    const isCapacitorNative =
+      (window as any).Capacitor !== undefined ||
+      protocol === 'capacitor:' ||
+      (hostname === 'localhost' && (!port || port === '80' || port === '443'));
+
+    if (isCapacitorNative) {
+      return PRODUCTION_RENDER_API_URL;
+    }
+
+    // 4. Local Vite Dev Server on PC (port 5174)
+    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '5174') {
       return 'http://localhost:4000/api';
     }
-    return 'https://anvimitra-erp.onrender.com/api';
+
+    // 5. Any mobile device or external browser opening the webapp
+    return PRODUCTION_RENDER_API_URL;
   }
 
-  return 'http://localhost:4000/api';
+  return PRODUCTION_RENDER_API_URL;
 }
 
 export function getMobileToken(): string | null {
@@ -68,21 +88,51 @@ export async function loginUser(
   password: string,
   schoolCode: string
 ): Promise<{ token: string; user: User; school: School; linkedStudents?: any[] }> {
-  const res = await fetch(`${getApiBaseUrl()}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, schoolCode }),
-  });
+  const cleanCode = (schoolCode || '').trim().toUpperCase();
+  const cleanEmail = (email || '').trim();
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Authentication failed. Please check credentials and school code.');
-  }
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password, schoolCode: cleanCode, isMobileApp: true }),
+    });
 
-  if (data.token) {
-    setMobileToken(data.token);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Authentication failed. Please check credentials and school code.');
+    }
+
+    if (data.token) {
+      setMobileToken(data.token);
+    }
+    return data;
+  } catch (err: any) {
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError') && !err.message.includes('Failed to fetch')) {
+      throw err;
+    }
+    throw new Error(`Unable to reach ERP Cloud Server (${getApiBaseUrl()}). Please check your internet connection or server status.`);
   }
-  return data;
+}
+
+// 2.1 Check Server Health
+export async function checkServerHealth(): Promise<{ online: boolean; url: string; latency?: number }> {
+  const url = getApiBaseUrl();
+  const start = Date.now();
+  try {
+    const healthEndpoint = url.endsWith('/api') ? url.replace(/\/api$/, '/health') : `${url}/health`;
+    const res = await fetch(healthEndpoint, { method: 'GET' });
+    if (res.ok) {
+      return { online: true, url, latency: Date.now() - start };
+    }
+  } catch {}
+  try {
+    const res = await fetch(`${url}/app/version`, { method: 'GET' });
+    if (res.ok) {
+      return { online: true, url, latency: Date.now() - start };
+    }
+  } catch {}
+  return { online: false, url };
 }
 
 // 3. Verify Active Session (/api/auth/me)
