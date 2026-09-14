@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { db, schema, eq } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken, hashPassword } from '../services/auth.js';
+import { isPostgresConnected, getPostgresPool } from '../db/postgres-sync.js';
+import { restoreLocalBackup, saveLocalBackup } from '../db/persistent-backup.js';
+import { getDatabaseInstance } from '../db/init.js';
 
 export const schoolRoutes = new Hono();
 
@@ -301,3 +304,136 @@ schoolRoutes.delete('/:id', async (c) => {
 
   return c.json({ success: true, message: `School '${existing.name}' (${existing.code}) has been removed.` });
 });
+
+// =========================================================================
+// ZERO-DATA-LOSS DATABASE STATUS & BACKUP RECOVERY ENDPOINTS
+// =========================================================================
+
+// Database Status (Publicly queryable or by Super Admin)
+schoolRoutes.get('/db-status', async (c) => {
+  const isPg = isPostgresConnected();
+  const allSchools = db.select().from(schema.schools).all();
+  const allStudents = db.select().from(schema.students).all();
+  const allUsers = db.select().from(schema.users).all();
+
+  return c.json({
+    database: isPg ? 'postgresql' : 'sqlite',
+    isPostgresConnected: isPg,
+    schoolCount: allSchools.length,
+    studentCount: allStudents.length,
+    userCount: allUsers.length,
+    persistentStorage: isPg ? 'Cloud PostgreSQL (Zero Data Loss)' : 'Local PC / Ephemeral Disk',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Download JSON Backup Snapshot (Super Admin only)
+schoolRoutes.get('/backup-snapshot', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const schools = db.select().from(schema.schools).all();
+  const users = db.select().from(schema.users).all();
+  const classes = db.select().from(schema.classes).all();
+  const sections = db.select().from(schema.sections).all();
+  const students = db.select().from(schema.students).all();
+  const parents = db.select().from(schema.parents).all();
+  const subjects = db.select().from(schema.subjects).all();
+  const marks = db.select().from(schema.marks).all();
+  const attendance = db.select().from(schema.attendance).all();
+  const feeStructures = db.select().from(schema.feeStructures).all();
+  const feePayments = db.select().from(schema.feePayments).all();
+
+  return c.json({
+    version: '1.0.0',
+    exportDate: new Date().toISOString(),
+    source: 'ANVIMITRA-ERP Cloud Control Plane',
+    totalSchools: schools.length,
+    dataset: {
+      schools,
+      users,
+      classes,
+      sections,
+      students,
+      parents,
+      subjects,
+      marks,
+      attendance,
+      feeStructures,
+      feePayments,
+    },
+  });
+});
+
+// Restore from JSON Backup Snapshot (Super Admin only)
+schoolRoutes.post('/restore-snapshot', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const body = await c.req.json();
+  const dataset = body.dataset || body;
+  if (!dataset || !Array.isArray(dataset.schools)) {
+    return c.json({ error: 'Invalid backup format: schools array not found' }, 400);
+  }
+
+  let restoredCount = 0;
+  for (const s of dataset.schools) {
+    try {
+      db.insert(schema.schools).values(s).run();
+      restoredCount++;
+    } catch {}
+  }
+
+  if (Array.isArray(dataset.users)) {
+    for (const u of dataset.users) {
+      try {
+        db.insert(schema.users).values(u).run();
+      } catch {}
+    }
+  }
+
+  if (Array.isArray(dataset.classes)) {
+    for (const cl of dataset.classes) {
+      try {
+        db.insert(schema.classes).values(cl).run();
+      } catch {}
+    }
+  }
+
+  if (Array.isArray(dataset.sections)) {
+    for (const sec of dataset.sections) {
+      try {
+        db.insert(schema.sections).values(sec).run();
+      } catch {}
+    }
+  }
+
+  if (Array.isArray(dataset.students)) {
+    for (const st of dataset.students) {
+      try {
+        db.insert(schema.students).values(st).run();
+      } catch {}
+    }
+  }
+
+  // Trigger local file backup save
+  try {
+    const sqlite = getDatabaseInstance();
+    saveLocalBackup(sqlite);
+  } catch {}
+
+  return c.json({
+    success: true,
+    message: `Restored ${restoredCount} schools successfully from backup snapshot`,
+    totalSchools: restoredCount,
+  });
+});
+

@@ -844,4 +844,48 @@ export async function deleteSchool(schoolId: string) {
   return data;
 }
 
+// 41. Super Admin: DB Status & Master Storage
+export async function fetchDbStatus(): Promise<{
+  database: string;
+  isPostgresConnected: boolean;
+  schoolCount: number;
+  studentCount: number;
+  userCount: number;
+  persistentStorage: string;
+}> {
+  const res = await authFetch('/schools/db-status');
+  if (res.ok) {
+    return await res.json();
+  }
+  return {
+    database: 'sqlite',
+    isPostgresConnected: false,
+    schoolCount: 0,
+    studentCount: 0,
+    userCount: 0,
+    persistentStorage: 'Local Master Storage',
+  };
+}
+
+export async function fetchBackupSnapshot(): Promise<any> {
+  const res = await authFetch('/schools/backup-snapshot');
+  if (!res.ok) {
+    throw new Error('Failed to fetch backup snapshot');
+  }
+  return await res.json();
+}
+
+export async function restoreBackupSnapshot(dataset: any): Promise<any> {
+  const res = await authFetch('/schools/restore-snapshot', {
+    method: 'POST',
+    body: JSON.stringify({ dataset }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to restore backup');
+  }
+  return data;
+}
+
+
 

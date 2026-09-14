@@ -1,7 +1,7 @@
 @echo off
-title MITRA-ERP Local Storage PC Sync Connector
+title ANVIMITRA-ERP Master PC Storage & Sync Connector
 echo ============================================================
-echo   STARTING MITRA-ERP LOCAL STORAGE PC SYNC CONNECTOR
+echo   ANVIMITRA-ERP ALL-SCHOOL MASTER PC STORAGE CONNECTOR (.EXE)
 echo ============================================================
 echo.
 echo [*] Target Directory: %~dp0packages\desktop-sync-agent

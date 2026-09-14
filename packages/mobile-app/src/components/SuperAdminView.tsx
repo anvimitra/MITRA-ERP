@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { School, User } from '../types';
-import { fetchSchools, createSchool, deleteSchool, checkServerHealth } from '../api';
+import { fetchSchools, createSchool, deleteSchool, checkServerHealth, fetchDbStatus, fetchBackupSnapshot, restoreBackupSnapshot } from '../api';
 import {
   ShieldCheck,
   Building2,
@@ -18,6 +18,9 @@ import {
   Phone,
   Mail,
   RefreshCw,
+  HardDrive,
+  Download,
+  Database,
 } from 'lucide-react';
 
 interface Props {
@@ -64,16 +67,24 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
     schoolCode: string;
   } | null>(null);
   const [copiedCreds, setCopiedCreds] = useState(false);
+  const [dbStatus, setDbStatus] = useState<{
+    database: string;
+    isPostgresConnected: boolean;
+    schoolCount: number;
+    persistentStorage: string;
+  } | null>(null);
 
   const loadSchoolsData = async () => {
     setLoading(true);
     try {
-      const [list, health] = await Promise.all([
+      const [list, health, status] = await Promise.all([
         fetchSchools(),
         checkServerHealth(),
+        fetchDbStatus().catch(() => null),
       ]);
       setSchools(list || []);
       setServerHealth(health);
+      if (status) setDbStatus(status);
     } catch (err) {
       console.warn('SuperAdmin load error', err);
     } finally {
@@ -217,6 +228,28 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
         <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold text-slate-400 block uppercase">Faculty</span>
           <p className="text-xl font-black text-indigo-700 mt-0.5">{totalTeachers}</p>
+        </div>
+      </div>
+
+      {/* Master PC Storage & Auto Recovery Banner */}
+      <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 p-3.5 rounded-2xl text-white shadow-md border border-purple-800/40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300">
+              <HardDrive className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold flex items-center gap-1.5">
+                <span>Single PC Master Storage</span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
+                  Auto-Recovery ON
+                </span>
+              </div>
+              <p className="text-[10px] text-purple-200 mt-0.5">
+                All school data safely mirrored to local PC. If cloud resets, PC restores it automatically.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

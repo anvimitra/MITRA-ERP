@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import { restoreLocalBackup } from './persistent-backup.js';
 
 let globalDbInstance: DatabaseSync | null = null;
 
@@ -524,6 +525,17 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     }
   } catch (err) {
     console.warn('Super Admin initialization check:', err);
+  }
+
+  // If schools count is 0, auto-restore from persistent backup snapshot
+  try {
+    const schoolRow = sqlite.prepare('SELECT count(*) as count FROM schools').get() as { count: number };
+    if (!schoolRow || schoolRow.count === 0) {
+      console.log('🔄 0 schools detected in local SQLite. Checking persistent backup snapshot...');
+      restoreLocalBackup(sqlite);
+    }
+  } catch (err) {
+    console.warn('Backup auto-restore check warning:', err);
   }
 
   globalDbInstance = sqlite;

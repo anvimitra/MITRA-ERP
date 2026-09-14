@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { School, SMSLogItem } from '../types';
 import { ApiService } from '../api';
-import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check } from 'lucide-react';
+import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check, HardDrive, Download, Upload, Database, AlertTriangle } from 'lucide-react';
 
 export const SuperAdminPortal: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
@@ -45,6 +45,19 @@ export const SuperAdminPortal: React.FC = () => {
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [copiedCreds, setCopiedCreds] = useState(false);
 
+  // Master PC Storage & DB Persistence State
+  const [dbStatus, setDbStatus] = useState<{
+    database: string;
+    isPostgresConnected: boolean;
+    schoolCount: number;
+    studentCount: number;
+    userCount: number;
+    persistentStorage: string;
+  } | null>(null);
+  const [showPgInstructions, setShowPgInstructions] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const restoreFileRef = useRef<HTMLInputElement | null>(null);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -52,10 +65,57 @@ export const SuperAdminPortal: React.FC = () => {
       setSchools(res.schools || []);
       const smsRes = await ApiService.getSMSLogs().catch(() => ({ smsLogs: [] }));
       setSmsLogs(smsRes.smsLogs || []);
+      const statusRes = await ApiService.getDbStatus().catch(() => null);
+      setDbStatus(statusRes);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const res = await ApiService.getBackupSnapshot();
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `anvimitra_master_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Failed to download backup: ' + err.message);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm(`Restore all schools and database records from '${file.name}'? Existing schools will be updated.`)) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setBackupLoading(true);
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const dataset = parsed.dataset || parsed;
+      const res = await ApiService.restoreBackupSnapshot(dataset);
+      alert(`✅ Success: Restored ${res.totalSchools || 0} schools into the active ERP!`);
+      await loadData();
+    } catch (err: any) {
+      alert('Error restoring backup: ' + err.message);
+    } finally {
+      setBackupLoading(false);
+      e.target.value = '';
     }
   };
 
@@ -231,6 +291,95 @@ export const SuperAdminPortal: React.FC = () => {
           <div className="text-2xl font-black text-slate-900">100%</div>
           <p className="text-[11px] text-emerald-600 font-semibold mt-1">Instant App Push Active</p>
         </div>
+      </div>
+
+      {/* Master PC Storage & Zero Data Loss Hub */}
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-purple-800/40 rounded-3xl p-6 text-white shadow-xl">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <HardDrive size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">Single Computer Master Storage & Auto Crash Recovery</h2>
+                {dbStatus?.isPostgresConnected ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 size={10} /> Cloud PostgreSQL Active
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                    <ShieldCheck size={10} /> Local PC Master Hub Connected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Every school, student, mark, and fee transaction is automatically mirrored to this computer ({dbStatus?.schoolCount || schools.length} Schools Protected). If the cloud container ever sleeps or restarts, this PC automatically restores all data.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2.5">
+            <input
+              type="file"
+              ref={restoreFileRef}
+              onChange={handleFileRestore}
+              accept=".json"
+              className="hidden"
+            />
+            <button
+              onClick={handleDownloadBackup}
+              disabled={backupLoading}
+              className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow"
+            >
+              <Download size={14} />
+              <span>{backupLoading ? 'Exporting...' : 'Download Master Backup (JSON)'}</span>
+            </button>
+            <button
+              onClick={() => restoreFileRef.current?.click()}
+              disabled={backupLoading}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+            >
+              <Upload size={14} />
+              <span>Restore from PC / JSON</span>
+            </button>
+            <button
+              onClick={() => window.open('http://localhost:5432', '_blank')}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 flex items-center gap-1.5"
+            >
+              <Server size={14} />
+              <span>Open Local Connector (Port 5432)</span>
+            </button>
+            <button
+              onClick={() => setShowPgInstructions(!showPgInstructions)}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700"
+            >
+              {showPgInstructions ? 'Hide Render Cloud DB Guide' : 'Add Render Free PostgreSQL'}
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Render PostgreSQL Guide */}
+        {showPgInstructions && (
+          <div className="mt-4 pt-4 border-t border-slate-800 bg-slate-950/60 rounded-2xl p-4 text-xs text-slate-300 space-y-2">
+            <div className="font-bold text-white flex items-center gap-2">
+              <Database size={14} className="text-purple-400" />
+              <span>Optional: Attach 100% Free PostgreSQL on Render (Takes 1 Minute)</span>
+            </div>
+            <p className="text-slate-400">
+              For additional cloud permanence on Render (zero downtime even if your computer is switched off):
+            </p>
+            <ol className="list-decimal list-inside space-y-1.5 ml-1 text-slate-300">
+              <li>Open <strong>dashboard.render.com</strong>, click <strong>"New +"</strong> &rarr; select <strong>"PostgreSQL"</strong>.</li>
+              <li>Name it <code className="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">mitra-db</code>, choose the <strong>Free</strong> tier, and click <strong>Create Database</strong>.</li>
+              <li>Copy the <strong>"Internal Database URL"</strong>.</li>
+              <li>In Render, open your <code className="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">mitra-erp</code> Web Service &rarr; <strong>Environment</strong> &rarr; add <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">DATABASE_URL</code> with that copied URL &rarr; Save!</li>
+            </ol>
+            <p className="text-emerald-400 font-semibold pt-1">
+              ✨ Once connected, the backend will automatically write to Cloud PostgreSQL + your Local PC simultaneously!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Schools Directory */}

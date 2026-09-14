@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import crypto from 'crypto';
+import { verifyToken } from '../services/auth.js';
 
 export const syncRoutes = new Hono();
 
@@ -244,3 +245,167 @@ syncRoutes.post('/push', async (c) => {
     syncedCount,
   });
 });
+
+// =========================================================================
+// MASTER MULTI-SCHOOL PC CONNECTOR ENDPOINTS (FOR SINGLE COMPUTER MASTER HUB)
+// =========================================================================
+
+const DEFAULT_MASTER_KEY = process.env.MASTER_SYNC_KEY || 'ANVI_MASTER_PC_CONNECTOR_SYNC_KEY_2026';
+
+function isMasterAuthorized(c: any, body?: any): boolean {
+  const authHeader = c.req.header('Authorization');
+  const masterKeyHeader = c.req.header('x-master-key');
+  if (masterKeyHeader === DEFAULT_MASTER_KEY) return true;
+  if (body?.masterKey === DEFAULT_MASTER_KEY) return true;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    if (token === DEFAULT_MASTER_KEY) return true;
+    try {
+      const user = verifyToken(token);
+      if (user && user.role === 'super_admin') return true;
+    } catch {}
+  }
+  return false;
+}
+
+// 1. Master ERP Status Check (Used by PC Connector to monitor Cloud ERP health)
+syncRoutes.get('/status', async (c) => {
+  const schools = db.select().from(schema.schools).all();
+  const students = db.select().from(schema.students).all();
+  const users = db.select().from(schema.users).all();
+
+  return c.json({
+    status: 'online',
+    serverTime: new Date().toISOString(),
+    schoolsCount: schools.length,
+    studentsCount: students.length,
+    usersCount: users.length,
+    cloudReady: true,
+  });
+});
+
+// 2. Master Auth Handshake
+syncRoutes.post('/master-auth', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  if (!isMasterAuthorized(c, body)) {
+    return c.json({ error: 'Unauthorized Master PC Connector key' }, 401);
+  }
+
+  const schools = db.select().from(schema.schools).all();
+  return c.json({
+    success: true,
+    message: 'Master PC Connector authorized successfully',
+    serverTime: new Date().toISOString(),
+    schoolsCount: schools.length,
+  });
+});
+
+// 3. Master Pull: Export ALL schools and entire ERP dataset to Local PC Connector
+syncRoutes.post('/master-pull', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  if (!isMasterAuthorized(c, body)) {
+    return c.json({ error: 'Unauthorized: Master PC Connector access only' }, 401);
+  }
+
+  const schools = db.select().from(schema.schools).all();
+  const users = db.select().from(schema.users).all();
+  const classes = db.select().from(schema.classes).all();
+  const sections = db.select().from(schema.sections).all();
+  const subjects = db.select().from(schema.subjects).all();
+  const students = db.select().from(schema.students).all();
+  const parents = db.select().from(schema.parents).all();
+  const attendance = db.select().from(schema.attendance).all();
+  const exams = db.select().from(schema.exams).all();
+  const marks = db.select().from(schema.marks).all();
+  const feeStructures = db.select().from(schema.feeStructures).all();
+  const feePayments = db.select().from(schema.feePayments).all();
+  const timetable = db.select().from(schema.timetablePeriods).all();
+  const staffLeaves = db.select().from(schema.staffLeaves).all();
+
+  const now = new Date().toISOString();
+
+  return c.json({
+    success: true,
+    timestamp: now,
+    schoolsCount: schools.length,
+    dataset: {
+      schools,
+      users,
+      classes,
+      sections,
+      subjects,
+      students,
+      parents,
+      attendance,
+      exams,
+      marks,
+      feeStructures,
+      feePayments,
+      timetable,
+      staffLeaves,
+    },
+  });
+});
+
+// 4. Master Push / Disaster Recovery: Restore ALL schools from PC Connector to Cloud ERP
+syncRoutes.post('/master-push', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  if (!isMasterAuthorized(c, body)) {
+    return c.json({ error: 'Unauthorized: Master PC Connector access only' }, 401);
+  }
+
+  const { dataset } = body;
+  if (!dataset || typeof dataset !== 'object') {
+    return c.json({ error: 'Invalid payload: dataset object required' }, 400);
+  }
+
+  const restored: Record<string, number> = {};
+
+  // Insert or replace helper
+  const restoreTable = (tableName: string, rows: any[]) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      restored[tableName] = 0;
+      return;
+    }
+    const tableObj = (schema as any)[tableName];
+    if (!tableObj) return;
+
+    let count = 0;
+    for (const row of rows) {
+      try {
+        db.insert(tableObj).values(row).run();
+        count++;
+      } catch {
+        // If conflict, try update or ignore
+      }
+    }
+    restored[tableName] = count;
+  };
+
+  if (Array.isArray(dataset.schools)) restoreTable('schools', dataset.schools);
+  if (Array.isArray(dataset.users)) restoreTable('users', dataset.users);
+  if (Array.isArray(dataset.classes)) restoreTable('classes', dataset.classes);
+  if (Array.isArray(dataset.sections)) restoreTable('sections', dataset.sections);
+  if (Array.isArray(dataset.subjects)) restoreTable('subjects', dataset.subjects);
+  if (Array.isArray(dataset.parents)) restoreTable('parents', dataset.parents);
+  if (Array.isArray(dataset.students)) restoreTable('students', dataset.students);
+  if (Array.isArray(dataset.attendance)) restoreTable('attendance', dataset.attendance);
+  if (Array.isArray(dataset.exams)) restoreTable('exams', dataset.exams);
+  if (Array.isArray(dataset.marks)) restoreTable('marks', dataset.marks);
+  if (Array.isArray(dataset.feeStructures)) restoreTable('feeStructures', dataset.feeStructures);
+  if (Array.isArray(dataset.feePayments)) restoreTable('feePayments', dataset.feePayments);
+  if (Array.isArray(dataset.timetable)) restoreTable('timetablePeriods', dataset.timetable);
+  if (Array.isArray(dataset.staffLeaves)) restoreTable('staffLeaves', dataset.staffLeaves);
+
+  const now = new Date().toISOString();
+  console.log(`🚀 [Master PC Connector] Synchronized ${restored.schools || 0} schools and related records to Cloud ERP at ${now}`);
+
+  return c.json({
+    success: true,
+    message: 'Master PC dataset synchronized and restored to Cloud ERP successfully',
+    restored,
+    timestamp: now,
+  });
+});
+

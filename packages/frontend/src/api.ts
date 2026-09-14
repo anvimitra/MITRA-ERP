@@ -764,6 +764,43 @@ export class ApiService {
       body: JSON.stringify(data),
     });
   }
+
+  // ==================== MASTER PC STORAGE & ZERO DATA LOSS ====================
+  static async getDbStatus() {
+    return this.request<{
+      database: string;
+      isPostgresConnected: boolean;
+      schoolCount: number;
+      studentCount: number;
+      userCount: number;
+      persistentStorage: string;
+      timestamp: string;
+    }>('/schools/db-status');
+  }
+
+  static async getBackupSnapshot() {
+    return this.request<{
+      version: string;
+      exportDate: string;
+      source: string;
+      totalSchools: number;
+      dataset: any;
+    }>('/schools/backup-snapshot');
+  }
+
+  static async restoreBackupSnapshot(dataset: any) {
+    return this.request<{ success: boolean; message: string; totalSchools: number }>('/schools/restore-snapshot', {
+      method: 'POST',
+      body: JSON.stringify({ dataset }),
+    });
+  }
+
+  static async masterPushToCloud(dataset: any) {
+    return this.request<{ success: boolean; message: string; restored: any }>('/sync/master-push', {
+      method: 'POST',
+      body: JSON.stringify({ dataset }),
+    });
+  }
 }
 
 

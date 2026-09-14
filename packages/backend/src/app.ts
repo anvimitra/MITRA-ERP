@@ -19,6 +19,7 @@ import { payrollRoutes } from './routes/payroll.js';
 import { libraryRoutes } from './routes/library.js';
 import { transportRoutes } from './routes/transport.js';
 import { inventoryRoutes } from './routes/inventory.js';
+import { isPostgresConnected } from './db/postgres-sync.js';
 
 export const app = new Hono();
 
@@ -28,15 +29,18 @@ app.use(
   cors({
     origin: '*',
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'x-school-code'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-school-code', 'x-master-key'],
   })
 );
 
 // Health check endpoint
 app.get('/health', (c) => {
+  const isPg = isPostgresConnected();
   return c.json({
     status: 'online',
-    service: 'ANVIMITRA-ERP Cloudflare Core API',
+    service: 'ANVIMITRA-ERP Cloud Control Plane',
+    database: isPg ? 'postgresql' : 'sqlite',
+    isPostgresConnected: isPg,
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });

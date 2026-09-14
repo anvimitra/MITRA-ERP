@@ -1,4 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
+import { queuePostgresWrite } from './postgres-sync.js';
+import { saveLocalBackup } from './persistent-backup.js';
 
 function toSnakeCase(str: string): string {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
@@ -131,6 +133,10 @@ export class SQLiteAdapter {
               const stmt = this.db.prepare(query);
               stmt.run(...values);
             }
+            queuePostgresWrite(tableName, 'insert', rows);
+            if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+              saveLocalBackup(this.db);
+            }
           },
         };
         return chain;
@@ -154,6 +160,10 @@ export class SQLiteAdapter {
                 const query = `UPDATE ${tableName} SET ${setClauses} ${whereSql}`;
                 const stmt = this.db.prepare(query);
                 stmt.run(...setParams, ...whereParams);
+                queuePostgresWrite(tableName, 'update', values, condition);
+                if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+                  saveLocalBackup(this.db);
+                }
               },
             };
           },
@@ -172,6 +182,10 @@ export class SQLiteAdapter {
             const query = `DELETE FROM ${tableName} ${whereSql}`;
             const stmt = this.db.prepare(query);
             stmt.run(...params);
+            queuePostgresWrite(tableName, 'delete', null, condition);
+            if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+              saveLocalBackup(this.db);
+            }
           },
         };
       },
