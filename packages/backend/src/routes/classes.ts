@@ -5,12 +5,55 @@ import { verifyToken } from '../services/auth.js';
 
 export const classRoutes = new Hono();
 
+function ensurePrePrimaryClasses(schoolId: string) {
+  const preClasses = [
+    { name: 'NURSERY', gradeLevel: -3, codeSuffix: 'nursery' },
+    { name: 'LKG', gradeLevel: -2, codeSuffix: 'lkg' },
+    { name: 'UKG', gradeLevel: -1, codeSuffix: 'ukg' },
+  ];
+
+  try {
+    const existingClasses = db.select().from(schema.classes).where(eq(schema.classes.schoolId, schoolId)).all();
+    const existingNames = new Set(existingClasses.map((c: any) => (c.name || '').toUpperCase().trim()));
+
+    for (const pre of preClasses) {
+      if (!existingNames.has(pre.name)) {
+        const classId = `cls-${schoolId.slice(0, 6)}-${pre.codeSuffix}`;
+        db.insert(schema.classes).values({
+          id: classId,
+          schoolId,
+          name: pre.name,
+          gradeLevel: pre.gradeLevel,
+        }).run();
+
+        db.insert(schema.sections).values({
+          id: `sec-${schoolId.slice(0, 6)}-${pre.codeSuffix}-a`,
+          schoolId,
+          classId,
+          name: 'A',
+        }).run();
+
+        db.insert(schema.sections).values({
+          id: `sec-${schoolId.slice(0, 6)}-${pre.codeSuffix}-b`,
+          schoolId,
+          classId,
+          name: 'B',
+        }).run();
+      }
+    }
+  } catch (err) {
+    console.warn('ensurePrePrimaryClasses warning:', err);
+  }
+}
+
 // Get all classes, sections, and subjects for the current school
 classRoutes.get('/', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized or no school associated' }, 401);
+
+  ensurePrePrimaryClasses(user.schoolId);
 
   const schoolClasses = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
   schoolClasses.sort((a: any, b: any) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0));
@@ -54,6 +97,8 @@ classRoutes.get('/my-allocations', async (c) => {
   if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  ensurePrePrimaryClasses(user.schoolId);
 
   // If teacher, find class teacher assignments
   const classTeacherOf = db

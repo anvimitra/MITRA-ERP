@@ -230,6 +230,50 @@ function initLocalDatabase(customPath) {
       status TEXT DEFAULT 'PENDING',
       applied_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS admit_cards (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      exam_id TEXT,
+      class_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      roll_no INTEGER,
+      roll_code TEXT,
+      exam_title TEXT,
+      center_number TEXT,
+      center_name TEXT,
+      is_published INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS certificates (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      certificate_type TEXT NOT NULL,
+      certificate_no TEXT NOT NULL UNIQUE,
+      issue_date TEXT NOT NULL,
+      academic_year TEXT NOT NULL,
+      reason TEXT,
+      conduct TEXT,
+      extra_fields TEXT,
+      status TEXT DEFAULT 'ISSUED',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS student_logs (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      log_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      action_taken TEXT,
+      reported_by_user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      notify_parent INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
   `);
 
   console.log(`[Master PC Storage] Local SQLite Master Database initialized at: ${targetPath}`);
@@ -329,6 +373,9 @@ function saveMasterDataset(dataset, updateJson = true) {
   if (Array.isArray(dataset.feePayments)) insertHelper('fee_payments', dataset.feePayments);
   if (Array.isArray(dataset.timetable)) insertHelper('timetable_periods', dataset.timetable);
   if (Array.isArray(dataset.staffLeaves)) insertHelper('staff_leaves', dataset.staffLeaves);
+  if (Array.isArray(dataset.admitCards)) insertHelper('admit_cards', dataset.admitCards);
+  if (Array.isArray(dataset.certificates)) insertHelper('certificates', dataset.certificates);
+  if (Array.isArray(dataset.studentLogs)) insertHelper('student_logs', dataset.studentLogs);
 
   // Update sync metadata
   const now = new Date().toISOString();
@@ -386,6 +433,9 @@ function getMasterDataset() {
     feePayments: mapRowsToDualFormat(db.prepare('SELECT * FROM fee_payments').all()),
     timetable: mapRowsToDualFormat(db.prepare('SELECT * FROM timetable_periods').all()),
     staffLeaves: mapRowsToDualFormat(db.prepare('SELECT * FROM staff_leaves').all()),
+    admitCards: mapRowsToDualFormat(db.prepare('SELECT * FROM admit_cards').all()),
+    certificates: mapRowsToDualFormat(db.prepare('SELECT * FROM certificates').all()),
+    studentLogs: mapRowsToDualFormat(db.prepare('SELECT * FROM student_logs').all()),
   };
 }
 

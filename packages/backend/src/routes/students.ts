@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import { verifyToken, hashPassword } from '../services/auth.js';
+import { saveLocalBackup } from '../db/persistent-backup.js';
+import { getDatabaseInstance } from '../db/init.js';
 import crypto from 'crypto';
 
 export const studentRoutes = new Hono();
@@ -220,9 +222,15 @@ studentRoutes.post('/', async (c) => {
     medicalConditions: medicalConditions || null,
     allergies: allergies || null,
     category: category || 'General',
-    photoUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150`,
+    photoUrl: (body.photoUrl && typeof body.photoUrl === 'string' && body.photoUrl.trim())
+      ? body.photoUrl.trim()
+      : (gender === 'Female' ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150' : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'),
     isActive: 1,
   }).run();
+
+  try {
+    saveLocalBackup(getDatabaseInstance());
+  } catch {}
 
   return c.json({
     success: true,
@@ -265,6 +273,7 @@ studentRoutes.put('/:id', async (c) => {
     medicalConditions,
     allergies,
     category,
+    photoUrl,
     fatherName,
     motherName,
     primaryPhone,
@@ -288,6 +297,7 @@ studentRoutes.put('/:id', async (c) => {
       medicalConditions: medicalConditions !== undefined ? medicalConditions : existing.medicalConditions,
       allergies: allergies !== undefined ? allergies : existing.allergies,
       category: category !== undefined ? category : existing.category,
+      photoUrl: (photoUrl !== undefined && typeof photoUrl === 'string' && photoUrl.trim()) ? photoUrl.trim() : existing.photoUrl,
       isActive: isActive !== undefined ? isActive : existing.isActive,
     })
     .where(eq(schema.students.id, studentId))
@@ -322,6 +332,10 @@ studentRoutes.put('/:id', async (c) => {
       .run();
   }
 
+  try {
+    saveLocalBackup(getDatabaseInstance());
+  } catch {}
+
   return c.json({ success: true, message: 'Student details updated successfully' });
 });
 
@@ -336,6 +350,10 @@ studentRoutes.delete('/:id', async (c) => {
   db.delete(schema.students)
     .where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.id, studentId)))
     .run();
+
+  try {
+    saveLocalBackup(getDatabaseInstance());
+  } catch {}
 
   return c.json({ success: true, message: 'Student removed from institution records' });
 });
@@ -381,24 +399,46 @@ studentRoutes.get('/parents', async (c) => {
     parentsById.set(p.id, p);
   }
 
-  // Also collect parents directly from students if missing from parents table
   const allParentEntries: any[] = [...rawParents];
 
+  // Also add registered parent users from users table if not in parents table
+  for (const u of users) {
+    const uPhone = (u.phone || '').replace(/\D/g, '');
+    const hasById = parentsById.has(u.id);
+    const hasByPhone = uPhone.length >= 10 && parentsByPhone.has(uPhone.slice(-10));
+    if (!hasById && !hasByPhone) {
+      const parentEntry = {
+        id: `par-user-${u.id}`,
+        schoolId: user.schoolId,
+        userId: u.id,
+        fatherName: u.name || 'Parent Guardian',
+        motherName: '',
+        primaryPhone: u.phone || '',
+        email: u.email || '',
+        address: '',
+      };
+      allParentEntries.push(parentEntry);
+      if (uPhone.length >= 10) parentsByPhone.set(uPhone.slice(-10), parentEntry);
+      parentsById.set(parentEntry.id, parentEntry);
+    }
+  }
+
+  // Also collect parents directly from students if missing from parents table
   for (const s of students) {
-    const sPhone = (s.primaryPhone || s.emergencyPhone || '').replace(/\D/g, '');
+    const sPhone = (s.emergencyPhone || '').replace(/\D/g, '');
     const hasParentById = s.parentId && parentsById.has(s.parentId);
     const hasParentByPhone = sPhone.length >= 10 && parentsByPhone.has(sPhone.slice(-10));
 
-    if (!hasParentById && !hasParentByPhone && (s.fatherName || s.motherName || s.primaryPhone)) {
+    if (!hasParentById && !hasParentByPhone) {
       const syntheticParent = {
         id: s.parentId || `par-auto-${s.id}`,
         schoolId: user.schoolId,
         userId: null,
-        fatherName: s.fatherName || '',
-        motherName: s.motherName || '',
-        primaryPhone: s.primaryPhone || s.emergencyPhone || '',
-        email: s.email || '',
-        address: s.address || '',
+        fatherName: `Guardian of ${s.firstName}`,
+        motherName: '',
+        primaryPhone: s.emergencyPhone || '',
+        email: '',
+        address: '',
       };
       allParentEntries.push(syntheticParent);
       if (sPhone.length >= 10) {

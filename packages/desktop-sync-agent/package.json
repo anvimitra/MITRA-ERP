@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
+    "build": "node -e \"console.log('desktop-sync-agent ready')\"",
     "build:exe": "npx @yao-pkg/pkg src/index.js --target node18-win-x64 --output bin/ANVIMITRA-Sync-Agent.exe"
   },
   "dependencies": {

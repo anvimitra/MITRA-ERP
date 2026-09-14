@@ -3,33 +3,70 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseSync } from 'node:sqlite';
 
-function getBackupFilePath(): string {
+function getPersistentSeedPath(): string {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(__dirname, 'persistent_dataset.json');
+}
+
+function getRuntimeBackupPath(): string {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   return path.resolve(__dirname, '..', '..', 'data', 'schools_backup.json');
 }
 
+const TABLE_MAP: { tableName: string; propName: string }[] = [
+  { tableName: 'schools', propName: 'schools' },
+  { tableName: 'users', propName: 'users' },
+  { tableName: 'classes', propName: 'classes' },
+  { tableName: 'sections', propName: 'sections' },
+  { tableName: 'subjects', propName: 'subjects' },
+  { tableName: 'subject_allocations', propName: 'subjectAllocations' },
+  { tableName: 'class_teachers', propName: 'classTeachers' },
+  { tableName: 'parents', propName: 'parents' },
+  { tableName: 'students', propName: 'students' },
+  { tableName: 'fee_structures', propName: 'feeStructures' },
+  { tableName: 'fee_payments', propName: 'feePayments' },
+  { tableName: 'admit_cards', propName: 'admitCards' },
+  { tableName: 'certificates', propName: 'certificates' },
+  { tableName: 'student_logs', propName: 'studentLogs' },
+  { tableName: 'attendance', propName: 'attendance' },
+  { tableName: 'exams', propName: 'exams' },
+  { tableName: 'marks', propName: 'marks' },
+  { tableName: 'timetable', propName: 'timetable' },
+  { tableName: 'notices', propName: 'notices' },
+];
+
 export function saveLocalBackup(sqlite: DatabaseSync) {
   try {
-    const backupPath = getBackupFilePath();
-    const dir = path.dirname(backupPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    const schools = sqlite.prepare('SELECT * FROM schools').all();
-    const users = sqlite.prepare("SELECT * FROM users WHERE role IN ('super_admin', 'principal', 'accountant', 'teacher')").all();
-    const classes = sqlite.prepare('SELECT * FROM classes').all();
-    const sections = sqlite.prepare('SELECT * FROM sections').all();
-
-    const data = {
+    const data: Record<string, any> = {
       timestamp: new Date().toISOString(),
-      schools,
-      users,
-      classes,
-      sections,
     };
 
-    fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), 'utf-8');
+    for (const item of TABLE_MAP) {
+      try {
+        const rows = sqlite.prepare(`SELECT * FROM ${item.tableName}`).all();
+        data[item.propName] = rows;
+      } catch (err) {
+        data[item.propName] = [];
+      }
+    }
+
+    const payload = JSON.stringify(data, null, 2);
+
+    // Save to runtime path in data/
+    const runtimePath = getRuntimeBackupPath();
+    const runDir = path.dirname(runtimePath);
+    if (!fs.existsSync(runDir)) {
+      fs.mkdirSync(runDir, { recursive: true });
+    }
+    fs.writeFileSync(runtimePath, payload, 'utf-8');
+
+    // Also persist into persistent_dataset.json if writable
+    const seedPath = getPersistentSeedPath();
+    try {
+      fs.writeFileSync(seedPath, payload, 'utf-8');
+    } catch {
+      // Read-only filesystem during some container runs
+    }
   } catch (err) {
     console.warn('Backup save warning:', err);
   }
@@ -37,46 +74,38 @@ export function saveLocalBackup(sqlite: DatabaseSync) {
 
 export function restoreLocalBackup(sqlite: DatabaseSync): boolean {
   try {
-    const backupPath = getBackupFilePath();
-    if (!fs.existsSync(backupPath)) return false;
+    let chosenPath = '';
+    const seedPath = getPersistentSeedPath();
+    const runtimePath = getRuntimeBackupPath();
 
-    const content = fs.readFileSync(backupPath, 'utf-8');
+    if (fs.existsSync(seedPath)) {
+      chosenPath = seedPath;
+    } else if (fs.existsSync(runtimePath)) {
+      chosenPath = runtimePath;
+    } else {
+      return false;
+    }
+
+    const content = fs.readFileSync(chosenPath, 'utf-8');
     const data = JSON.parse(content);
 
-    if (Array.isArray(data.schools) && data.schools.length > 0) {
-      console.log(`📦 Restoring ${data.schools.length} schools from local JSON backup...`);
-      for (const s of data.schools) {
-        const keys = Object.keys(s);
-        const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => s[k]);
-        sqlite.prepare(`INSERT OR REPLACE INTO schools (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
-      }
-    }
+    console.log(`📦 Restoring institutional snapshot from ${path.basename(chosenPath)}...`);
 
-    if (Array.isArray(data.users) && data.users.length > 0) {
-      for (const u of data.users) {
-        const keys = Object.keys(u);
-        const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => u[k]);
-        sqlite.prepare(`INSERT OR REPLACE INTO users (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
-      }
-    }
-
-    if (Array.isArray(data.classes) && data.classes.length > 0) {
-      for (const c of data.classes) {
-        const keys = Object.keys(c);
-        const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => c[k]);
-        sqlite.prepare(`INSERT OR REPLACE INTO classes (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
-      }
-    }
-
-    if (Array.isArray(data.sections) && data.sections.length > 0) {
-      for (const sec of data.sections) {
-        const keys = Object.keys(sec);
-        const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => sec[k]);
-        sqlite.prepare(`INSERT OR REPLACE INTO sections (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
+    for (const item of TABLE_MAP) {
+      const rows = data[item.propName] || data[item.tableName];
+      if (Array.isArray(rows) && rows.length > 0) {
+        for (const row of rows) {
+          try {
+            const keys = Object.keys(row);
+            if (keys.length === 0) continue;
+            const placeholders = keys.map(() => '?').join(', ');
+            const values = keys.map((k) => row[k]);
+            sqlite.prepare(`INSERT OR REPLACE INTO ${item.tableName} (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
+          } catch (rowErr) {
+            // Silently handle column mismatch in legacy backups
+          }
+        }
+        console.log(`  - Restored ${rows.length} records into ${item.tableName}`);
       }
     }
 

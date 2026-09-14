@@ -540,7 +540,18 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     sqlite.exec('ALTER TABLE marks ADD COLUMN is_published INTEGER DEFAULT 0;');
   } catch {}
 
-  // Auto-seed pre-primary classes (NURSERY, LKG, UKG) for all schools
+  // If schools count is 0, auto-restore from persistent backup snapshot first
+  try {
+    const schoolRow = sqlite.prepare('SELECT count(*) as count FROM schools').get() as { count: number };
+    if (!schoolRow || schoolRow.count === 0) {
+      console.log('🔄 0 schools detected in local SQLite. Checking persistent backup snapshot...');
+      restoreLocalBackup(sqlite);
+    }
+  } catch (err) {
+    console.warn('Backup auto-restore check warning:', err);
+  }
+
+  // Auto-seed pre-primary classes (NURSERY, LKG, UKG) for all schools (including restored schools)
   try {
     const allSchools = sqlite.prepare('SELECT id, code FROM schools').all() as { id: string; code: string }[];
     const preClasses = [
@@ -586,17 +597,6 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     }
   } catch (err) {
     console.warn('Super Admin initialization check:', err);
-  }
-
-  // If schools count is 0, auto-restore from persistent backup snapshot
-  try {
-    const schoolRow = sqlite.prepare('SELECT count(*) as count FROM schools').get() as { count: number };
-    if (!schoolRow || schoolRow.count === 0) {
-      console.log('🔄 0 schools detected in local SQLite. Checking persistent backup snapshot...');
-      restoreLocalBackup(sqlite);
-    }
-  } catch (err) {
-    console.warn('Backup auto-restore check warning:', err);
   }
 
   globalDbInstance = sqlite;

@@ -78,6 +78,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     | 'attendance'
     | 'exams'
     | 'fees'
+    | 'admit_cards'
     | 'faculty'
     | 'discipline'
     | 'certificates'
@@ -100,6 +101,67 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [loading, setLoading] = useState(true);
 
   // Logo Settings
+  // Exam Admit Cards Desk State
+  const [admitCardClassId, setAdmitCardClassId] = useState('');
+  const [admitCardExamTitle, setAdmitCardExamTitle] = useState('CBSE Annual / Board Examination 2026-27');
+  const [admitCardCenterName, setAdmitCardCenterName] = useState('Institutional Examination Wing, Campus Block A');
+  const [admitCardCenterNumber, setAdmitCardCenterNumber] = useState('8402');
+  const [generatingAdmitCards, setGeneratingAdmitCards] = useState(false);
+  const [classAdmitCards, setClassAdmitCards] = useState<any[]>([]);
+  const [loadingAdmitCards, setLoadingAdmitCards] = useState(false);
+  const [selectedAdmitCardStudent, setSelectedAdmitCardStudent] = useState<any>(null);
+  const [selectedAdmitCardDetails, setSelectedAdmitCardDetails] = useState<any>(null);
+  const [showAdmitCardModal, setShowAdmitCardModal] = useState(false);
+  const [showBulkAdmitModal, setShowBulkAdmitModal] = useState(false);
+
+  const loadClassAdmitCards = async (cId: string) => {
+    if (!cId) return;
+    setLoadingAdmitCards(true);
+    try {
+      const res = await ApiService.getClassAdmitCards(cId);
+      setClassAdmitCards(res.admitCards || []);
+    } catch (err) {
+      console.warn('Error loading admit cards:', err);
+    } finally {
+      setLoadingAdmitCards(false);
+    }
+  };
+
+  const handleGenerateClassAdmitCards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetClassId = admitCardClassId || classesData?.classes?.[0]?.id;
+    if (!targetClassId) {
+      alert('Please select a target class.');
+      return;
+    }
+    setGeneratingAdmitCards(true);
+    try {
+      const res = await ApiService.generateClassAdmitCards({
+        classId: targetClassId,
+        examTitle: admitCardExamTitle,
+        centerNumber: admitCardCenterNumber,
+        centerName: admitCardCenterName,
+      });
+      alert(`🎉 ${res.message || 'Admit cards successfully generated and assigned for the entire class!'}`);
+      loadClassAdmitCards(targetClassId);
+    } catch (err: any) {
+      alert('Error generating admit cards: ' + err.message);
+    } finally {
+      setGeneratingAdmitCards(false);
+    }
+  };
+
+  const handleOpenStudentAdmitCard = async (student: any) => {
+    setSelectedAdmitCardStudent(student);
+    setShowAdmitCardModal(true);
+    try {
+      const res = await ApiService.getAdmitCard(student.id);
+      setSelectedAdmitCardDetails(res.admitCard);
+    } catch (err) {
+      console.warn('Error fetching student admit card:', err);
+    }
+  };
+
   const [editingSchoolLogo, setEditingSchoolLogo] = useState(currentSchool?.logoUrl || '');
   const [savingLogo, setSavingLogo] = useState(false);
 
@@ -365,6 +427,8 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       }
       if (cData.classes?.length > 0) {
         setStructClassId(cData.classes[0].id);
+        setAdmitCardClassId(cData.classes[0].id);
+        loadClassAdmitCards(cData.classes[0].id);
       }
 
       if (cData?.classes?.length > 0) {
@@ -746,11 +810,15 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
   const handleCreateStructure = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!structTitle || !structAmount || !structClassId) return;
+    const targetClassId = structClassId || classesData?.classes?.[0]?.id;
+    if (!structTitle.trim() || !structAmount || !targetClassId) {
+      alert('Please enter a Fee Title, Amount, and select a Target Class.');
+      return;
+    }
 
     try {
       await ApiService.createFeeStructure({
-        classId: structClassId,
+        classId: targetClassId,
         title: structTitle,
         amount: Number(structAmount),
         dueDate: structDueDate,
@@ -934,6 +1002,26 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             >
               <CreditCard size={16} />
               <span>Fees & Accounts Desk</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('admit_cards');
+                if (classesData?.classes?.length > 0 && !admitCardClassId) {
+                  const firstCls = classesData.classes[0].id;
+                  setAdmitCardClassId(firstCls);
+                  loadClassAdmitCards(firstCls);
+                }
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'admit_cards' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <GraduationCap size={16} />
+                <span>Exam Admit Cards Desk</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full font-bold text-amber-300">New</span>
             </button>
 
             <button
@@ -2193,6 +2281,261 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
           </div>
         )}
 
+        
+        {/* ================= MODULE: EXAM ADMIT CARDS DESK ================= */}
+        {activeTab === 'admit_cards' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <GraduationCap className="text-blue-600" size={24} />
+                  Exam Admit Cards & Hall Ticket Desk
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Design, assign, and release official examination admit cards for class batches. Once released, students and parents can view and download hall tickets on their mobile app and web portals.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowBulkAdmitModal(true)}
+                  disabled={classAdmitCards.length === 0}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-2"
+                >
+                  <Printer size={15} />
+                  <span>Print All Class Admit Cards</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Admit Card Generator Form */}
+            <form onSubmit={handleGenerateClassAdmitCards} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <span className="font-black text-slate-800 uppercase tracking-wide text-[11px] flex items-center gap-2">
+                  <span>⚡ Batch Admit Card Generator</span>
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Select a class to load existing hall tickets or generate new ones for the whole batch
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Target Class *</label>
+                  <select
+                    value={admitCardClassId}
+                    onChange={(e) => {
+                      const cId = e.target.value;
+                      setAdmitCardClassId(cId);
+                      loadClassAdmitCards(cId);
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-xs"
+                  >
+                    {classesData?.classes?.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Exam Schedule Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={admitCardExamTitle}
+                    onChange={(e) => setAdmitCardExamTitle(e.target.value)}
+                    placeholder="e.g. CBSE Annual Board Exam 2026-27"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Examination Center Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={admitCardCenterName}
+                    onChange={(e) => setAdmitCardCenterName(e.target.value)}
+                    placeholder="e.g. Campus Examination Hall A"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Center Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={admitCardCenterNumber}
+                    onChange={(e) => setAdmitCardCenterNumber(e.target.value)}
+                    placeholder="e.g. 8402"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-[11px] text-slate-500 italic">
+                  * Note: Re-generating will overwrite previous roll codes for this class batch with updated center details.
+                </span>
+
+                <button
+                  type="submit"
+                  disabled={generatingAdmitCards}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-black text-xs shadow-md shadow-blue-600/30 transition flex items-center gap-2"
+                >
+                  <GraduationCap size={15} />
+                  <span>{generatingAdmitCards ? 'Generating Cards...' : '⚡ Generate & Assign Entire Class Admit Cards'}</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Metrics Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(() => {
+                const classStudents = students.filter((s) => s.classId === admitCardClassId);
+                const assignedCount = classStudents.filter((s) => classAdmitCards.some((c) => c.studentId === s.id)).length;
+                const pendingCount = Math.max(0, classStudents.length - assignedCount);
+
+                return (
+                  <>
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Class Enrollment</span>
+                      <span className="text-2xl font-black text-slate-900">{classStudents.length}</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">Enrolled pupils</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 block">Admit Cards Assigned</span>
+                      <span className="text-2xl font-black text-emerald-700">{assignedCount}</span>
+                      <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">Ready for parent & student view</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                      <span className="text-[10px] uppercase font-bold text-amber-600 block">Pending Assignment</span>
+                      <span className="text-2xl font-black text-amber-700">{pendingCount}</span>
+                      <span className="text-[11px] text-amber-600 font-semibold block mt-0.5">Awaiting batch generation</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Candidates Table */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-900">
+                  Candidate Roster & Hall Ticket Status
+                </h3>
+                <span className="text-xs text-slate-400 font-bold">
+                  {students.filter((s) => s.classId === admitCardClassId).length} Candidates
+                </span>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                    <tr>
+                      <th className="px-4 py-3">Photo & Candidate</th>
+                      <th className="px-4 py-3">Admission No</th>
+                      <th className="px-4 py-3">Roll No</th>
+                      <th className="px-4 py-3">Assigned Roll Code</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(() => {
+                      const classStudents = students.filter((s) => s.classId === admitCardClassId);
+                      if (classStudents.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                              No students found in this class. Select another class above or admit students.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return classStudents.map((s) => {
+                        const card = classAdmitCards.find((c) => c.studentId === s.id);
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-50/80 transition">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                {s.photoUrl ? (
+                                  <img
+                                    src={s.photoUrl}
+                                    alt={s.firstName}
+                                    className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-black flex items-center justify-center shrink-0 border border-blue-200">
+                                    {s.firstName?.[0] || 'S'}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-extrabold text-slate-900 text-sm">
+                                    {s.firstName} {s.lastName || ''}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {s.fatherName ? `Father: ${s.fatherName}` : `Class ${s.className || 'General'}`}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-3 font-mono font-bold text-slate-700">
+                              {s.admissionNo}
+                            </td>
+
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">
+                              {s.rollNo || '-'}
+                            </td>
+
+                            <td className="px-4 py-3 font-mono text-[11px] text-blue-700">
+                              {card?.rollCode || (
+                                <span className="text-slate-400 italic">Not Assigned</span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              {card ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 size={11} className="text-emerald-600" />
+                                  <span>Assigned & Released</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  <AlertCircle size={11} className="text-amber-600" />
+                                  <span>Pending</span>
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => handleOpenStudentAdmitCard(s)}
+                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ml-auto"
+                              >
+                                <Printer size={13} />
+                                <span>Preview Hall Ticket</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+
         {/* ================= MODULE 7: FACULTY & STAFF ROSTER ================= */}
         {activeTab === 'faculty' && (
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
@@ -2828,6 +3171,314 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
           <TransportDesk students={students} />
         )}
       </main>
+
+      
+      {/* ================= MODAL: PREVIEW & PRINT OFFICIAL ADMIT CARD ================= */}
+      {showAdmitCardModal && selectedAdmitCardStudent && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative my-8 print:border-none print:shadow-none print:my-0 print:p-4">
+            <button
+              onClick={() => setShowAdmitCardModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 print:hidden"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Printable Admit Card Document Layout */}
+            <div id="admit-card-print-area" className="border-2 border-slate-900 p-6 rounded-2xl relative space-y-4">
+              {/* Institution Header */}
+              <div className="text-center border-b-2 border-slate-900 pb-4 relative">
+                <div className="flex items-center justify-center gap-4">
+                  {(currentSchool?.logoUrl || classesData?.school?.logoUrl) && (
+                    <img
+                      src={currentSchool?.logoUrl || classesData?.school?.logoUrl}
+                      alt="Logo"
+                      className="w-16 h-16 object-contain rounded-xl border border-slate-200"
+                    />
+                  )}
+                  <div>
+                    <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+                      {currentSchool?.name || classesData?.school?.name || 'LSK ACADEMY SECONDARY SCHOOL'}
+                    </h1>
+                    <p className="text-xs font-semibold text-slate-600">
+                      Affiliation No: {currentSchool?.affiliationNo || 'CBSE-REG-8402'} | School Code: {currentSchool?.code || 'LSK1'}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {currentSchool?.address || 'Institutional Campus, Main Road'} • Phone: {currentSchool?.phone || '+91 9680897658'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 inline-block px-4 py-1 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-lg">
+                  {selectedAdmitCardDetails?.examTitle || admitCardExamTitle || 'Annual Examination Hall Ticket 2026-27'}
+                </div>
+              </div>
+
+              {/* Candidate Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-start pt-2">
+                <div className="sm:col-span-3 grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Candidate Name</span>
+                    <span className="font-extrabold text-sm text-slate-900">
+                      {selectedAdmitCardStudent.firstName} {selectedAdmitCardStudent.lastName || ''}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Admission Number</span>
+                    <span className="font-mono font-bold text-sm text-blue-700">{selectedAdmitCardStudent.admissionNo}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Father's Name</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedAdmitCardStudent.fatherName || selectedAdmitCardDetails?.fatherName || 'Guardian'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Roll Number & Code</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {selectedAdmitCardStudent.rollNo ? `Roll: ${selectedAdmitCardStudent.rollNo}` : ''} • {selectedAdmitCardDetails?.rollCode || `CBSE-LSK1-2026-${String(selectedAdmitCardStudent.rollNo || 1).padStart(4, '0')}`}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Class & Section</span>
+                    <span className="font-bold text-slate-800">
+                      {classesData?.classes?.find((c: any) => c.id === selectedAdmitCardStudent.classId)?.name || 'Class'} (Section {classesData?.sections?.find((s: any) => s.id === selectedAdmitCardStudent.sectionId)?.name || 'A'})
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Examination Center</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedAdmitCardDetails?.centerName || admitCardCenterName} ({selectedAdmitCardDetails?.centerNumber || admitCardCenterNumber})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Candidate Photo */}
+                <div className="flex flex-col items-center">
+                  <div className="w-24 h-28 border-2 border-slate-900 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center relative">
+                    {selectedAdmitCardStudent.photoUrl ? (
+                      <img
+                        src={selectedAdmitCardStudent.photoUrl}
+                        alt="Candidate Photo"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-2">
+                        <GraduationCap size={28} className="mx-auto text-slate-400" />
+                        <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block">Affix Photo</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 mt-1">Verified Candidate</span>
+                </div>
+              </div>
+
+              {/* Examination Schedule / Timetable */}
+              <div className="border border-slate-900 rounded-xl overflow-hidden mt-3">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase">
+                    <tr>
+                      <th className="p-2 border-r border-slate-800">Date</th>
+                      <th className="p-2 border-r border-slate-800">Time</th>
+                      <th className="p-2 border-r border-slate-800">Subject Code</th>
+                      <th className="p-2 border-r border-slate-800">Subject Name</th>
+                      <th className="p-2 text-center">Invigilator Sign</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {(() => {
+                      const subs = classesData?.subjects?.filter((s: any) => !s.classId || s.classId === selectedAdmitCardStudent.classId) || [];
+                      const defaultDates = ['2026-10-10', '2026-10-12', '2026-10-14', '2026-10-16', '2026-10-18', '2026-10-20'];
+                      const displayList = subs.length > 0 ? subs : [
+                        { name: 'English Core', code: 'ENG-101' },
+                        { name: 'Mathematics', code: 'MATH-102' },
+                        { name: 'Science / Physics', code: 'SCI-103' },
+                        { name: 'Social Studies / Chemistry', code: 'SST-104' },
+                        { name: 'Hindi / Regional', code: 'HIN-105' },
+                      ];
+
+                      return displayList.map((sub: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-2 font-mono font-bold border-r border-slate-200">
+                            {defaultDates[idx % defaultDates.length]}
+                          </td>
+                          <td className="p-2 font-mono border-r border-slate-200">
+                            09:00 AM – 12:00 PM
+                          </td>
+                          <td className="p-2 font-mono font-bold text-blue-700 border-r border-slate-200">
+                            {sub.code || `SUB-${idx + 101}`}
+                          </td>
+                          <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                            {sub.name}
+                          </td>
+                          <td className="p-2 text-center border-slate-200"></td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Candidate Instructions */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-300 text-[10px] text-slate-700 space-y-1">
+                <span className="font-bold text-slate-900 block">Candidate Rules & Examination Instructions:</span>
+                <p>1. Candidates must arrive at the examination center at least 30 minutes before commencement of the exam.</p>
+                <p>2. Electronic gadgets, mobile phones, and smart watches are strictly prohibited inside the hall.</p>
+                <p>3. This printed Admit Card must be kept safe and produced for verification during all exam sessions.</p>
+              </div>
+
+              {/* Signatures Row */}
+              <div className="grid grid-cols-3 gap-6 pt-6 border-t-2 border-slate-900 text-center text-xs">
+                <div>
+                  <div className="h-10 border-b border-dashed border-slate-400"></div>
+                  <span className="font-bold text-slate-800 text-[11px] block mt-1">Candidate Signature</span>
+                </div>
+
+                <div>
+                  <div className="h-10 border-b border-dashed border-slate-400"></div>
+                  <span className="font-bold text-slate-800 text-[11px] block mt-1">Center Superintendent</span>
+                </div>
+
+                <div>
+                  <div className="h-10 border-b border-dashed border-slate-400 flex items-center justify-center">
+                    <span className="font-serif italic font-bold text-blue-900">Amit Tiwari</span>
+                  </div>
+                  <span className="font-bold text-slate-900 text-[11px] block mt-1">Principal / Examination Controller</span>
+                  <span className="text-[9px] text-slate-400 block">Seal & Signature</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Print & Action Controls */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200 print:hidden">
+              <button
+                type="button"
+                onClick={() => setShowAdmitCardModal(false)}
+                className="px-5 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50"
+              >
+                Close Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/30 transition flex items-center gap-2"
+              >
+                <Printer size={15} />
+                <span>Print Official Admit Card (PDF)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: BULK PRINT ALL CLASS ADMIT CARDS ================= */}
+      {showBulkAdmitModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative my-8 print:border-none print:shadow-none print:my-0 print:p-0">
+            <button
+              onClick={() => setShowBulkAdmitModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 print:hidden"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-6 print:hidden">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  Bulk Class Admit Cards Printing
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ready to print {students.filter((s) => s.classId === admitCardClassId).length} hall tickets. Each candidate is rendered on an individual printable page.
+                </p>
+              </div>
+
+              <button
+                onClick={() => window.print()}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-xs shadow-lg transition flex items-center gap-2"
+              >
+                <Printer size={15} />
+                <span>Print All ({students.filter((s) => s.classId === admitCardClassId).length} Students)</span>
+              </button>
+            </div>
+
+            {/* Render each student admit card */}
+            <div className="space-y-8 print:space-y-0">
+              {students
+                .filter((s) => s.classId === admitCardClassId)
+                .map((st) => {
+                  const card = classAdmitCards.find((c) => c.studentId === st.id);
+                  return (
+                    <div key={st.id} className="border-2 border-slate-900 p-6 rounded-2xl relative space-y-4 print:page-break-after-always">
+                      <div className="text-center border-b-2 border-slate-900 pb-4">
+                        <h2 className="text-xl font-black uppercase text-slate-900">
+                          {currentSchool?.name || 'LSK ACADEMY SECONDARY SCHOOL'}
+                        </h2>
+                        <p className="text-xs font-semibold text-slate-600">
+                          {card?.examTitle || admitCardExamTitle || 'Annual Examination Hall Ticket 2026-27'}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-4 text-xs">
+                        <div className="col-span-3 grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Candidate Name</span>
+                            <span className="font-extrabold text-slate-900">{st.firstName} {st.lastName || ''}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Admission No</span>
+                            <span className="font-mono font-bold text-blue-700">{st.admissionNo}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Roll No & Code</span>
+                            <span className="font-mono font-bold">{st.rollNo || 1} • {card?.rollCode || `CBSE-LSK1-2026-${String(st.rollNo || 1).padStart(4, '0')}`}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Examination Center</span>
+                            <span className="font-bold">{card?.centerName || admitCardCenterName} ({card?.centerNumber || admitCardCenterNumber})</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-24 border-2 border-slate-900 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center">
+                            {st.photoUrl ? (
+                              <img src={st.photoUrl} alt="Photo" className="w-full h-full object-cover" />
+                            ) : (
+                              <GraduationCap size={24} className="text-slate-400" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-6 pt-4 border-t-2 border-slate-900 text-center text-xs">
+                        <div>
+                          <div className="h-8 border-b border-dashed border-slate-400"></div>
+                          <span className="text-[10px] font-bold text-slate-700 block mt-1">Candidate Sign</span>
+                        </div>
+                        <div>
+                          <div className="h-8 border-b border-dashed border-slate-400"></div>
+                          <span className="text-[10px] font-bold text-slate-700 block mt-1">Center Superintendent</span>
+                        </div>
+                        <div>
+                          <div className="h-8 border-b border-dashed border-slate-400 flex items-center justify-center">
+                            <span className="font-serif italic text-blue-900 font-bold">Amit Tiwari</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-900 block mt-1">Principal / Controller</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* ================= MODAL: ADMIT / EDIT STUDENT ================= */}
       {showStudentModal && (

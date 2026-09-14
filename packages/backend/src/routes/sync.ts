@@ -322,6 +322,9 @@ syncRoutes.post('/master-pull', async (c) => {
   const feePayments = db.select().from(schema.feePayments).all();
   const timetable = db.select().from(schema.timetablePeriods).all();
   const staffLeaves = db.select().from(schema.staffLeaves).all();
+  const admitCards = db.select().from(schema.admitCards).all();
+  const certificates = db.select().from(schema.certificates).all();
+  const studentLogs = db.select().from(schema.studentLogs).all();
 
   const now = new Date().toISOString();
 
@@ -344,6 +347,9 @@ syncRoutes.post('/master-pull', async (c) => {
       feePayments,
       timetable,
       staffLeaves,
+      admitCards,
+      certificates,
+      studentLogs,
     },
   });
 });
@@ -397,6 +403,9 @@ syncRoutes.post('/master-push', async (c) => {
   if (Array.isArray(dataset.feePayments)) restoreTable('feePayments', dataset.feePayments);
   if (Array.isArray(dataset.timetable)) restoreTable('timetablePeriods', dataset.timetable);
   if (Array.isArray(dataset.staffLeaves)) restoreTable('staffLeaves', dataset.staffLeaves);
+  if (Array.isArray(dataset.admitCards)) restoreTable('admitCards', dataset.admitCards);
+  if (Array.isArray(dataset.certificates)) restoreTable('certificates', dataset.certificates);
+  if (Array.isArray(dataset.studentLogs)) restoreTable('studentLogs', dataset.studentLogs);
 
   const now = new Date().toISOString();
   console.log(`🚀 [Master PC Connector] Synchronized ${restored.schools || 0} schools and related records to Cloud ERP at ${now}`);
