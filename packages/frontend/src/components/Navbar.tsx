@@ -46,7 +46,15 @@ export const Navbar: React.FC<Props> = ({
         {/* School Branding */}
         <div className="flex items-center gap-3">
           {school?.logoUrl ? (
-            <img src={school.logoUrl} alt="Logo" className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm" />
+            <img
+              src={school.logoUrl}
+              alt="Logo"
+              className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm bg-white"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+              }}
+            />
           ) : (
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
               <SchoolIcon size={22} />

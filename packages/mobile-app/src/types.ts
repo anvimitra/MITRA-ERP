@@ -218,6 +218,35 @@ export interface StaffMember {
   createdAt: string;
 }
 
+export interface ParentChildLink {
+  id: string;
+  name: string;
+  admissionNo: string;
+  rollNo?: number;
+  className?: string;
+  sectionName?: string;
+  gender?: string;
+}
+
+export interface ParentInfo {
+  id: string;
+  userId?: string | null;
+  name: string;
+  fatherName?: string;
+  motherName?: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  loginId?: string;
+  passwordFormula?: string;
+  autoPasswordPreview?: string;
+  appInstalled?: number;
+  lastActiveAt?: string | null;
+  isActive?: number;
+  children: ParentChildLink[];
+  totalChildren: number;
+}
+
 export interface FeeStructureItem {
   id: string;
   schoolId?: string;

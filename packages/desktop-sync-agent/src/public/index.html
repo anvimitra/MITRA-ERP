@@ -139,14 +139,15 @@
               <th class="py-3 px-4">School Name</th>
               <th class="py-3 px-4">Code</th>
               <th class="py-3 px-4">Location</th>
-              <th class="py-3 px-4">Enrolled Students</th>
-              <th class="py-3 px-4">Teachers</th>
+              <th class="py-3 px-4">Students</th>
+              <th class="py-3 px-4">Staff / Faculty</th>
+              <th class="py-3 px-4">Parents</th>
               <th class="py-3 px-4">Local Status</th>
             </tr>
           </thead>
           <tbody id="schoolsTableBody" class="divide-y divide-slate-800">
             <tr>
-              <td colspan="6" class="py-8 text-center text-slate-500">
+              <td colspan="7" class="py-8 text-center text-slate-500">
                 Loading schools from master PC storage...
               </td>
             </tr>
@@ -185,9 +186,9 @@
         const res = await fetch('/api/stats');
         const data = await res.json();
 
+        document.getElementById('storagePathDisplay').innerText = data.storagePath ? data.storagePath.split(/[\\\\/]/).pop() : 'anvimitra_master_local.db';
         document.getElementById('totalSchoolsDisplay').innerText = `${data.totalSchools || 0} Schools`;
         document.getElementById('totalStudentsDisplay').innerText = `${data.totalStudents || 0} Students`;
-        document.getElementById('storagePathDisplay').innerText = data.storagePath ? data.storagePath.split('\\').pop() : 'anvimitra_master_local.db';
         document.getElementById('cfgErpUrl').value = data.erpUrl || 'https://mitra-erp.onrender.com';
         if (data.masterKey) document.getElementById('cfgMasterKey').value = data.masterKey;
 
@@ -196,7 +197,7 @@
         if (!data.schools || data.schools.length === 0) {
           tbody.innerHTML = `
             <tr>
-              <td colspan="6" class="py-8 text-center text-slate-400">
+              <td colspan="7" class="py-8 text-center text-slate-400">
                 <div class="text-sm">No schools recorded in PC storage yet.</div>
                 <div class="text-xs text-slate-500 mt-1">Click "Sync from Cloud" above to pull all schools from Cloud ERP.</div>
               </td>
@@ -208,8 +209,13 @@
         tbody.innerHTML = data.schools.map(s => `
           <tr class="hover:bg-slate-800/40 transition">
             <td class="py-3 px-4">
-              <div class="font-bold text-white text-sm">${s.name}</div>
-              <div class="text-xs text-slate-400">${s.domain || `${s.code.toLowerCase()}.anvimitra.com`}</div>
+              <div class="flex items-center gap-3">
+                ${s.logo_url ? `<img src="${s.logo_url}" class="w-8 h-8 rounded-lg object-cover bg-white shrink-0 border border-slate-700" onerror="this.style.display='none'" />` : `<div class="w-8 h-8 rounded-lg bg-indigo-900/60 border border-indigo-700 flex items-center justify-center text-indigo-300 text-xs font-black shrink-0"><i class="fa-solid fa-school"></i></div>`}
+                <div>
+                  <div class="font-bold text-white text-sm">${s.name}</div>
+                  <div class="text-xs text-slate-400">${s.domain || `${s.code.toLowerCase()}.anvimitra.com`}</div>
+                </div>
+              </div>
             </td>
             <td class="py-3 px-4">
               <span class="px-2 py-0.5 rounded font-mono text-xs bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
@@ -225,7 +231,11 @@
             </td>
             <td class="py-3 px-4">
               <span class="font-semibold text-white">${s.teacherCount || 0}</span>
-              <span class="text-xs text-slate-500 ml-1">Faculty</span>
+              <span class="text-xs text-slate-500 ml-1">Staff</span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="font-semibold text-emerald-400">${s.parentCount || 0}</span>
+              <span class="text-xs text-slate-500 ml-1">Parents</span>
             </td>
             <td class="py-3 px-4">
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">

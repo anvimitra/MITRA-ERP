@@ -28,10 +28,8 @@ data/*.db
 data/*.sqlite
 packages/**/data/*.db
 packages/**/data/*.sqlite
-packages/**/local-storage/*.db
-packages/**/local-storage/*.sqlite
-local-storage/*.db
-local-storage/*.sqlite
+packages/**/local-storage/
+local-storage/
 *.sqlite-journal
 
 # Logs

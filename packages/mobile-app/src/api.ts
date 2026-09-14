@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo } from './types';
 
 // Canonical Live Production Render API Endpoint
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -579,6 +579,22 @@ export async function deleteStudent(studentId: string) {
   return data;
 }
 
+// 25b. Fetch Parents Directory
+export async function fetchParents(): Promise<ParentInfo[]> {
+  try {
+    const res = await authFetch('/students/parents');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.parents)) {
+        return data.parents;
+      }
+    }
+  } catch (err) {
+    console.warn('Parents directory offline:', err);
+  }
+  return [];
+}
+
 // 26. Fetch Staff / Faculty Members
 export async function fetchStaffMembers(): Promise<StaffMember[]> {
   try {
@@ -886,6 +902,9 @@ export async function restoreBackupSnapshot(dataset: any): Promise<any> {
   }
   return data;
 }
+
+
+
 
 
 

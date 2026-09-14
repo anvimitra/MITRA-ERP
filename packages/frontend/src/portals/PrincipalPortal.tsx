@@ -39,6 +39,8 @@ import {
   Briefcase,
   Bookmark,
   Copy,
+  HeartHandshake,
+  Upload,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
 import { FrontDeskReception } from '../components/FrontDeskReception';
@@ -72,6 +74,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [activeTab, setActiveTab] = useState<
     | 'dashboard'
     | 'students'
+    | 'parents'
     | 'academics'
     | 'timetable'
     | 'attendance'
@@ -92,11 +95,17 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   // Core Data
   const [classesData, setClassesData] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
+  const [parentsList, setParentsList] = useState<any[]>([]);
+  const [parentSearch, setParentSearch] = useState('');
   const [staffList, setStaffList] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Logo Settings
+  const [editingSchoolLogo, setEditingSchoolLogo] = useState(currentSchool?.logoUrl || '');
+  const [savingLogo, setSavingLogo] = useState(false);
 
   // Student search & filter
   // Fees & Accounts Management Suite (Merged Principal & Accountant Desk)
@@ -325,7 +334,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cData, sData, stData, eData, pData, nData, fData] = await Promise.all([
+      const [cData, sData, stData, eData, pData, nData, fData, parData] = await Promise.all([
         ApiService.getClasses().catch(() => ({ classes: [], sections: [], subjects: [], teachers: [] })),
         ApiService.getStudents().catch(() => ({ students: [] })),
         ApiService.getTeachers().catch(() => ({ staff: [] })),
@@ -333,6 +342,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         ApiService.getPayments().catch(() => ({ payments: [] })),
         ApiService.getNotices().catch(() => ({ notices: [] })),
         ApiService.getFeeStructures().catch(() => ({ structures: [] })),
+        ApiService.getParents().catch(() => ({ parents: [] })),
       ]);
 
       setClassesData(cData);
@@ -342,6 +352,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       setPayments(pData.payments || []);
       setNotices(nData.notices || []);
       setStructures(fData.structures || []);
+      setParentsList(parData.parents || []);
       if (sData.students?.length > 0) {
         setSelectedStudentId(sData.students[0].id);
       }
@@ -723,12 +734,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       <aside className="w-full lg:w-64 bg-slate-900 text-white rounded-3xl p-5 shadow-xl border border-slate-800 shrink-0 flex flex-col justify-between">
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/30">
-              <SchoolIcon size={20} />
-            </div>
-            <div>
-              <h2 className="text-sm font-black tracking-tight leading-tight">ANVIMITRA ERP</h2>
-              <span className="text-[10px] text-slate-400 font-mono">Session 2026-2027</span>
+            {currentSchool?.logoUrl ? (
+              <img
+                src={currentSchool.logoUrl}
+                alt={currentSchool.name || 'School Logo'}
+                className="w-10 h-10 rounded-2xl object-cover bg-white border border-slate-700 shadow-lg shrink-0"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+                }}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/30 shrink-0">
+                <SchoolIcon size={20} />
+              </div>
+            )}
+            <div className="overflow-hidden">
+              <h2 className="text-sm font-black tracking-tight leading-tight truncate text-white" title={currentSchool?.name}>
+                {currentSchool?.name || 'ANVIMITRA ERP'}
+              </h2>
+              <span className="text-[10px] text-slate-400 font-mono block">
+                Code: {currentSchool?.code || 'LSK1'} • 2026-2027
+              </span>
             </div>
           </div>
 
@@ -758,6 +785,19 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 <span>Student Directory</span>
               </div>
               <span className="text-[10px] bg-blue-500/30 px-2 py-0.5 rounded-full">{students.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('parents')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'parents' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <HeartHandshake size={16} />
+                <span>Parents Directory</span>
+              </div>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">{parentsList.length}</span>
             </button>
 
             <button
@@ -1158,6 +1198,213 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                         </td>
                       </tr>
                     ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODULE: PARENTS DIRECTORY ================= */}
+        {activeTab === 'parents' && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <HeartHandshake className="text-emerald-600" size={24} />
+                  Parents & Guardians Directory
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Dedicated parent management registry. View linked student wards, mobile app access status, and secure auto-generated credentials.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                  {parentsList.length} Active Parents
+                </span>
+              </div>
+            </div>
+
+            {/* Metrics & Password Rule Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Parents</span>
+                <span className="text-2xl font-black text-slate-900">{parentsList.length}</span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">Enrolled with students</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Linked Student Wards</span>
+                <span className="text-2xl font-black text-blue-600">
+                  {parentsList.reduce((acc, p) => acc + (p.totalChildren || 0), 0)}
+                </span>
+                <span className="text-[11px] text-blue-600 font-semibold block mt-0.5">Active pupils</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Mobile App Installed</span>
+                <span className="text-2xl font-black text-emerald-600">
+                  {parentsList.filter((p) => p.appInstalled).length}
+                </span>
+                <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">Logged in on Android/iOS</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 text-xs text-purple-950">
+                <span className="font-bold block text-purple-900 flex items-center gap-1 mb-1">
+                  <Key size={14} className="text-purple-600" />
+                  Auto-Credentials Rule
+                </span>
+                <p className="text-[11px] text-purple-800 leading-snug">
+                  <strong>Login ID:</strong> Parent Mobile Number<br />
+                  <strong>Password:</strong> First 4 uppercase letters of Name + Last 4 digits of Mobile
+                </p>
+              </div>
+            </div>
+
+            {/* Filter / Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <div className="relative w-full sm:w-96">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Parent Name, Mobile, Student Name or Admission No..."
+                  value={parentSearch}
+                  onChange={(e) => setParentSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+              <span className="text-xs text-slate-400 font-bold self-end sm:self-center">
+                Showing {
+                  parentsList.filter((p) => {
+                    const q = parentSearch.toLowerCase();
+                    if (!q) return true;
+                    const matchesParent = (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q);
+                    const matchesChild = p.children?.some((c: any) =>
+                      (c.name || '').toLowerCase().includes(q) || (c.admissionNo || '').toLowerCase().includes(q)
+                    );
+                    return matchesParent || matchesChild;
+                  }).length
+                } of {parentsList.length} Parents
+              </span>
+            </div>
+
+            {/* Parents Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                  <tr>
+                    <th className="px-4 py-3">Parent Name</th>
+                    <th className="px-4 py-3">Login ID (Mobile No)</th>
+                    <th className="px-4 py-3">Linked Wards / Children</th>
+                    <th className="px-4 py-3">Auto Password Preview</th>
+                    <th className="px-4 py-3">Mobile App Status</th>
+                    <th className="px-4 py-3">Address & Contact</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {parentsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                        No parents found. Parents are automatically registered when admitting students.
+                      </td>
+                    </tr>
+                  ) : (
+                    parentsList
+                      .filter((p) => {
+                        const q = parentSearch.toLowerCase();
+                        if (!q) return true;
+                        const matchesParent = (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q);
+                        const matchesChild = p.children?.some((c: any) =>
+                          (c.name || '').toLowerCase().includes(q) || (c.admissionNo || '').toLowerCase().includes(q)
+                        );
+                        return matchesParent || matchesChild;
+                      })
+                      .map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition">
+                          <td className="px-4 py-3.5">
+                            <div className="font-bold text-slate-900 text-sm">{p.name}</div>
+                            {(p.fatherName || p.motherName) && (
+                              <div className="text-[10px] text-slate-400">
+                                {[p.fatherName ? `Father: ${p.fatherName}` : null, p.motherName ? `Mother: ${p.motherName}` : null]
+                                  .filter(Boolean)
+                                  .join(' • ')}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            <a
+                              href={`tel:${p.phone}`}
+                              className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5"
+                            >
+                              <Phone size={12} className="text-blue-500" />
+                              <span>{p.phone || 'No Phone'}</span>
+                            </a>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">Mobile Login ID</span>
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            {p.children && p.children.length > 0 ? (
+                              <div className="space-y-1">
+                                {p.children.map((c: any) => (
+                                  <div
+                                    key={c.id}
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-[11px] font-bold mr-1.5 mb-1"
+                                  >
+                                    <GraduationCap size={12} className="text-blue-600" />
+                                    <span>{c.name}</span>
+                                    <span className="text-[10px] text-blue-500 font-mono font-normal">({c.className})</span>
+                                    <span className="text-[10px] bg-white text-blue-700 font-mono px-1 rounded border border-blue-200">{c.admissionNo}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic">No linked ward</span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-slate-100 text-slate-800 border border-slate-300">
+                                {p.autoPasswordPreview}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(p.autoPasswordPreview);
+                                  alert(`Copied password for ${p.name}: ${p.autoPasswordPreview}`);
+                                }}
+                                title="Copy Password"
+                                className="p-1 text-slate-400 hover:text-slate-700 rounded transition"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                              {p.passwordFormula}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            {p.appInstalled ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 size={11} className="text-emerald-600" />
+                                <span>App Active</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                <AlertCircle size={11} className="text-amber-600" />
+                                <span>Pending Login</span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-[11px] text-slate-600 max-w-xs truncate">
+                            <div>{p.address || 'Address not specified'}</div>
+                            {p.email && <div className="text-[10px] text-slate-400 font-mono truncate">{p.email}</div>}
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>
@@ -1671,6 +1918,118 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <span className="text-slate-400 font-bold block mb-1">Academic Session Cycle</span>
                 <span className="text-sm font-black text-indigo-700">2026-2027 (Term 1 & Term 2 Active)</span>
+              </div>
+            </div>
+
+            {/* School Logo & Branding Section */}
+            <div className="p-5 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-slate-50 border border-blue-200 rounded-2xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <SchoolIcon size={16} className="text-blue-600" />
+                    School Official Crest & Logo Branding
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Displayed on ID cards, CBSE report cards, parent mobile apps, and institutional receipts.
+                  </p>
+                </div>
+
+                <label className="px-3 py-1.5 bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 font-bold text-xs rounded-xl shadow-sm cursor-pointer flex items-center gap-1.5 transition self-start sm:self-auto">
+                  <Upload size={13} />
+                  <span>Upload Logo from PC</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        alert('⚠️ Image must be under 2MB');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (ev.target?.result) setEditingSchoolLogo(ev.target.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                <div className="w-16 h-16 rounded-2xl border-2 border-blue-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                  {editingSchoolLogo || currentSchool?.logoUrl ? (
+                    <img
+                      src={editingSchoolLogo || currentSchool?.logoUrl}
+                      alt="Logo Preview"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+                      }}
+                    />
+                  ) : (
+                    <SchoolIcon size={28} className="text-slate-300" />
+                  )}
+                </div>
+
+                <div className="flex-1 w-full space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Paste image URL (PNG, JPG, SVG, WebP)..."
+                      value={editingSchoolLogo}
+                      onChange={(e) => setEditingSchoolLogo(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:bg-white focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingLogo || !currentSchool?.id}
+                      onClick={async () => {
+                        if (!currentSchool?.id) return;
+                        setSavingLogo(true);
+                        try {
+                          await ApiService.updateSchool(currentSchool.id, { logoUrl: editingSchoolLogo });
+                          setCurrentSchool({ ...currentSchool, logoUrl: editingSchoolLogo });
+                          alert('✅ School logo updated successfully!');
+                        } catch (err: any) {
+                          alert('Error saving logo: ' + err.message);
+                        } finally {
+                          setSavingLogo(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition disabled:opacity-50"
+                    >
+                      {savingLogo ? 'Saving...' : 'Save Logo'}
+                    </button>
+                  </div>
+
+                  {/* Preset Badges */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto text-[10px]">
+                    <span className="text-slate-400 font-semibold shrink-0">Sample Crests:</span>
+                    {[
+                      { name: 'CBSE Crest', url: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150' },
+                      { name: 'Royal Academy', url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=150' },
+                      { name: 'Global High', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150' },
+                      { name: 'Tech Crest', url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=150' },
+                    ].map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => setEditingSchoolLogo(c.url)}
+                        className={`px-2 py-0.5 rounded-lg border font-semibold transition shrink-0 ${
+                          editingSchoolLogo === c.url
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

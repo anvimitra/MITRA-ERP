@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, School, Student, StaffMember, FeePaymentRecord, FeeStructureItem, StaffLeaveItem, NotificationItem } from '../types';
+import { User, School, Student, StaffMember, FeePaymentRecord, FeeStructureItem, StaffLeaveItem, NotificationItem, ParentInfo } from '../types';
 import {
   fetchLiveStudents,
   fetchLiveClasses,
@@ -15,6 +15,7 @@ import {
   broadcastLiveNotice,
   createStudent,
   deleteStudent,
+  fetchParents,
 } from '../api';
 import {
   Users,
@@ -38,13 +39,14 @@ import {
   Mail,
   GraduationCap,
   Layers,
+  UserCheck,
 } from 'lucide-react';
 
 interface Props {
   principal: User;
   school: School;
-  activeSubTab?: 'overview' | 'students' | 'staff' | 'fees' | 'operations';
-  onSubTabChange?: (tab: 'overview' | 'students' | 'staff' | 'fees' | 'operations') => void;
+  activeSubTab?: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations';
+  onSubTabChange?: (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations') => void;
 }
 
 export const PrincipalView: React.FC<Props> = ({
@@ -53,15 +55,16 @@ export const PrincipalView: React.FC<Props> = ({
   activeSubTab: externalTab,
   onSubTabChange,
 }) => {
-  const [internalTab, setInternalTab] = useState<'overview' | 'students' | 'staff' | 'fees' | 'operations'>('overview');
+  const [internalTab, setInternalTab] = useState<'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations'>('overview');
   const currentTab = externalTab || internalTab;
-  const setTab = (tab: 'overview' | 'students' | 'staff' | 'fees' | 'operations') => {
+  const setTab = (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations') => {
     setInternalTab(tab);
     if (onSubTabChange) onSubTabChange(tab);
   };
 
   // Data states
   const [students, setStudents] = useState<Student[]>([]);
+  const [parents, setParents] = useState<ParentInfo[]>([]);
   const [classesData, setClassesData] = useState<{ classes: any[]; sections: any[] }>({ classes: [], sections: [] });
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [payments, setPayments] = useState<FeePaymentRecord[]>([]);
@@ -69,6 +72,10 @@ export const PrincipalView: React.FC<Props> = ({
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
   const [notices, setNotices] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Parents filter & state
+  const [parentSearch, setParentSearch] = useState('');
+  const [copiedParentId, setCopiedParentId] = useState<string | null>(null);
 
   // Student filter & modal
   const [studentSearch, setStudentSearch] = useState('');
@@ -136,7 +143,7 @@ export const PrincipalView: React.FC<Props> = ({
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [stuRes, clsRes, staffRes, payRes, feeRes, leavesRes, noticesRes] = await Promise.all([
+      const [stuRes, clsRes, staffRes, payRes, feeRes, leavesRes, noticesRes, parentsRes] = await Promise.all([
         fetchLiveStudents(),
         fetchLiveClasses(),
         fetchStaffMembers(),
@@ -144,6 +151,7 @@ export const PrincipalView: React.FC<Props> = ({
         fetchFeeStructures(),
         fetchStaffLeaves(),
         fetchLiveNotices(),
+        fetchParents(),
       ]);
 
       setStudents(stuRes || []);
@@ -153,6 +161,7 @@ export const PrincipalView: React.FC<Props> = ({
       setFeeStructures(feeRes || []);
       setLeaves(leavesRes || []);
       setNotices(noticesRes || []);
+      setParents(parentsRes || []);
 
       if (clsRes?.classes?.length > 0 && !newStudent.classId) {
         setNewStudent((prev) => ({
@@ -346,6 +355,15 @@ export const PrincipalView: React.FC<Props> = ({
     }
   };
 
+  // Copy Parent Credentials to Clipboard for WhatsApp/SMS
+  const copyParentLogin = (parent: ParentInfo) => {
+    const firstChild = parent.children?.[0];
+    const text = `🎉 Welcome to ${school.name}!\n\nYour Parent Portal & Mobile App login credentials:\n📱 Login ID (Mobile): ${parent.phone}\n🔑 Password: ${parent.autoPasswordPreview || 'School@123'}\n👨‍👩‍👧 Parent: ${parent.name}\n${firstChild ? `🎓 Student: ${firstChild.name} (${firstChild.admissionNo || ''})\n` : ''}\nLogin here or download the app: https://mitra-erp.pages.dev`;
+    navigator.clipboard.writeText(text);
+    setCopiedParentId(parent.id);
+    setTimeout(() => setCopiedParentId(null), 3000);
+  };
+
   // Filter students
   const filteredStudents = students.filter((s) => {
     const q = studentSearch.toLowerCase();
@@ -357,6 +375,18 @@ export const PrincipalView: React.FC<Props> = ({
       s.fatherName?.toLowerCase().includes(q);
     const matchClass = !classFilter || s.className?.includes(classFilter) || (s as any).classId === classFilter;
     return matchQuery && matchClass;
+  });
+
+  // Filter parents
+  const filteredParents = parents.filter((p) => {
+    const q = parentSearch.toLowerCase();
+    if (!q) return true;
+    const matchName = p.name?.toLowerCase().includes(q) || p.fatherName?.toLowerCase().includes(q) || p.motherName?.toLowerCase().includes(q);
+    const matchPhone = p.phone?.includes(q) || p.loginId?.includes(q);
+    const matchChild = p.children?.some(
+      (c) => c.name?.toLowerCase().includes(q) || c.admissionNo?.toLowerCase().includes(q)
+    );
+    return matchName || matchPhone || matchChild;
   });
 
   return (
@@ -379,10 +409,10 @@ export const PrincipalView: React.FC<Props> = ({
         </div>
 
         {/* Sub Navigation Bar */}
-        <div className="grid grid-cols-5 gap-1 mt-3.5 pt-3 border-t border-white/10 text-[10px] font-bold">
+        <div className="grid grid-cols-6 gap-1 mt-3.5 pt-3 border-t border-white/10 text-[9px] font-bold">
           <button
             onClick={() => setTab('overview')}
-            className={`py-1.5 px-1 rounded-xl transition text-center ${
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
               currentTab === 'overview' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
             }`}
           >
@@ -390,15 +420,23 @@ export const PrincipalView: React.FC<Props> = ({
           </button>
           <button
             onClick={() => setTab('students')}
-            className={`py-1.5 px-1 rounded-xl transition text-center ${
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
               currentTab === 'students' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
             }`}
           >
             Students
           </button>
           <button
+            onClick={() => setTab('parents')}
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
+              currentTab === 'parents' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Parents
+          </button>
+          <button
             onClick={() => setTab('staff')}
-            className={`py-1.5 px-1 rounded-xl transition text-center ${
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
               currentTab === 'staff' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
             }`}
           >
@@ -406,7 +444,7 @@ export const PrincipalView: React.FC<Props> = ({
           </button>
           <button
             onClick={() => setTab('fees')}
-            className={`py-1.5 px-1 rounded-xl transition text-center ${
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
               currentTab === 'fees' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
             }`}
           >
@@ -414,7 +452,7 @@ export const PrincipalView: React.FC<Props> = ({
           </button>
           <button
             onClick={() => setTab('operations')}
-            className={`py-1.5 px-1 rounded-xl transition text-center ${
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
               currentTab === 'operations' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
             }`}
           >
@@ -446,6 +484,23 @@ export const PrincipalView: React.FC<Props> = ({
             </div>
 
             <div
+              onClick={() => setTab('parents')}
+              className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-purple-300 transition"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-slate-500">Registered Parents</span>
+                <UserCheck className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-black text-slate-900">
+                {loading ? '...' : parents.length}
+              </p>
+              <span className="text-[10px] font-semibold text-purple-600 flex items-center space-x-1 mt-0.5">
+                <Shield className="w-3 h-3" />
+                <span>Dedicated Directory</span>
+              </span>
+            </div>
+
+            <div
               onClick={() => setTab('staff')}
               className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-purple-300 transition"
             >
@@ -473,17 +528,6 @@ export const PrincipalView: React.FC<Props> = ({
               <span className="text-[10px] font-semibold text-slate-400">
                 {payments.length} verified receipts
               </span>
-            </div>
-
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-slate-500">Classes Setup</span>
-                <Layers className="w-4 h-4 text-amber-500" />
-              </div>
-              <p className="text-2xl font-black text-slate-900">
-                {classesData.classes.length || 12}
-              </p>
-              <span className="text-[10px] font-semibold text-slate-400">Grades 1-12 (A & B)</span>
             </div>
           </div>
 
@@ -657,6 +701,135 @@ export const PrincipalView: React.FC<Props> = ({
         </div>
       )}
 
+      {/* TAB: PARENTS & GUARDIANS DIRECTORY */}
+      {currentTab === 'parents' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-slate-800 flex items-center space-x-1.5">
+              <UserCheck className="w-4 h-4 text-emerald-600" />
+              <span>Parents Directory ({parents.length})</span>
+            </h3>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+              Auto-Synced
+            </span>
+          </div>
+
+          {/* Info note */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-xs text-emerald-900 flex items-start space-x-2 shadow-sm">
+            <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-[11px] leading-relaxed">
+              <strong>Dedicated Parent Directory:</strong> When students are enrolled, parent portal accounts are auto-created. Parents login with their mobile number and auto-generated password (First 4 letters of name + Last 4 digits of mobile).
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search parent name, mobile, or student..."
+              value={parentSearch}
+              onChange={(e) => setParentSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-white rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+            />
+          </div>
+
+          {/* Parents List */}
+          <div className="space-y-2">
+            {filteredParents.length === 0 ? (
+              <div className="bg-white rounded-2xl p-6 text-center text-slate-400 text-xs border">
+                {loading ? 'Loading parents directory...' : 'No parents found matching search.'}
+              </div>
+            ) : (
+              filteredParents.map((p) => (
+                <div
+                  key={p.id}
+                  className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <strong className="text-slate-900 font-bold text-sm">{p.name}</strong>
+                        {p.appInstalled === 1 ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-800 font-black uppercase">
+                            App Active
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-600 font-medium">
+                            Not Installed
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={`tel:${p.phone}`}
+                        className="text-[11px] text-purple-700 font-bold flex items-center space-x-1 mt-0.5 hover:underline"
+                      >
+                        <Phone className="w-3 h-3 text-purple-600" />
+                        <span>{p.phone}</span>
+                      </a>
+                    </div>
+
+                    <button
+                      onClick={() => copyParentLogin(p)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center space-x-1 border transition shadow-sm ${
+                        copiedParentId === p.id
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
+                      }`}
+                      title="Copy login credentials"
+                    >
+                      {copiedParentId === p.id ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-purple-600" />
+                          <span>Share Login</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Linked Wards / Children */}
+                  <div className="pt-1.5 border-t border-slate-100">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+                      Linked Children ({p.children?.length || 0}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.children && p.children.length > 0 ? (
+                        p.children.map((c) => (
+                          <span
+                            key={c.id}
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-purple-50 text-purple-900 border border-purple-200 text-[10px] font-bold"
+                          >
+                            <GraduationCap className="w-3 h-3 text-purple-600" />
+                            <span>{c.name}</span>
+                            <span className="text-[9px] font-mono text-purple-600">({c.admissionNo})</span>
+                            {c.className && <span className="text-slate-400">• {c.className}</span>}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">No student linked</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Password Formula Box */}
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[10px]">
+                    <span className="text-slate-500">Auto Password:</span>
+                    <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-200">
+                      {p.autoPasswordPreview || 'School@123'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* TAB 3: STAFF & FACULTY */}
       {currentTab === 'staff' && (
         <div className="space-y-3">
@@ -671,6 +844,18 @@ export const PrincipalView: React.FC<Props> = ({
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Recruit Staff</span>
+            </button>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-2.5 text-xs text-purple-900 flex items-center justify-between">
+            <span className="text-[11px]">
+              Showing teachers and office staff only. Parents are in the <strong>Parents Directory</strong>.
+            </span>
+            <button
+              onClick={() => setTab('parents')}
+              className="text-[10px] font-black text-purple-700 underline shrink-0 ml-2"
+            >
+              View Parents
             </button>
           </div>
 

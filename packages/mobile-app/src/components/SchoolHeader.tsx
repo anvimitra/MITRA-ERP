@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { School, User } from '../types';
-import { Bell, Sparkles, LogOut, RefreshCw } from 'lucide-react';
+import { Bell, Sparkles, LogOut, RefreshCw, School as SchoolIcon } from 'lucide-react';
 
 interface Props {
   school?: School | null;
@@ -23,24 +23,30 @@ export const SchoolHeader: React.FC<Props> = ({
   onLogout,
   onCheckUpdate,
 }) => {
+  const [imgError, setImgError] = useState(false);
   const schoolName = school?.name || 'MITRA-ERP';
   const schoolCode = school?.code || 'MOBILE';
-  const logoUrl = school?.logoUrl || '/school-icon.svg';
+  const logoUrl = school?.logoUrl;
+  const initial = (schoolName || 'S').charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-r from-purple-700 via-purple-800 to-indigo-900 text-white shadow-lg pt-safe">
       <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
         {/* School Logo & Title */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md p-1.5 flex items-center justify-center border border-white/20 shadow-inner">
-            <img
-              src={logoUrl}
-              alt={schoolName}
-              className="w-full h-full object-contain rounded-lg"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
+          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md p-1 flex items-center justify-center border border-white/20 shadow-inner overflow-hidden">
+            {logoUrl && !imgError ? (
+              <img
+                src={logoUrl}
+                alt={schoolName}
+                className="w-full h-full object-contain rounded-lg"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center text-purple-950 font-black text-sm shadow">
+                {initial}
+              </div>
+            )}
           </div>
           <div>
             <div className="flex items-center space-x-1.5">

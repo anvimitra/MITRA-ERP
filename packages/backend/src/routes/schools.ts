@@ -6,7 +6,30 @@ import { isPostgresConnected, getPostgresPool } from '../db/postgres-sync.js';
 import { restoreLocalBackup, saveLocalBackup } from '../db/persistent-backup.js';
 import { getDatabaseInstance } from '../db/init.js';
 
+function normalizeLogoUrl(url?: string | null): string {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+  }
+  let clean = url.trim();
+  // Handle Google Drive preview/sharing URL
+  const gdriveMatch = clean.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (gdriveMatch && gdriveMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${gdriveMatch[1]}`;
+  }
+  // Handle Imgur page link
+  const imgurMatch = clean.match(/^https?:\/\/imgur\.com\/([a-zA-Z0-9]+)$/);
+  if (imgurMatch && imgurMatch[1]) {
+    return `https://i.imgur.com/${imgurMatch[1]}.png`;
+  }
+  // Ensure http/https/data prefix
+  if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('data:')) {
+    clean = 'https://' + clean;
+  }
+  return clean;
+}
+
 export const schoolRoutes = new Hono();
+
 
 // Public: Get school branding info by School Code or Domain (used by mobile app & branded portal)
 schoolRoutes.get('/branding/:codeOrDomain', async (c) => {
@@ -131,7 +154,7 @@ schoolRoutes.post('/', async (c) => {
     name,
     code: code.toUpperCase(),
     domain,
-    logoUrl: logoUrl || 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150',
+    logoUrl: normalizeLogoUrl(logoUrl),
     primaryColor: primaryColor || '#2563eb',
     secondaryColor: secondaryColor || '#1e40af',
     phone,
@@ -244,7 +267,7 @@ schoolRoutes.put('/:id', async (c) => {
         tagline: body.tagline !== undefined ? body.tagline : existing.tagline,
         primaryColor: body.primaryColor || existing.primaryColor,
         secondaryColor: body.secondaryColor || existing.secondaryColor,
-        logoUrl: body.logoUrl || existing.logoUrl,
+        logoUrl: body.logoUrl !== undefined ? normalizeLogoUrl(body.logoUrl) : existing.logoUrl,
       })
       .where(eq(schema.schools.id, schoolId))
       .run();
@@ -272,7 +295,7 @@ schoolRoutes.put('/:id', async (c) => {
         tagline: body.tagline !== undefined ? body.tagline : existing.tagline,
         primaryColor: body.primaryColor || existing.primaryColor,
         secondaryColor: body.secondaryColor || existing.secondaryColor,
-        logoUrl: body.logoUrl || existing.logoUrl,
+        logoUrl: body.logoUrl !== undefined ? normalizeLogoUrl(body.logoUrl) : existing.logoUrl,
         isActive: body.isActive !== undefined ? body.isActive : existing.isActive,
       })
       .where(eq(schema.schools.id, schoolId))

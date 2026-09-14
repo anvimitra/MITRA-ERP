@@ -26,6 +26,7 @@ export type TabType =
   | 'principal'
   | 'overview'
   | 'students'
+  | 'parents'
   | 'staff'
   | 'operations'
   | 'marks'
@@ -85,52 +86,62 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
           <>
             <button
               onClick={() => onChangeTab('overview')}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
                 activeTab === 'overview' || activeTab === 'principal' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Shield className={`w-5 h-5 ${activeTab === 'overview' || activeTab === 'principal' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              <span className="text-[10px] mt-0.5">Dashboard</span>
+              <span className="text-[9px] mt-0.5">Dashboard</span>
             </button>
 
             <button
               onClick={() => onChangeTab('students')}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
                 activeTab === 'students' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Users className={`w-5 h-5 ${activeTab === 'students' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              <span className="text-[10px] mt-0.5">Students</span>
+              <span className="text-[9px] mt-0.5">Students</span>
+            </button>
+
+            <button
+              onClick={() => onChangeTab('parents')}
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
+                activeTab === 'parents' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <UserCheck className={`w-5 h-5 ${activeTab === 'parents' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+              <span className="text-[9px] mt-0.5">Parents</span>
             </button>
 
             <button
               onClick={() => onChangeTab('staff')}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
                 activeTab === 'staff' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Briefcase className={`w-5 h-5 ${activeTab === 'staff' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              <span className="text-[10px] mt-0.5">Staff</span>
+              <span className="text-[9px] mt-0.5">Staff</span>
             </button>
 
             <button
               onClick={() => onChangeTab('fees')}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
                 activeTab === 'fees' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <CreditCard className={`w-5 h-5 ${activeTab === 'fees' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              <span className="text-[10px] mt-0.5">Fees</span>
+              <span className="text-[9px] mt-0.5">Fees</span>
             </button>
 
             <button
               onClick={() => onChangeTab('operations')}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
                 activeTab === 'operations' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Radio className={`w-5 h-5 ${activeTab === 'operations' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              <span className="text-[10px] mt-0.5">Circulars</span>
+              <span className="text-[9px] mt-0.5">Circulars</span>
             </button>
           </>
         )}

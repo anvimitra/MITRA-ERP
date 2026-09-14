@@ -204,6 +204,28 @@ export const SuperAdminPortal: React.FC = () => {
     }
   };
 
+  const PRESET_LOGOS = [
+    { name: 'CBSE Crest', url: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150' },
+    { name: 'Royal Academy', url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=150' },
+    { name: 'Global High', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150' },
+    { name: 'Modern Tech', url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=150' },
+  ];
+
+  const handleLogoFileUpload = (file: File, setter: (url: string) => void) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('⚠️ Image size must be under 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setter(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassLoading(true);
@@ -403,9 +425,23 @@ export const SuperAdminPortal: React.FC = () => {
               />
               <div className="flex items-start justify-between gap-4 mt-1">
                 <div className="flex items-center gap-3">
-                  {s.logoUrl && (
-                    <img src={s.logoUrl} alt={s.name} className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white" />
-                  )}
+                  <div className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
+                    {s.logoUrl ? (
+                      <img
+                        src={s.logoUrl}
+                        alt={s.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold">
+                        <SchoolIcon size={20} />
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-base">{s.name}</h3>
                     <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
@@ -702,14 +738,63 @@ export const SuperAdminPortal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">School Logo URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://example.com/logo.png"
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700">School Logo</label>
+                      <label className="text-[10px] font-bold text-purple-600 hover:text-purple-800 cursor-pointer flex items-center gap-1">
+                        <Upload size={11} />
+                        <span>Upload File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) handleLogoFileUpload(e.target.files[0], setLogoUrl);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="https://example.com/logo.png"
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                      />
+                      <div className="w-9 h-9 rounded-xl border border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+                            }}
+                          />
+                        ) : (
+                          <SchoolIcon size={16} className="text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto">
+                      <span className="text-[10px] text-slate-400 font-semibold shrink-0">Presets:</span>
+                      {PRESET_LOGOS.map((p) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => setLogoUrl(p.url)}
+                          className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition shrink-0 ${
+                            logoUrl === p.url
+                              ? 'bg-purple-100 text-purple-800 border-purple-300 font-bold'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1055,14 +1140,67 @@ export const SuperAdminPortal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">School Logo URL</label>
-                    <input
-                      type="url"
-                      value={editingSchool.logoUrl || ''}
-                      onChange={(e) => setEditingSchool({ ...editingSchool, logoUrl: e.target.value })}
-                      placeholder="https://example.com/logo.png"
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700">School Logo</label>
+                      <label className="text-[10px] font-bold text-purple-600 hover:text-purple-800 cursor-pointer flex items-center gap-1">
+                        <Upload size={11} />
+                        <span>Upload File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              handleLogoFileUpload(e.target.files[0], (url) =>
+                                setEditingSchool({ ...editingSchool, logoUrl: url })
+                              );
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editingSchool.logoUrl || ''}
+                        onChange={(e) => setEditingSchool({ ...editingSchool, logoUrl: e.target.value })}
+                        placeholder="https://example.com/logo.png"
+                        className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                      />
+                      <div className="w-9 h-9 rounded-xl border border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                        {editingSchool.logoUrl ? (
+                          <img
+                            src={editingSchool.logoUrl}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150';
+                            }}
+                          />
+                        ) : (
+                          <SchoolIcon size={16} className="text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto">
+                      <span className="text-[10px] text-slate-400 font-semibold shrink-0">Presets:</span>
+                      {PRESET_LOGOS.map((p) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => setEditingSchool({ ...editingSchool, logoUrl: p.url })}
+                          className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition shrink-0 ${
+                            editingSchool.logoUrl === p.url
+                              ? 'bg-purple-100 text-purple-800 border-purple-300 font-bold'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

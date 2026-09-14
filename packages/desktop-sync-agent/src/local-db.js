@@ -262,6 +262,23 @@ function getLocalDb() {
   return localDb;
 }
 
+function toSnakeCase(str) {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+const tableColumnCache = new Map();
+function getTableColumns(db, tableName) {
+  if (tableColumnCache.has(tableName)) return tableColumnCache.get(tableName);
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${tableName})`).all().map((c) => c.name);
+    const colSet = new Set(cols);
+    tableColumnCache.set(tableName, colSet);
+    return colSet;
+  } catch {
+    return null;
+  }
+}
+
 // Save complete dataset from Cloud ERP into local SQLite and JSON backup file
 function saveMasterDataset(dataset, updateJson = true) {
   const db = getLocalDb();
@@ -269,14 +286,31 @@ function saveMasterDataset(dataset, updateJson = true) {
 
   const insertHelper = (tableName, rows) => {
     if (!Array.isArray(rows) || rows.length === 0) return;
+    const validCols = getTableColumns(db, tableName);
+
     for (const r of rows) {
-      const keys = Object.keys(r);
+      if (!r || typeof r !== 'object') continue;
+      const originalKeys = Object.keys(r);
+      const rowSnake = {};
+
+      for (const k of originalKeys) {
+        const snake = toSnakeCase(k);
+        if (!validCols || validCols.has(snake)) {
+          let val = r[k];
+          if (typeof val === 'boolean') val = val ? 1 : 0;
+          if (val === undefined) val = null;
+          rowSnake[snake] = val;
+        }
+      }
+
+      const keys = Object.keys(rowSnake);
+      if (keys.length === 0) continue;
       const placeholders = keys.map(() => '?').join(', ');
-      const values = keys.map((k) => (r[k] === undefined ? null : r[k]));
+      const values = keys.map((k) => rowSnake[k]);
       try {
         db.prepare(`INSERT OR REPLACE INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
       } catch (err) {
-        // Continue with other records
+        console.warn(`⚠️ [LocalDB] Insert warning into ${tableName}:`, err.message);
       }
     }
   };
@@ -314,7 +348,7 @@ function saveMasterDataset(dataset, updateJson = true) {
         dataset: currentFullDataset,
       };
       fs.writeFileSync(backupPath, JSON.stringify(backupPayload, null, 2), 'utf8');
-      console.log(`💾 [Master PC Storage] Persistent JSON snapshot saved: ${backupPath}`);
+      console.log(`💾 [Master PC Storage] Persistent JSON snapshot saved (${currentFullDataset.schools?.length || 0} schools, ${currentFullDataset.students?.length || 0} students): ${backupPath}`);
     } catch (err) {
       console.warn('Backup write notice:', err.message);
     }
@@ -324,21 +358,34 @@ function saveMasterDataset(dataset, updateJson = true) {
 // Retrieve complete dataset of ALL schools from local SQLite
 function getMasterDataset() {
   const db = getLocalDb();
+  const mapRowsToDualFormat = (rows) => {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((r) => {
+      const obj = {};
+      for (const k of Object.keys(r)) {
+        const camel = k.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        obj[camel] = r[k];
+        obj[k] = r[k]; // Support both snake_case and camelCase for consumers
+      }
+      return obj;
+    });
+  };
+
   return {
-    schools: db.prepare('SELECT * FROM schools').all(),
-    users: db.prepare('SELECT * FROM users').all(),
-    classes: db.prepare('SELECT * FROM classes').all(),
-    sections: db.prepare('SELECT * FROM sections').all(),
-    subjects: db.prepare('SELECT * FROM subjects').all(),
-    parents: db.prepare('SELECT * FROM parents').all(),
-    students: db.prepare('SELECT * FROM students').all(),
-    attendance: db.prepare('SELECT * FROM attendance').all(),
-    exams: db.prepare('SELECT * FROM exams').all(),
-    marks: db.prepare('SELECT * FROM marks').all(),
-    feeStructures: db.prepare('SELECT * FROM fee_structures').all(),
-    feePayments: db.prepare('SELECT * FROM fee_payments').all(),
-    timetable: db.prepare('SELECT * FROM timetable_periods').all(),
-    staffLeaves: db.prepare('SELECT * FROM staff_leaves').all(),
+    schools: mapRowsToDualFormat(db.prepare('SELECT * FROM schools').all()),
+    users: mapRowsToDualFormat(db.prepare('SELECT * FROM users').all()),
+    classes: mapRowsToDualFormat(db.prepare('SELECT * FROM classes').all()),
+    sections: mapRowsToDualFormat(db.prepare('SELECT * FROM sections').all()),
+    subjects: mapRowsToDualFormat(db.prepare('SELECT * FROM subjects').all()),
+    parents: mapRowsToDualFormat(db.prepare('SELECT * FROM parents').all()),
+    students: mapRowsToDualFormat(db.prepare('SELECT * FROM students').all()),
+    attendance: mapRowsToDualFormat(db.prepare('SELECT * FROM attendance').all()),
+    exams: mapRowsToDualFormat(db.prepare('SELECT * FROM exams').all()),
+    marks: mapRowsToDualFormat(db.prepare('SELECT * FROM marks').all()),
+    feeStructures: mapRowsToDualFormat(db.prepare('SELECT * FROM fee_structures').all()),
+    feePayments: mapRowsToDualFormat(db.prepare('SELECT * FROM fee_payments').all()),
+    timetable: mapRowsToDualFormat(db.prepare('SELECT * FROM timetable_periods').all()),
+    staffLeaves: mapRowsToDualFormat(db.prepare('SELECT * FROM staff_leaves').all()),
   };
 }
 
@@ -349,13 +396,15 @@ function getMultiSchoolStats() {
   
   const enrichedSchools = schools.map((s) => {
     const studentCount = db.prepare('SELECT count(*) as count FROM students WHERE school_id = ?').get(s.id)?.count || 0;
-    const teacherCount = db.prepare("SELECT count(*) as count FROM users WHERE school_id = ? AND role = 'teacher'").get(s.id)?.count || 0;
+    const teacherCount = db.prepare("SELECT count(*) as count FROM users WHERE school_id = ? AND role NOT IN ('parent', 'student')").get(s.id)?.count || 0;
+    const parentCount = db.prepare("SELECT count(*) as count FROM users WHERE school_id = ? AND role = 'parent'").get(s.id)?.count || 0;
     const attendanceCount = db.prepare('SELECT count(*) as count FROM attendance WHERE school_id = ?').get(s.id)?.count || 0;
     const feeCount = db.prepare('SELECT count(*) as count FROM fee_payments WHERE school_id = ?').get(s.id)?.count || 0;
     return {
       ...s,
       studentCount,
       teacherCount,
+      parentCount,
       attendanceCount,
       feeCount,
     };
@@ -363,6 +412,8 @@ function getMultiSchoolStats() {
 
   const totalStudents = db.prepare('SELECT count(*) as count FROM students').get()?.count || 0;
   const totalUsers = db.prepare('SELECT count(*) as count FROM users').get()?.count || 0;
+  const totalStaff = db.prepare("SELECT count(*) as count FROM users WHERE role NOT IN ('parent', 'student')").get()?.count || 0;
+  const totalParents = db.prepare("SELECT count(*) as count FROM users WHERE role = 'parent'").get()?.count || 0;
   const totalAttendance = db.prepare('SELECT count(*) as count FROM attendance').get()?.count || 0;
   const totalFees = db.prepare('SELECT count(*) as count FROM fee_payments').get()?.count || 0;
 
@@ -372,6 +423,8 @@ function getMultiSchoolStats() {
     totalSchools: schools.length,
     totalStudents,
     totalUsers,
+    totalStaff,
+    totalParents,
     totalAttendance,
     totalFees,
     lastSyncTimestamp: lastSyncMeta?.value || null,

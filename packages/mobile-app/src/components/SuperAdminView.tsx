@@ -51,6 +51,7 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
     name: '',
     code: '',
     affiliationNo: '',
+    logoUrl: '',
     principalName: '',
     principalEmail: '',
     principalPassword: '',
@@ -282,11 +283,35 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                   className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-black uppercase bg-purple-100 text-purple-800">
-                        {sch.code}
-                      </span>
-                      <strong className="text-slate-900 font-bold text-sm">{sch.name}</strong>
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                        {sch.logoUrl ? (
+                          <img
+                            src={sch.logoUrl}
+                            alt={sch.name}
+                            className="w-full h-full object-contain p-0.5"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                              const parent = (e.target as HTMLElement).parentElement;
+                              if (parent) {
+                                parent.innerHTML = `<span class="text-xs font-black text-purple-700">${(sch.name || 'S').charAt(0).toUpperCase()}</span>`;
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xs font-black text-purple-700">
+                            {(sch.name || 'S').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-black uppercase bg-purple-100 text-purple-800">
+                            {sch.code}
+                          </span>
+                          <strong className="text-slate-900 font-bold text-sm leading-tight">{sch.name}</strong>
+                        </div>
+                      </div>
                     </div>
 
                     <button
@@ -416,6 +441,50 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                     className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">School Crest / Logo URL or Image</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://... or choose file below"
+                    value={schoolForm.logoUrl}
+                    onChange={(e) => setSchoolForm({ ...schoolForm, logoUrl: e.target.value })}
+                    className="flex-1 p-2.5 border rounded-xl bg-slate-50 text-xs focus:bg-white"
+                  />
+                  <label className="px-3 py-2 bg-purple-50 text-purple-700 font-bold border border-purple-200 rounded-xl cursor-pointer hover:bg-purple-100 flex items-center justify-center shrink-0">
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              setSchoolForm({ ...schoolForm, logoUrl: reader.result });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {schoolForm.logoUrl && (
+                  <div className="mt-2 flex items-center space-x-2 bg-slate-50 p-2 rounded-xl border">
+                    <img
+                      src={schoolForm.logoUrl}
+                      alt="Preview"
+                      className="w-8 h-8 rounded-lg object-contain bg-white border p-0.5"
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                    <span className="text-[10px] text-emerald-700 font-bold">Logo ready for school</span>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-100">

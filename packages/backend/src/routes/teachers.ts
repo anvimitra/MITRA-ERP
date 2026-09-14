@@ -18,7 +18,7 @@ teacherRoutes.get('/', async (c) => {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const staff = db
+  const allUsers = db
     .select({
       id: schema.users.id,
       name: schema.users.name,
@@ -33,6 +33,9 @@ teacherRoutes.get('/', async (c) => {
     .from(schema.users)
     .where(eq(schema.users.schoolId, user.schoolId))
     .all();
+
+  // EXCLUDE parents and students - only return actual faculty & staff
+  const staff = allUsers.filter((u: any) => u.role !== 'parent' && u.role !== 'student');
 
   return c.json({ staff });
 });

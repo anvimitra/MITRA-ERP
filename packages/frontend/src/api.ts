@@ -301,6 +301,11 @@ export class ApiService {
     });
   }
 
+  // Parents Directory
+  static async getParents() {
+    return this.request<{ parents: any[] }>('/students/parents');
+  }
+
   // Faculty & Staff CRUD
   static async getTeachers() {
     return this.request<{ staff: any[] }>('/teachers');

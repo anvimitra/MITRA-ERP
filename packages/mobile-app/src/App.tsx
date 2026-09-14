@@ -330,7 +330,7 @@ export const App: React.FC = () => {
                   }
                 }
                 activeSubTab={
-                  activeTab === 'students' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
+                  activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
                     ? activeTab
                     : 'overview'
                 }

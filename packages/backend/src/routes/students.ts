@@ -339,3 +339,81 @@ studentRoutes.delete('/:id', async (c) => {
 
   return c.json({ success: true, message: 'Student removed from institution records' });
 });
+
+// GET /api/students/parents - Dedicated directory of all parents for current school
+studentRoutes.get('/parents', async (c) => {
+  const user = getAuthUser(c);
+  if (!user || !user.schoolId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const parents = db
+    .select()
+    .from(schema.parents)
+    .where(eq(schema.parents.schoolId, user.schoolId))
+    .all();
+
+  const students = db
+    .select()
+    .from(schema.students)
+    .where(eq(schema.students.schoolId, user.schoolId))
+    .all();
+
+  const users = db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.schoolId, user.schoolId), eq(schema.users.role, 'parent')))
+    .all();
+
+  const classes = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
+  const sections = db.select().from(schema.sections).where(eq(schema.sections.schoolId, user.schoolId)).all();
+  const classMap = new Map(classes.map((cl: any) => [cl.id, cl.name]));
+  const sectionMap = new Map(sections.map((sec: any) => [sec.id, sec.name]));
+  const userMap = new Map(users.map((u: any) => [u.id, u]));
+
+  const enrichedParents = parents.map((p: any) => {
+    const parentUser: any = p.userId ? userMap.get(p.userId) : users.find((u: any) => u.phone === p.primaryPhone);
+    const pName = (p.fatherName || p.motherName || parentUser?.name || 'Parent').trim();
+
+    // Linked children for this parent
+    const children = students
+      .filter((s: any) => s.parentId === p.id)
+      .map((s: any) => ({
+        id: s.id,
+        name: `${s.firstName} ${s.lastName || ''}`.trim(),
+        admissionNo: s.admissionNo,
+        className: classMap.get(s.classId) || s.classId,
+        sectionName: sectionMap.get(s.sectionId) || s.sectionId,
+        gender: s.gender,
+      }));
+
+    // Calculate auto password hint: First 4 letters uppercase + Last 4 digits of phone
+    const lettersOnly = pName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const namePrefix = (lettersOnly.length >= 4 ? lettersOnly.slice(0, 4) : lettersOnly.padEnd(4, 'P')).toUpperCase();
+    const cleanPhone = (p.primaryPhone || '').replace(/\D/g, '');
+    const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+    const autoPasswordPreview = `${namePrefix}${phoneSuffix}`;
+
+    return {
+      id: p.id,
+      userId: parentUser?.id || p.userId || null,
+      name: pName,
+      fatherName: p.fatherName || '',
+      motherName: p.motherName || '',
+      phone: p.primaryPhone || parentUser?.phone || '',
+      email: p.email || parentUser?.email || '',
+      address: p.address || '',
+      loginId: cleanPhone || p.primaryPhone,
+      passwordFormula: `${namePrefix} + Last 4 digits (${autoPasswordPreview})`,
+      autoPasswordPreview,
+      appInstalled: parentUser ? parentUser.appInstalled : 0,
+      lastActiveAt: parentUser ? parentUser.lastActiveAt : null,
+      isActive: parentUser ? parentUser.isActive : 1,
+      children,
+      totalChildren: children.length,
+    };
+  });
+
+  return c.json({ parents: enrichedParents });
+});
+
