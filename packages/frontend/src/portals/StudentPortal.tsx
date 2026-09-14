@@ -1123,10 +1123,10 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
                 </div>
 
                 <div className="w-24 h-28 border-2 border-slate-800 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center text-3xl font-black shrink-0 self-center">
-                  {student?.photoUrl ? (
-                    <img src={student.photoUrl} alt="Photo" className="w-full h-full object-cover" />
+                  {(viewAdmitCardModal?.photoUrl || student?.photoUrl) ? (
+                    <img src={viewAdmitCardModal?.photoUrl || student?.photoUrl} alt="Candidate Photo" className="w-full h-full object-cover" />
                   ) : (
-                    '🎓'
+                    <span className="text-xs text-slate-400 font-bold">PHOTO</span>
                   )}
                 </div>
               </div>

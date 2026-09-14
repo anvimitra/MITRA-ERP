@@ -299,6 +299,21 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS admit_cards (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      exam_id TEXT,
+      class_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      roll_no INTEGER,
+      roll_code TEXT,
+      exam_title TEXT,
+      center_number TEXT,
+      center_name TEXT,
+      is_published INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS front_desk_visitors (
       id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
@@ -524,6 +539,38 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
   try {
     sqlite.exec('ALTER TABLE marks ADD COLUMN is_published INTEGER DEFAULT 0;');
   } catch {}
+
+  // Auto-seed pre-primary classes (NURSERY, LKG, UKG) for all schools
+  try {
+    const allSchools = sqlite.prepare('SELECT id, code FROM schools').all() as { id: string; code: string }[];
+    const preClasses = [
+      { name: 'NURSERY', gradeLevel: -3, codeSuffix: 'nursery' },
+      { name: 'LKG', gradeLevel: -2, codeSuffix: 'lkg' },
+      { name: 'UKG', gradeLevel: -1, codeSuffix: 'ukg' },
+    ];
+    for (const sch of allSchools) {
+      const sCode = (sch.code || 'sch').toLowerCase();
+      for (const pre of preClasses) {
+        const classId = `cls-${sCode}-${pre.codeSuffix}`;
+        sqlite.prepare(`
+          INSERT OR IGNORE INTO classes (id, school_id, name, grade_level)
+          VALUES (?, ?, ?, ?)
+        `).run(classId, sch.id, pre.name, pre.gradeLevel);
+
+        sqlite.prepare(`
+          INSERT OR IGNORE INTO sections (id, school_id, class_id, name)
+          VALUES (?, ?, ?, 'A')
+        `).run(`sec-${sCode}-${pre.codeSuffix}-a`, sch.id, classId);
+
+        sqlite.prepare(`
+          INSERT OR IGNORE INTO sections (id, school_id, class_id, name)
+          VALUES (?, ?, ?, 'B')
+        `).run(`sec-${sCode}-${pre.codeSuffix}-b`, sch.id, classId);
+      }
+    }
+  } catch (err) {
+    console.warn('Pre-primary class auto-seed warning:', err);
+  }
 
   // Ensure default Super Admin root account exists
   try {

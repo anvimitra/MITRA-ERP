@@ -43,3 +43,4 @@ export const transportStops = createTable('transport_stops');
 export const studentTransport = createTable('student_transport');
 export const inventoryItems = createTable('inventory_items');
 export const inventoryTransactions = createTable('inventory_transactions');
+export const admitCards = createTable('admit_cards');

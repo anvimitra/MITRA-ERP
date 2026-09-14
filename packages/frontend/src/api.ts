@@ -265,6 +265,18 @@ export class ApiService {
     });
   }
 
+  static async deleteFeeStructure(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/fees/structures/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async broadcastDueFeeReminders() {
+    return this.request<{ success: boolean; message: string; count: number }>('/fees/broadcast-due-reminders', {
+      method: 'POST',
+    });
+  }
+
   // Notifications & SMS Logs
   static async getMyAlerts() {
     return this.request<{ notifications: NotificationItem[] }>('/notifications/my-alerts');
@@ -477,6 +489,23 @@ export class ApiService {
     return this.request<{ success: boolean; message: string }>(`/certificates/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  static async generateClassAdmitCards(data: {
+    classId: string;
+    examId?: string;
+    examTitle?: string;
+    centerNumber?: string;
+    centerName?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; count: number }>('/certificates/generate-class-admit-cards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getClassAdmitCards(classId: string) {
+    return this.request<{ admitCards: any[] }>(`/certificates/admit-cards/class/${classId}`);
   }
 
   // ==================== FRONT DESK & RECEPTION ====================

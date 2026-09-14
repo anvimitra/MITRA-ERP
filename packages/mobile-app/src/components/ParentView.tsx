@@ -10,6 +10,8 @@ interface Props {
   attendance: AttendanceRecord[];
   fees: FeeItem[];
   latestReport: ExamReport | null;
+  linkedStudents?: Student[];
+  onSelectStudent?: (student: Student) => void;
   onChangeTab: (tab: TabType) => void;
   onOpenIdCard?: () => void;
   onCheckUpdate?: () => void;
@@ -21,6 +23,8 @@ export const ParentView: React.FC<Props> = ({
   attendance,
   fees,
   latestReport,
+  linkedStudents,
+  onSelectStudent,
   onChangeTab,
   onOpenIdCard,
   onCheckUpdate,
@@ -64,6 +68,76 @@ export const ParentView: React.FC<Props> = ({
 
   return (
     <div className="space-y-4 pb-20">
+      {/* Multi-Child Selector for Parents with >1 Children */}
+      {linkedStudents && linkedStudents.length > 1 && (
+        <div className="bg-white border-2 border-purple-200 rounded-2xl p-3 shadow-sm space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+            <span className="flex items-center gap-1.5 text-purple-950 font-black">
+              <Award size={15} className="text-purple-600" />
+              <span>Select Ward / Child ({linkedStudents.length} Enrolled)</span>
+            </span>
+            <span className="text-[10px] bg-purple-100 text-purple-800 font-black px-2 py-0.5 rounded-full uppercase">
+              Multi-Child
+            </span>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {linkedStudents.map((child) => {
+              const isSelected = child.id === student?.id;
+              return (
+                <button
+                  key={child.id}
+                  onClick={() => onSelectStudent && onSelectStudent(child)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+                    isSelected
+                      ? 'bg-purple-900 text-white shadow-md'
+                      : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
+                  }`}
+                >
+                  <span className="w-5 h-5 rounded-full bg-amber-400 text-purple-950 font-black text-[10px] flex items-center justify-center">
+                    {child.firstName[0]}
+                  </span>
+                  <span>{child.firstName} {child.lastName || ''}</span>
+                  <span className="text-[10px] opacity-80 font-mono">({child.className})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bakaya Fee Notification Alert */}
+      {pendingFee && (
+        <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 rounded-2xl p-4 shadow-sm space-y-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center font-black text-base shadow">
+                ₹
+              </div>
+              <div>
+                <h4 className="font-extrabold text-xs text-rose-950 uppercase tracking-wide">
+                  Pending Fee Notification • {student?.firstName}
+                </h4>
+                <p className="text-[11px] text-rose-800 mt-0.5">
+                  An installment balance of <strong className="font-black text-rose-950">₹{pendingFee.amount.toLocaleString('en-IN')}</strong> is outstanding.
+                </p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-600 text-white uppercase">
+              Due Alert
+            </span>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-rose-200 text-xs">
+            <span className="text-slate-600 font-medium">Due Date: <strong className="text-slate-900">{pendingFee.dueDate || 'Immediate'}</strong></span>
+            <button
+              onClick={() => onChangeTab('fees')}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-[11px] shadow transition"
+            >
+              Pay / View Ledger
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Student Profile Card */}
       <div className="bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-950 rounded-2xl p-4 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl"></div>
@@ -307,12 +381,12 @@ export const ParentView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* CBSE Examination Admit Card Card */}
-      {admitCard && (
+      {/* Examination Admit Card Card */}
+      {admitCard?.isAssigned ? (
         <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-4 text-white shadow-md space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30">
-              CBSE Annual Exam 2026
+              Exam Admit Card • Issued
             </span>
             <span className="text-[10px] font-mono text-amber-300 font-bold">
               Roll #{admitCard.rollNo}
@@ -329,6 +403,20 @@ export const ParentView: React.FC<Props> = ({
             <Printer className="w-3.5 h-3.5 text-blue-600" />
             <span>View & Print Admit Card</span>
           </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
+              <Award size={15} className="text-blue-600" /> Examination Admit Card
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+              Pending Release
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Admit Card has not been assigned or released by the Principal yet. It will appear here automatically once issued for {student?.firstName}'s class.
+          </p>
         </div>
       )}
 
@@ -409,10 +497,19 @@ export const ParentView: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-50 border text-xs space-y-1">
-              <p><span className="text-slate-500">Candidate:</span> <strong>{admitCard.studentName}</strong></p>
-              <p><span className="text-slate-500">Class:</span> <strong>{admitCard.className} - {admitCard.sectionName}</strong></p>
-              <p><span className="text-slate-500">Center:</span> <strong>{admitCard.centerName}</strong></p>
+            <div className="p-3 rounded-xl bg-slate-50 border text-xs flex items-center gap-3">
+              <div className="w-16 h-20 rounded-lg border-2 border-slate-800 overflow-hidden bg-white shrink-0 flex items-center justify-center shadow-sm">
+                {student.photoUrl || admitCard.photoUrl ? (
+                  <img src={student.photoUrl || admitCard.photoUrl} alt="Candidate" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-black">🎓</span>
+                )}
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <p><span className="text-slate-500">Candidate:</span> <strong className="uppercase block truncate">{admitCard.studentName}</strong></p>
+                <p><span className="text-slate-500">Class:</span> <strong>{admitCard.className} - {admitCard.sectionName}</strong></p>
+                <p><span className="text-slate-500">Center:</span> <strong className="text-blue-900 block truncate">{admitCard.centerName}</strong></p>
+              </div>
             </div>
 
             <div className="space-y-1.5">

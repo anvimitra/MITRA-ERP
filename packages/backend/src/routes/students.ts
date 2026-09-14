@@ -347,7 +347,7 @@ studentRoutes.get('/parents', async (c) => {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const parents = db
+  const rawParents = db
     .select()
     .from(schema.parents)
     .where(eq(schema.parents.schoolId, user.schoolId))
@@ -371,13 +371,65 @@ studentRoutes.get('/parents', async (c) => {
   const sectionMap = new Map(sections.map((sec: any) => [sec.id, sec.name]));
   const userMap = new Map(users.map((u: any) => [u.id, u]));
 
-  const enrichedParents = parents.map((p: any) => {
-    const parentUser: any = p.userId ? userMap.get(p.userId) : users.find((u: any) => u.phone === p.primaryPhone);
+  // Index known parents by clean phone and ID
+  const parentsByPhone = new Map<string, any>();
+  const parentsById = new Map<string, any>();
+
+  for (const p of rawParents) {
+    const pPhone = (p.primaryPhone || '').replace(/\D/g, '');
+    if (pPhone) parentsByPhone.set(pPhone.slice(-10), p);
+    parentsById.set(p.id, p);
+  }
+
+  // Also collect parents directly from students if missing from parents table
+  const allParentEntries: any[] = [...rawParents];
+
+  for (const s of students) {
+    const sPhone = (s.primaryPhone || s.emergencyPhone || '').replace(/\D/g, '');
+    const hasParentById = s.parentId && parentsById.has(s.parentId);
+    const hasParentByPhone = sPhone.length >= 10 && parentsByPhone.has(sPhone.slice(-10));
+
+    if (!hasParentById && !hasParentByPhone && (s.fatherName || s.motherName || s.primaryPhone)) {
+      const syntheticParent = {
+        id: s.parentId || `par-auto-${s.id}`,
+        schoolId: user.schoolId,
+        userId: null,
+        fatherName: s.fatherName || '',
+        motherName: s.motherName || '',
+        primaryPhone: s.primaryPhone || s.emergencyPhone || '',
+        email: s.email || '',
+        address: s.address || '',
+      };
+      allParentEntries.push(syntheticParent);
+      if (sPhone.length >= 10) {
+        parentsByPhone.set(sPhone.slice(-10), syntheticParent);
+      }
+      parentsById.set(syntheticParent.id, syntheticParent);
+    }
+  }
+
+  const enrichedParents = allParentEntries.map((p: any) => {
+    const cleanPhone = (p.primaryPhone || '').replace(/\D/g, '');
+    const parentUser: any = p.userId
+      ? userMap.get(p.userId)
+      : users.find((u: any) => {
+          const uPhone = (u.phone || '').replace(/\D/g, '');
+          return cleanPhone && uPhone && cleanPhone.slice(-10) === uPhone.slice(-10);
+        });
+
     const pName = (p.fatherName || p.motherName || parentUser?.name || 'Parent').trim();
 
-    // Linked children for this parent
+    // Find all children linked by parentId OR phone matching
     const children = students
-      .filter((s: any) => s.parentId === p.id)
+      .filter((s: any) => {
+        if (s.parentId === p.id) return true;
+        const sPhone = (s.primaryPhone || '').replace(/\D/g, '');
+        const sEmerg = (s.emergencyPhone || '').replace(/\D/g, '');
+        if (cleanPhone.length >= 10 && (sPhone.endsWith(cleanPhone.slice(-10)) || sEmerg.endsWith(cleanPhone.slice(-10)))) {
+          return true;
+        }
+        return false;
+      })
       .map((s: any) => ({
         id: s.id,
         name: `${s.firstName} ${s.lastName || ''}`.trim(),
@@ -390,7 +442,6 @@ studentRoutes.get('/parents', async (c) => {
     // Calculate auto password hint: First 4 letters uppercase + Last 4 digits of phone
     const lettersOnly = pName.replace(/[^a-zA-Z]/g, '').toUpperCase();
     const namePrefix = (lettersOnly.length >= 4 ? lettersOnly.slice(0, 4) : lettersOnly.padEnd(4, 'P')).toUpperCase();
-    const cleanPhone = (p.primaryPhone || '').replace(/\D/g, '');
     const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
     const autoPasswordPreview = `${namePrefix}${phoneSuffix}`;
 

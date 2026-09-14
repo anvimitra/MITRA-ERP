@@ -52,6 +52,66 @@ feeRoutes.post('/structures', async (c) => {
   return c.json({ success: true, message: 'Fee structure created', id });
 });
 
+// Delete fee structure (Principal, SuperAdmin, Accountant)
+feeRoutes.delete('/structures/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'accountant' && user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Forbidden: Accountant or Principal only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.feeStructures)
+    .where(and(eq(schema.feeStructures.schoolId, user.schoolId), eq(schema.feeStructures.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Fee structure removed' });
+});
+
+// Broadcast Due Fee Reminders to All Parents with Balances (Principal or Accountant)
+feeRoutes.post('/broadcast-due-reminders', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'accountant' && user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Forbidden: Accountant or Principal only' }, 403);
+  }
+
+  const students = db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all();
+  const feeStructs = db.select().from(schema.feeStructures).where(eq(schema.feeStructures.schoolId, user.schoolId)).all();
+  const payments = db.select().from(schema.feePayments).where(eq(schema.feePayments.schoolId, user.schoolId)).all();
+
+  let sentCount = 0;
+  for (const s of students) {
+    const applicableFees = feeStructs.filter((f: any) => f.classId === s.classId);
+    const totalExpected = applicableFees.reduce((sum: number, f: any) => sum + (Number(f.amount) || 0), 0);
+    const totalPaid = payments
+      .filter((p: any) => p.studentId === s.id)
+      .reduce((sum: number, p: any) => sum + (Number(p.amountPaid) || 0), 0);
+
+    const balance = totalExpected - totalPaid;
+    if (balance > 0) {
+      const studentName = `${s.firstName} ${s.lastName || ''}`.trim();
+      const earliestDue = applicableFees.find((f: any) => f.dueDate)?.dueDate || 'Immediate';
+      await dispatchStudentNotification({
+        schoolId: user.schoolId,
+        studentId: s.id,
+        title: 'Pending Fee Alert: Immediate Action Required',
+        message: `Dear Parent, outstanding fee balance of Rs. ${balance.toLocaleString('en-IN')} is due for ${studentName} (${earliestDue}). Please pay timely to avoid late fine.`,
+        type: 'fee',
+      });
+      sentCount++;
+    }
+  }
+
+  return c.json({
+    success: true,
+    message: `Fee due notices successfully broadcasted to ${sentCount} parents.`,
+    count: sentCount,
+  });
+});
+
 // Collect Fee Payment & Generate Receipt
 feeRoutes.post('/collect', async (c) => {
   const authHeader = c.req.header('Authorization');

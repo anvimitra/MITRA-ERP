@@ -191,8 +191,28 @@ schoolRoutes.post('/', async (c) => {
     createdAt: now,
   }).run();
 
-  // 3. Auto-initialize Classes 1 to 12 with Sections A & B for this school
+  // 3. Auto-initialize Pre-Primary (NURSERY, LKG, UKG) and Classes 1 to 12 with Sections A & B for this school
   try {
+    const preClasses = [
+      { name: 'NURSERY', gradeLevel: -3, codeSuffix: 'nursery' },
+      { name: 'LKG', gradeLevel: -2, codeSuffix: 'lkg' },
+      { name: 'UKG', gradeLevel: -1, codeSuffix: 'ukg' },
+    ];
+    for (const pre of preClasses) {
+      const classId = `cls-${code.toLowerCase()}-${pre.codeSuffix}`;
+      db.insert(schema.classes).values({
+        id: classId,
+        schoolId,
+        name: pre.name,
+        gradeLevel: pre.gradeLevel,
+      }).onConflictDoNothing().run();
+
+      db.insert(schema.sections).values([
+        { id: `sec-${code.toLowerCase()}-${pre.codeSuffix}-a`, schoolId, classId, name: 'A' },
+        { id: `sec-${code.toLowerCase()}-${pre.codeSuffix}-b`, schoolId, classId, name: 'B' },
+      ]).onConflictDoNothing().run();
+    }
+
     for (let grade = 1; grade <= 12; grade++) {
       const classId = `cls-${code.toLowerCase()}-${grade}`;
       db.insert(schema.classes).values({
@@ -200,19 +220,19 @@ schoolRoutes.post('/', async (c) => {
         schoolId,
         name: `Class ${grade}`,
         gradeLevel: grade,
-      }).run();
+      }).onConflictDoNothing().run();
 
       db.insert(schema.sections).values([
         { id: `sec-${code.toLowerCase()}-${grade}-a`, schoolId, classId, name: 'A' },
         { id: `sec-${code.toLowerCase()}-${grade}-b`, schoolId, classId, name: 'B' },
-      ]).run();
+      ]).onConflictDoNothing().run();
     }
   } catch (err) {
     console.warn('Auto class initialization check:', err);
   }
 
   return c.json({
-    message: 'School created successfully with Principal credentials & standard classes 1 to 12',
+    message: 'School created successfully with Principal credentials & classes (NURSERY, LKG, UKG, 1 to 12)',
     schoolId,
     apiSyncKey,
     principalCredentials: {

@@ -323,6 +323,57 @@ export async function fetchLiveNotices(): Promise<NotificationItem[]> {
   return [];
 }
 
+// Fetch personal in-app user notifications (Attendance Alerts, Fee Reminders, Exam Updates)
+export async function fetchUserNotifications(): Promise<NotificationItem[]> {
+  try {
+    const [notifRes, noticeRes] = await Promise.all([
+      authFetch('/notifications').catch(() => null),
+      authFetch('/notifications/notices').catch(() => null),
+    ]);
+
+    const items: NotificationItem[] = [];
+
+    if (notifRes && notifRes.ok) {
+      const data = await notifRes.json();
+      if (Array.isArray(data.notifications)) {
+        for (const n of data.notifications) {
+          items.push({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            channel: 'APP_PUSH_NOTIFICATION',
+            timestamp: new Date(n.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            read: n.isRead === 1,
+          });
+        }
+      }
+    }
+
+    if (noticeRes && noticeRes.ok) {
+      const data = await noticeRes.json();
+      if (Array.isArray(data.notices)) {
+        for (const n of data.notices) {
+          if (!items.some((it) => it.id === n.id)) {
+            items.push({
+              id: n.id,
+              title: n.title,
+              message: n.message,
+              channel: 'APP_PUSH_NOTIFICATION',
+              timestamp: new Date(n.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+              read: n.isRead === 1,
+            });
+          }
+        }
+      }
+    }
+
+    return items;
+  } catch (err) {
+    console.warn('User notifications offline', err);
+  }
+  return [];
+}
+
 // 11. Broadcast Notice / Circular to School
 export async function broadcastLiveNotice(title: string, message: string) {
   const res = await authFetch('/notifications/notices', {

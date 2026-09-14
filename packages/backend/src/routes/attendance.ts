@@ -80,27 +80,35 @@ attendanceRoutes.post('/mark', async (c) => {
 
     results.push({ studentId: item.studentId, status: item.status });
 
-    // If student is marked ABSENT or LATE, trigger automated notification & SMS fallback
-    if (item.status === 'absent' || item.status === 'late') {
-      const student = db.select().from(schema.students).where(eq(schema.students.id, item.studentId)).get();
-      const studentName = student ? `${student.firstName} ${student.lastName || ''}`.trim() : 'Your ward';
-      const statusText = item.status === 'absent' ? 'ABSENT' : 'LATE';
+    // Trigger automated in-app attendance notification to parent app (Present, Absent, Late)
+    const student = db.select().from(schema.students).where(eq(schema.students.id, item.studentId)).get();
+    const studentName = student ? `${student.firstName} ${student.lastName || ''}`.trim() : 'Your ward';
+    const statusText = item.status.toUpperCase();
 
-      const dispatchResult = await dispatchStudentNotification({
-        schoolId: user.schoolId,
-        studentId: item.studentId,
-        title: `Attendance Alert: ${statusText}`,
-        message: `${studentName} has been marked ${statusText} on ${date}.`,
-        type: 'attendance',
-      });
-
-      alertDispatches.push({
-        studentId: item.studentId,
-        studentName,
-        status: item.status,
-        dispatchResult,
-      });
+    let notifTitle = `Attendance Alert: ${statusText}`;
+    let notifMessage = `${studentName} has been marked ${statusText} on ${date}.`;
+    if (item.status === 'present') {
+      notifTitle = `Attendance Update: PRESENT`;
+      notifMessage = `${studentName} is PRESENT in school today (${date}).`;
+    } else if (item.status === 'absent') {
+      notifTitle = `Attendance Alert: ABSENT`;
+      notifMessage = `${studentName} has been marked ABSENT on ${date}. Please contact school administration if unplanned.`;
     }
+
+    const dispatchResult = await dispatchStudentNotification({
+      schoolId: user.schoolId,
+      studentId: item.studentId,
+      title: notifTitle,
+      message: notifMessage,
+      type: 'attendance',
+    });
+
+    alertDispatches.push({
+      studentId: item.studentId,
+      studentName,
+      status: item.status,
+      dispatchResult,
+    });
   }
 
   return c.json({

@@ -43,11 +43,9 @@ import {
   Upload,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
-import { FrontDeskReception } from '../components/FrontDeskReception';
 import { StaffPayrollDesk } from '../components/StaffPayrollDesk';
 import { LibraryDesk } from '../components/LibraryDesk';
 import { TransportDesk } from '../components/TransportDesk';
-import { InventoryDesk } from '../components/InventoryDesk';
 
 export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({ userRole, school: initialSchool }) => {
   const [currentSchool, setCurrentSchool] = useState<any>(initialSchool || null);
@@ -83,11 +81,9 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     | 'faculty'
     | 'discipline'
     | 'certificates'
-    | 'frontdesk'
     | 'payroll'
     | 'library'
     | 'transport'
-    | 'inventory'
     | 'notices'
     | 'settings'
   >(userRole === 'accountant' ? 'fees' : 'dashboard');
@@ -479,8 +475,12 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         }
       }
       setShowStudentModal(false);
-      const res = await ApiService.getStudents();
-      setStudents(res.students || []);
+      const [sRes, pRes] = await Promise.all([
+        ApiService.getStudents(),
+        ApiService.getParents(),
+      ]);
+      setStudents(sRes.students || []);
+      setParentsList(pRes.parents || []);
     } catch (err: any) {
       alert('Error: ' + err.message);
     }
@@ -491,8 +491,12 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     try {
       await ApiService.deleteStudent(id);
       alert('✅ Student record deleted.');
-      const res = await ApiService.getStudents();
-      setStudents(res.students || []);
+      const [sRes, pRes] = await Promise.all([
+        ApiService.getStudents(),
+        ApiService.getParents(),
+      ]);
+      setStudents(sRes.students || []);
+      setParentsList(pRes.parents || []);
     } catch (err: any) {
       alert('Error: ' + err.message);
     }
@@ -764,6 +768,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     }
   };
 
+  const handleDeleteStructure = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this fee head?')) return;
+    try {
+      await ApiService.deleteFeeStructure(id);
+      alert('✅ Fee Head deleted successfully!');
+      const fRes = await ApiService.getFeeStructures();
+      setStructures(fRes.structures || []);
+    } catch (err: any) {
+      alert('Error deleting fee head: ' + err.message);
+    }
+  };
+
+  const handleBroadcastDueReminders = async () => {
+    if (!confirm('📢 Broadcast fee due notifications to all parents with pending dues?')) return;
+    try {
+      const res = await ApiService.broadcastDueFeeReminders();
+      alert(`✅ Fee Reminder Broadcast Complete! ${res.notifiedCount} parent(s) notified in their Mobile App.`);
+    } catch (err: any) {
+      alert('Error broadcasting fee reminders: ' + err.message);
+    }
+  };
+
   const handleSendReminder = async (studentId: string, name: string, dueAmount: number) => {
     try {
       const res = await ApiService.sendFeeReminder(studentId, dueAmount, '2026-10-15');
@@ -947,16 +973,6 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('frontdesk')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
-                activeTab === 'frontdesk' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Building2 size={16} />
-              <span>Front Desk & Reception</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('payroll')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
                 activeTab === 'payroll' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
@@ -984,16 +1000,6 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             >
               <Bus size={16} />
               <span>Transport & Fleet</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('inventory')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
-                activeTab === 'inventory' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Package size={16} />
-              <span>Stock & Inventory</span>
             </button>
 
             <button
@@ -1088,43 +1094,118 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
               </div>
             </div>
 
-            {/* Timetable Weekly Snapshot */}
+            {/* Live Class-Wise Period Timetable Viewer */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Clock size={18} className="text-indigo-600" /> Academic Class Schedule (Monday - Saturday)
-                </h3>
-                <span className="text-xs font-bold text-slate-500">Working Hours: 08:30 AM - 02:30 PM</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Clock size={18} className="text-indigo-600" /> Live Class Period Schedule
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Select any class to inspect its daily periods, allotted subjects, teachers, and timings.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={ttClassId}
+                    onChange={(e) => {
+                      const cId = e.target.value;
+                      setTtClassId(cId);
+                      const sec = classesData?.sections?.find((s: any) => s.classId === cId)?.id || classesData?.sections?.[0]?.id || '';
+                      setTtSectionId(sec);
+                      loadTimetableData(cId, sec);
+                    }}
+                    className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold"
+                  >
+                    {classesData?.classes?.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={ttSectionId}
+                    onChange={(e) => {
+                      setTtSectionId(e.target.value);
+                      loadTimetableData(ttClassId, e.target.value);
+                    }}
+                    className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold"
+                  >
+                    {classesData?.sections
+                      ?.filter((s: any) => s.classId === ttClassId)
+                      ?.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          Sec {s.name}
+                        </option>
+                      ))}
+                  </select>
+
+                  <button
+                    onClick={() => setActiveTab('timetable')}
+                    className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition"
+                  >
+                    Manage Timetable →
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 font-black text-[10px] text-slate-500 uppercase">
-                    <tr>
-                      <th className="px-3 py-2.5">Day</th>
-                      <th className="px-3 py-2.5">Period 1 (08:30)</th>
-                      <th className="px-3 py-2.5">Period 2 (09:15)</th>
-                      <th className="px-3 py-2.5">Period 3 (10:00)</th>
-                      <th className="px-3 py-2.5">Period 4 (11:00)</th>
-                      <th className="px-3 py-2.5">Period 5 (12:00)</th>
-                      <th className="px-3 py-2.5">Period 6 (12:45)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-                      <tr key={day} className="hover:bg-slate-50/80">
-                        <td className="px-3 py-3 font-bold text-slate-900 bg-slate-50/50">{day}</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">Mathematics (Room 101)</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">Science Lab</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">English Literature</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">Social Science</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">Computer Science</td>
-                        <td className="px-3 py-3 font-medium text-slate-700">Physical Education</td>
+              {ttPeriods.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                  <p className="text-xs text-slate-500 font-medium">No periods scheduled for this class yet.</p>
+                  <button
+                    onClick={() => setActiveTab('timetable')}
+                    className="mt-2 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    + Assign periods in Timetable Matrix
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 font-black text-[10px] text-slate-500 uppercase">
+                      <tr>
+                        <th className="px-3 py-2.5">Day</th>
+                        <th className="px-3 py-2.5">Period 1</th>
+                        <th className="px-3 py-2.5">Period 2</th>
+                        <th className="px-3 py-2.5">Period 3</th>
+                        <th className="px-3 py-2.5">Period 4</th>
+                        <th className="px-3 py-2.5">Period 5</th>
+                        <th className="px-3 py-2.5">Period 6</th>
+                        <th className="px-3 py-2.5">Period 7</th>
+                        <th className="px-3 py-2.5">Period 8</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => {
+                        const dayPeriods = ttPeriods.filter((p) => p.dayOfWeek === day);
+                        return (
+                          <tr key={day} className="hover:bg-slate-50/80">
+                            <td className="px-3 py-3 font-bold text-slate-900 bg-slate-50/50">{day}</td>
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => {
+                              const p = dayPeriods.find((item) => item.periodNumber === num);
+                              return (
+                                <td key={num} className="px-3 py-2.5 text-[11px] align-top">
+                                  {p ? (
+                                    <div className="bg-blue-50/80 border border-blue-200/80 rounded-lg p-1.5 min-w-[95px]">
+                                      <div className="font-bold text-blue-900 leading-tight">{p.subjectName}</div>
+                                      <div className="text-[10px] text-slate-600 mt-0.5">{p.teacherName}</div>
+                                      <div className="text-[9px] text-slate-400 font-mono">{p.startTime}-{p.endTime} • {p.roomNumber}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 text-[10px] italic">Free</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1208,8 +1289,19 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                       <tr key={s.id} className="hover:bg-slate-50/80 transition">
                         <td className="px-4 py-3 font-mono font-bold text-blue-600">{s.admissionNo}</td>
                         <td className="px-4 py-3 font-semibold text-slate-700">{s.rollNo || '-'}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">
-                          {s.firstName} {s.lastName}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            {s.photoUrl ? (
+                              <img src={s.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                {s.firstName?.[0] || 'S'}
+                              </div>
+                            )}
+                            <div className="font-bold text-slate-900">
+                              {s.firstName} {s.lastName}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold rounded-lg text-[11px]">
@@ -1804,57 +1896,300 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
         {/* ================= MODULE 6: FEES & BILLING DESK ================= */}
         {activeTab === 'fees' && (
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-6">
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-900/50">
               <div>
-                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                  <CreditCard className="text-emerald-600" size={24} />
-                  Fee Ledger & Cash Collection Desk
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Review fee transactions, print duplicate receipts, and inspect fee heads.
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider mb-2">
+                  <CreditCard size={16} /> Institutional Bursar & Fee Desk
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Class-Wise Fee System & Ledger</h1>
+                <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
+                  Configure class-wise fee structures (Nursery to Class 12), track defaulter dues, accept payments with instant receipts, and broadcast bakaya notifications to parents.
                 </p>
               </div>
 
-              <span className="px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-black text-sm">
-                Total Revenue: ₹{totalRevenue.toLocaleString('en-IN')}
-              </span>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button
+                  onClick={() => setShowAddStructModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
+                >
+                  <Plus size={16} />
+                  <span>Add Class Fee Head</span>
+                </button>
+                <button
+                  onClick={() => setShowCollectModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition"
+                >
+                  <CreditCard size={16} />
+                  <span>Accept Fee Counter</span>
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                  <tr>
-                    <th className="px-4 py-3">Receipt No</th>
-                    <th className="px-4 py-3">Student Name</th>
-                    <th className="px-4 py-3">Fee Category</th>
-                    <th className="px-4 py-3">Amount Paid</th>
-                    <th className="px-4 py-3">Payment Mode</th>
-                    <th className="px-4 py-3">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                        No transactions recorded yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    payments.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/80">
-                        <td className="px-4 py-3 font-mono font-bold text-emerald-700">{p.receiptNo}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">{p.studentName}</td>
-                        <td className="px-4 py-3 text-slate-600">{p.feeTitle}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">₹{Number(p.amountPaid).toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-3 uppercase font-bold text-slate-700">{p.paymentMode}</td>
-                        <td className="px-4 py-3 font-mono text-slate-500">{p.paymentDate}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            {/* Sub Tabs */}
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+              <button
+                onClick={() => setFeeSubTab('structures')}
+                className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+                  feeSubTab === 'structures' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                <FileText size={15} />
+                <span>Class Fee Heads ({structures.length})</span>
+              </button>
+              <button
+                onClick={() => setFeeSubTab('defaulters')}
+                className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+                  feeSubTab === 'defaulters' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                <AlertCircle size={15} />
+                <span>Defaulters & Bakaya List ({
+                  students.filter((s) => {
+                    const sFees = structures.filter((st) => st.classId === s.classId).reduce((a, st) => a + (Number(st.amount) || 0), 0);
+                    const sPaid = payments.filter((p) => p.studentId === s.id).reduce((a, p) => a + (Number(p.amountPaid) || 0), 0);
+                    return sFees > sPaid;
+                  }).length
+                })</span>
+              </button>
+              <button
+                onClick={() => setFeeSubTab('ledger')}
+                className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+                  feeSubTab === 'ledger' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                <History size={15} />
+                <span>Payment Transactions ({payments.length})</span>
+              </button>
             </div>
+
+            {/* SUB-TAB 1: STRUCTURES */}
+            {feeSubTab === 'structures' && (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Class Fee Structures & Heads</h3>
+                    <p className="text-xs text-slate-500">Institutional fee rates defined per class batch.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddStructModal(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow"
+                  >
+                    <Plus size={14} />
+                    <span>Create Fee Head</span>
+                  </button>
+                </div>
+
+                {structures.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 bg-slate-50 border border-dashed border-slate-300 rounded-2xl">
+                    No fee structures defined yet. Click "Create Fee Head" to add fee rates for classes (Nursery, LKG, UKG, Class 1-12).
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {structures.map((st) => {
+                      const className = classesData?.classes?.find((c: any) => c.id === st.classId)?.name || `Class ${st.classId}`;
+                      return (
+                        <div key={st.id} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative group hover:border-indigo-300 transition">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase text-indigo-700 px-2.5 py-1 bg-indigo-100/80 border border-indigo-200 rounded-lg">
+                              {className}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteStructure(st.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition"
+                              title="Delete Fee Head"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-900 text-base">{st.title}</h4>
+                            <div className="text-2xl font-black text-slate-900 mt-1">₹{Number(st.amount).toLocaleString('en-IN')}</div>
+                          </div>
+                          <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-200 flex justify-between">
+                            <span>Due Date: {st.dueDate || 'Standard'}</span>
+                            <span className="font-semibold text-slate-600">Session {st.academicYear || '2026-27'}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUB-TAB 2: DEFAULTERS */}
+            {feeSubTab === 'defaulters' && (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-amber-50/70 border border-amber-200 p-5 rounded-2xl">
+                  <div>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-800 block">Pending Bakaya Dues</span>
+                    <h3 className="text-xl font-black text-amber-950 mt-0.5">
+                      Total Outstanding: ₹{
+                        students.reduce((total, s) => {
+                          const sFees = structures.filter((st) => st.classId === s.classId).reduce((a, st) => a + (Number(st.amount) || 0), 0);
+                          const sPaid = payments.filter((p) => p.studentId === s.id).reduce((a, p) => a + (Number(p.amountPaid) || 0), 0);
+                          return total + Math.max(0, sFees - sPaid);
+                        }, 0).toLocaleString('en-IN')
+                      }
+                    </h3>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Students who have unpaid balances for their enrolled class fee structures.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleBroadcastDueReminders}
+                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-lg shadow-amber-600/30 transition flex items-center gap-2 shrink-0"
+                  >
+                    <Bell size={15} />
+                    <span>📢 Broadcast Bakaya Due Notifications to Parents</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                      <tr>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Class</th>
+                        <th className="px-4 py-3">Guardian / Phone</th>
+                        <th className="px-4 py-3">Total Fee</th>
+                        <th className="px-4 py-3">Paid</th>
+                        <th className="px-4 py-3">Bakaya (Due)</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(() => {
+                        const defaulters = students.map((s) => {
+                          const sFees = structures.filter((st) => st.classId === s.classId).reduce((a, st) => a + (Number(st.amount) || 0), 0);
+                          const sPaid = payments.filter((p) => p.studentId === s.id).reduce((a, p) => a + (Number(p.amountPaid) || 0), 0);
+                          const due = Math.max(0, sFees - sPaid);
+                          return { ...s, totalAssignedFee: sFees, totalPaid: sPaid, dueAmount: due };
+                        }).filter((s) => s.dueAmount > 0);
+
+                        if (defaulters.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                                🎉 No fee defaulters found! All enrolled students are clear of dues.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return defaulters.map((s) => (
+                          <tr key={s.id} className="hover:bg-slate-50/80 transition">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                {s.photoUrl ? (
+                                  <img src={s.photoUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                                    {s.firstName?.[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-900">{s.firstName} {s.lastName || ''}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono">Adm: {s.admissionNo}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">
+                              {s.className} - {s.sectionName || 'A'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              <div>{s.fatherName || s.motherName || 'Guardian'}</div>
+                              <div className="font-mono text-[11px] text-slate-400">{s.primaryPhone || 'N/A'}</div>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-700">₹{s.totalAssignedFee.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 font-bold text-emerald-600">₹{s.totalPaid.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 font-black text-rose-600">₹{s.dueAmount.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => handleSendReminder(s.id, s.firstName, s.dueAmount)}
+                                className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ml-auto"
+                              >
+                                <Bell size={12} />
+                                <span>Send Alert</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TAB 3: LEDGER */}
+            {feeSubTab === 'ledger' && (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <History className="text-emerald-600" size={20} />
+                      Fee Ledger & Cash Collection Transactions
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Review fee receipts, inspect payment modes, and reprint official receipts.
+                    </p>
+                  </div>
+
+                  <span className="px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-black text-sm">
+                    Total Revenue: ₹{totalRevenue.toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                      <tr>
+                        <th className="px-4 py-3">Receipt No</th>
+                        <th className="px-4 py-3">Student Name</th>
+                        <th className="px-4 py-3">Fee Category</th>
+                        <th className="px-4 py-3">Amount Paid</th>
+                        <th className="px-4 py-3">Payment Mode</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                            No transactions recorded yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        payments.map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50/80">
+                            <td className="px-4 py-3 font-mono font-bold text-emerald-700">{p.receiptNo}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{p.studentName}</td>
+                            <td className="px-4 py-3 text-slate-600">{p.feeTitle}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">₹{Number(p.amountPaid).toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 uppercase font-bold text-slate-700">{p.paymentMode}</td>
+                            <td className="px-4 py-3 font-mono text-slate-500">{p.paymentDate}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => setLatestReceipt(p)}
+                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-[11px] hover:bg-emerald-100 transition flex items-center gap-1 ml-auto"
+                              >
+                                <Printer size={12} />
+                                <span>Receipt</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2464,12 +2799,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
         {/* ================= MODULE: CERTIFICATES & CREDENTIALS ================= */}
         {activeTab === 'certificates' && (
-          <CertificatesDesk students={students} schoolInfo={classesData?.school} />
-        )}
-
-        {/* ================= MODULE: FRONT DESK & RECEPTION ================= */}
-        {activeTab === 'frontdesk' && (
-          <FrontDeskReception />
+          <CertificatesDesk
+            students={students}
+            schoolInfo={classesData?.school}
+            onStudentsUpdated={async () => {
+              const [sRes, pRes] = await Promise.all([
+                ApiService.getStudents(),
+                ApiService.getParents(),
+              ]);
+              setStudents(sRes.students || []);
+              setParentsList(pRes.parents || []);
+            }}
+          />
         )}
 
         {/* ================= MODULE: STAFF HR & PAYROLL ================= */}
@@ -2485,11 +2826,6 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         {/* ================= MODULE: TRANSPORT FLEET ================= */}
         {activeTab === 'transport' && (
           <TransportDesk students={students} />
-        )}
-
-        {/* ================= MODULE: STOCK & INVENTORY ================= */}
-        {activeTab === 'inventory' && (
-          <InventoryDesk />
         )}
       </main>
 

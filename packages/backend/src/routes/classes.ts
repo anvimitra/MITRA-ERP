@@ -13,6 +13,7 @@ classRoutes.get('/', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized or no school associated' }, 401);
 
   const schoolClasses = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
+  schoolClasses.sort((a: any, b: any) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0));
   const schoolSections = db.select().from(schema.sections).where(eq(schema.sections.schoolId, user.schoolId)).all();
   const schoolSubjects = db.select().from(schema.subjects).where(eq(schema.subjects.schoolId, user.schoolId)).all();
   const schoolTeachers = db
@@ -69,6 +70,7 @@ classRoutes.get('/my-allocations', async (c) => {
     .all();
 
   const classes = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
+  classes.sort((a: any, b: any) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0));
   const sections = db.select().from(schema.sections).where(eq(schema.sections.schoolId, user.schoolId)).all();
   const subjects = db.select().from(schema.subjects).where(eq(schema.subjects.schoolId, user.schoolId)).all();
 

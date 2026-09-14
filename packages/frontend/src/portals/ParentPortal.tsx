@@ -53,31 +53,42 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
   // Report card modal state
   const [activeReportCard, setActiveReportCard] = useState<ReportCardData | null>(null);
   const [loadingReportCard, setLoadingReportCard] = useState(false);
+  const [allLinkedStudents, setAllLinkedStudents] = useState<any[]>([]);
+  const [activeChildId, setActiveChildId] = useState<string>(studentId);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (studentId) {
+      setActiveChildId(studentId);
+    }
+  }, [studentId]);
+
+  const loadData = async (targetId?: string) => {
+    const sId = targetId || activeChildId || studentId;
+    if (!sId) return;
     setLoading(true);
     try {
-      const att = await ApiService.getStudentAttendance(studentId).catch(() => null);
-      setAttendanceData(att);
-
-      const fees = await ApiService.getStudentFees(studentId).catch(() => null);
-      setFeesData(fees);
-
-      const ex = await ApiService.getExams().catch(() => ({ exams: [] }));
-      setExams(ex.exams || []);
-
-      const notifs = await ApiService.getMyAlerts().catch(() => ({ notifications: [] }));
-      setNotifications(notifs.notifications || []);
-
-      // Load Student Logs
-      const logs = await ApiService.getStudentLogs(studentId).catch(() => ({ logs: [] }));
-      setStudentLogs(logs.logs || []);
-
-      // Load Current Student Profile & School
       const me = await ApiService.getMe().catch(() => null);
       setSchool(me?.school || null);
-      const currentStudent = me?.linkedStudents?.find((s: any) => s.id === studentId) || me?.studentRecord || me?.linkedStudents?.[0];
+      if (me?.linkedStudents && me.linkedStudents.length > 0) {
+        setAllLinkedStudents(me.linkedStudents);
+      }
+
+      const currentStudent = me?.linkedStudents?.find((s: any) => s.id === sId) || me?.studentRecord || me?.linkedStudents?.[0];
       setStudent(currentStudent || null);
+
+      const [att, fees, ex, notifs, logs] = await Promise.all([
+        ApiService.getStudentAttendance(sId).catch(() => null),
+        ApiService.getStudentFees(sId).catch(() => null),
+        ApiService.getExams().catch(() => ({ exams: [] })),
+        ApiService.getMyAlerts().catch(() => ({ notifications: [] })),
+        ApiService.getStudentLogs(sId).catch(() => ({ logs: [] })),
+      ]);
+
+      setAttendanceData(att);
+      setFeesData(fees);
+      setExams(ex.exams || []);
+      setNotifications(notifs.notifications || []);
+      setStudentLogs(logs.logs || []);
 
       // Load Timetable
       if (currentStudent?.classId && currentStudent?.sectionId) {
@@ -108,8 +119,8 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, [studentId]);
+    loadData(activeChildId);
+  }, [activeChildId]);
 
   const handleOpenReportCard = async (examId: string) => {
     setLoadingReportCard(true);
@@ -128,12 +139,14 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
   const handleViewAdmitCard = async () => {
     setLoadingAdmitCard(true);
     try {
-      const res = await ApiService.getAdmitCardData(studentId);
-      if (res.admitCard) {
-        setViewAdmitCardModal(res.admitCard);
+      const res = await ApiService.getAdmitCardData(activeChildId || studentId);
+      if (!res.isAssigned || !res.admitCard) {
+        alert('⚠️ Exam Admit Card has not been assigned or released by the Principal yet. Please check back later or contact school administration.');
+        return;
       }
+      setViewAdmitCardModal(res.admitCard);
     } catch (err: any) {
-      alert('Admit card not generated yet: ' + err.message);
+      alert('⚠️ Admit Card has not been released yet by the School Principal: ' + err.message);
     } finally {
       setLoadingAdmitCard(false);
     }
@@ -150,6 +163,64 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
 
   return (
     <div className="space-y-8">
+      {/* Multi-Child Family Switcher */}
+      {allLinkedStudents.length > 1 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-slate-700 font-black text-xs">
+            <Users size={16} className="text-blue-600" />
+            <span>Select Student Ward ({allLinkedStudents.length} Children Enrolled):</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {allLinkedStudents.map((child) => {
+              const isSelected = child.id === activeChildId;
+              return (
+                <button
+                  key={child.id}
+                  onClick={() => setActiveChildId(child.id)}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs transition ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {child.photoUrl ? (
+                    <img src={child.photoUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center text-[10px]">
+                      {child.firstName?.[0]}
+                    </span>
+                  )}
+                  <span>{child.firstName} ({child.className || 'Class'})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bakaya Pending Fee Alert Banner */}
+      {feesData && Number(feesData.dueAmount) > 0 && (
+        <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-900 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider text-rose-700">Bakaya Fee Notification</div>
+              <div className="text-sm font-bold text-rose-950">
+                Outstanding dues of <strong>₹{Number(feesData.dueAmount).toLocaleString('en-IN')}</strong> pending for {studentName}.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('fees')}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-md transition shrink-0"
+          >
+            View Fee Ledger →
+          </button>
+        </div>
+      )}
+
       {/* Student Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -933,7 +1004,15 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
                 </div>
 
                 <div className="w-24 h-28 border-2 border-slate-800 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center text-3xl font-black shrink-0 self-center">
-                  🎓
+                  {(viewAdmitCardModal.photoUrl || student?.photoUrl) ? (
+                    <img
+                      src={viewAdmitCardModal.photoUrl || student?.photoUrl}
+                      alt="Candidate Photo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs text-slate-400 font-bold">PHOTO</span>
+                  )}
                 </div>
               </div>
 

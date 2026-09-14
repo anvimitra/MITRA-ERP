@@ -19,9 +19,10 @@ import {
 interface CertificatesDeskProps {
   students?: Student[];
   schoolInfo?: any;
+  onStudentsUpdated?: () => void;
 }
 
-export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: propStudents, schoolInfo }) => {
+export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: propStudents, schoolInfo, onStudentsUpdated }) => {
   const [internalStudents, setInternalStudents] = useState<Student[]>([]);
   const students = (propStudents && propStudents.length > 0) ? propStudents : internalStudents;
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
@@ -46,6 +47,18 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
   // Print modal
   const [printCert, setPrintCert] = useState<any | null>(null);
 
+  // Admit Card Generator Desk
+  const [showAdmitCardDesk, setShowAdmitCardDesk] = useState(false);
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [admitClassId, setAdmitClassId] = useState('');
+  const [admitExamName, setAdmitExamName] = useState('Annual Board Examination 2026');
+  const [admitCenterName, setAdmitCenterName] = useState('Central Examination Wing, Campus Block A');
+  const [admitCenterNo, setAdmitCenterNo] = useState('8402');
+  const [admitInstructions, setAdmitInstructions] = useState(
+    '1. Candidate must carry this printed Admit Card and original Student ID Card.\n2. Reporting time is 30 minutes prior to exam schedule.\n3. Electronic devices and calculators are strictly prohibited inside the examination room.'
+  );
+  const [generatingAdmitCards, setGeneratingAdmitCards] = useState(false);
+
   const loadCertificates = async () => {
     try {
       setLoading(true);
@@ -60,6 +73,12 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
 
   useEffect(() => {
     loadCertificates();
+    ApiService.getClasses().then(res => {
+      setClassesList(res.classes || []);
+      if (res.classes?.length > 0) {
+        setAdmitClassId(res.classes[0].id);
+      }
+    }).catch(() => {});
   }, []);
 
   const handleIssueCertificate = async (e: React.FormEvent) => {
@@ -82,7 +101,14 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
         },
       });
 
-      alert('✅ Certificate successfully generated and recorded in the student registry!');
+      if (certType === 'TRANSFER_CERTIFICATE') {
+        alert('✅ Transfer Certificate issued! Student has been automatically removed from active institutional records.');
+        const sRes = await ApiService.getStudents().catch(() => ({ students: [] }));
+        setInternalStudents(sRes.students || []);
+        onStudentsUpdated?.();
+      } else {
+        alert('✅ Certificate successfully generated and recorded in the student registry!');
+      }
       setShowIssueModal(false);
       setSelectedStudentId('');
       setReason('');
@@ -100,6 +126,256 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
     } catch (err: any) {
       alert('Delete failed: ' + err.message);
     }
+  };
+
+  const handleGenerateClassAdmitCards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admitClassId) {
+      alert('Please select a target class.');
+      return;
+    }
+    setGeneratingAdmitCards(true);
+    try {
+      const instructionsArr = admitInstructions
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const res = await ApiService.generateClassAdmitCards({
+        classId: admitClassId,
+        examName: admitExamName,
+        examCenter: admitCenterName,
+        centerNo: admitCenterNo,
+        instructions: instructionsArr,
+      });
+
+      alert(`🎉 Success! Generated & Assigned ${res.generatedCount} Admit Card(s) for the entire class. All students & parents can now access and print them!`);
+      setShowAdmitCardDesk(false);
+      loadCertificates();
+    } catch (err: any) {
+      alert('Error generating class admit cards: ' + err.message);
+    } finally {
+      setGeneratingAdmitCards(false);
+    }
+  };
+
+  const handlePrintCertificatePdf = (cert: any) => {
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) {
+      alert('Please allow popups in your browser to print / save certificate as PDF.');
+      return;
+    }
+
+    const typeTitle = getTypeName(cert.certificateType);
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${typeTitle} - ${cert.student?.fullName || cert.studentName || 'Student'}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: 'Times New Roman', Georgia, serif;
+      background: #fff;
+      color: #0f172a;
+      margin: 0;
+      padding: 10px;
+    }
+    .cert-frame {
+      border: 6px double #1e293b;
+      padding: 36px 44px;
+      min-height: 940px;
+      position: relative;
+      background: #fffdfc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .cert-header {
+      text-align: center;
+      border-bottom: 2px solid #1e293b;
+      padding-bottom: 16px;
+    }
+    .cert-logo {
+      max-height: 75px;
+      margin: 0 auto 6px auto;
+      display: block;
+      object-fit: contain;
+    }
+    .school-name {
+      font-size: 26px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #0f172a;
+      margin: 0;
+    }
+    .school-info {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #475569;
+      margin-top: 4px;
+    }
+    .affil-badge {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: #1e3a8a;
+      margin-top: 2px;
+    }
+    .badge-wrap {
+      text-align: center;
+      margin: 24px 0 16px 0;
+    }
+    .type-badge {
+      display: inline-block;
+      background: #0f172a;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      padding: 6px 26px;
+      border-radius: 20px;
+    }
+    .cert-meta {
+      display: flex;
+      justify-content: space-between;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #475569;
+      margin-top: 12px;
+      padding: 0 4px;
+    }
+    .cert-body {
+      font-size: 16px;
+      line-height: 1.85;
+      text-align: justify;
+      margin: 24px 0;
+    }
+    .underlined {
+      font-weight: 800;
+      border-bottom: 1px dotted #0f172a;
+      padding: 0 4px;
+      color: #000;
+    }
+    .cert-footer {
+      display: flex;
+      justify-content: space-between;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: #334155;
+      margin-top: 40px;
+      padding-top: 20px;
+    }
+    .sig-col {
+      width: 160px;
+    }
+    .sig-line {
+      border-bottom: 1px solid #64748b;
+      height: 40px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .seal-text {
+      font-family: monospace;
+      color: #94a3b8;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="cert-frame">
+    <div>
+      <div class="cert-header">
+        ${cert.school?.logoUrl ? `<img src="${cert.school.logoUrl}" class="cert-logo" alt="Logo" />` : ''}
+        <h1 class="school-name">${cert.school?.name || 'DELHI PUBLIC SCHOOL'}</h1>
+        <div class="school-info">${cert.school?.address || 'Institutional Campus'} • Phone: ${cert.school?.phone || '+91 11 4911 5500'}</div>
+        <div class="affil-badge">Affiliation No: ${cert.school?.affiliationNo || 'CBSE/AFF/2026/8892'} • Institutional Accreditation</div>
+      </div>
+
+      <div class="badge-wrap">
+        <div class="type-badge">${typeTitle}</div>
+        <div class="cert-meta">
+          <div><strong>Certificate No:</strong> ${cert.certificateNo}</div>
+          <div><strong>Date of Issue:</strong> ${cert.issueDate || new Date().toLocaleDateString('en-IN')}</div>
+        </div>
+      </div>
+
+      <div class="cert-body">
+        <p>
+          This is to officially certify that Master / Miss <span class="underlined">${cert.student?.fullName || cert.studentName || 'Student'}</span>,
+          Son / Daughter of <span class="underlined">${cert.student?.fatherName || 'Guardian'}</span>,
+          holding Admission Roll No. <span class="underlined">${cert.student?.admissionNo || 'N/A'}</span>,
+          was a bonafide student of this institution during the academic session <span class="underlined">${cert.academicYear}</span>,
+          enrolled in <span class="underlined">${cert.student?.className || 'Class'} - ${cert.student?.sectionName || 'A'}</span>.
+        </p>
+
+        ${cert.certificateType === 'TRANSFER_CERTIFICATE' ? `
+        <p>
+          All institutional dues, library books, and examination fees have been fully cleared up to the date of leaving.
+          The reason for leaving the institution is officially recorded as: <em style="font-weight:bold;">"${cert.reason || 'Parent relocation / Higher education'}"</em>.
+        </p>` : ''}
+
+        ${cert.certificateType === 'BONAFIDE_CERTIFICATE' ? `
+        <p>
+          This bonafide certificate is issued upon the request of the student/parent for the specified purpose of: <em style="font-weight:bold;">"${cert.reason || 'Official Verification & Documentation'}"</em>.
+        </p>` : ''}
+
+        ${cert.certificateType === 'CHARACTER_CERTIFICATE' ? `
+        <p>
+          During the period of study in this institution, the student's conduct, character, and adherence to moral values have been evaluated and recorded as <span class="underlined" style="text-transform:uppercase;">${cert.conduct || 'Exemplary'}</span>.
+        </p>` : ''}
+
+        <p>
+          We wish the candidate all success, bright achievements, and moral fortitude in all their future academic and personal pursuits.
+        </p>
+      </div>
+    </div>
+
+    <div class="cert-footer">
+      <div class="sig-col">
+        <div class="sig-line"></div>
+        <div>Prepared By</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-line seal-text">[INSTITUTIONAL SEAL]</div>
+        <div>Registrar / Examination Incharge</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-line" style="font-family:'Times New Roman',serif; font-style:italic; font-size:15px; color:#1e3a8a;">
+          ${cert.school?.principalName || 'Principal'}
+        </div>
+        <div>Principal Signature</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 350);
+    };
+  </script>
+</body>
+</html>`;
+
+    win.document.open();
+    win.document.write(htmlContent);
+    win.document.close();
   };
 
   const handleOpenPrint = async (certId: string) => {
@@ -170,13 +446,22 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
           </p>
         </div>
 
-        <button
-          onClick={() => setShowIssueModal(true)}
-          className="bg-white text-blue-700 hover:bg-blue-50 px-5 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-black/10 flex items-center gap-2 shrink-0 transition active:scale-95"
-        >
-          <Plus size={16} />
-          <span>Issue New Certificate</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setShowAdmitCardDesk(true)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 shrink-0 transition"
+          >
+            <GraduationCap size={16} />
+            <span>Generate Class Admit Cards</span>
+          </button>
+          <button
+            onClick={() => setShowIssueModal(true)}
+            className="bg-white text-blue-700 hover:bg-blue-50 px-5 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-black/10 flex items-center gap-2 shrink-0 transition"
+          >
+            <Plus size={16} />
+            <span>Issue Certificate / TC</span>
+          </button>
+        </div>
       </div>
 
       {/* Control Bar: Search & Filter */}
@@ -415,11 +700,11 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => handlePrintCertificatePdf(printCert)}
                   className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow transition"
                 >
                   <Printer size={14} />
-                  <span>Print Document</span>
+                  <span>Generate Clean A4 PDF</span>
                 </button>
                 <button
                   onClick={() => setPrintCert(null)}
@@ -537,6 +822,113 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CLASS ADMIT CARD GENERATOR ================= */}
+      {showAdmitCardDesk && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8 relative my-8">
+            <button
+              onClick={() => setShowAdmitCardDesk(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-1 rounded-xl transition"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black">
+                <GraduationCap size={22} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Class Admit Card Auto-Generator</h3>
+                <p className="text-xs text-slate-500">Assign & generate exam admit cards for an entire class batch.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleGenerateClassAdmitCards} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Select Target Class Batch *</label>
+                <select
+                  value={admitClassId}
+                  onChange={(e) => setAdmitClassId(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  {classesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Examination Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={admitExamName}
+                  onChange={(e) => setAdmitExamName(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="e.g. CBSE Annual Board Examination 2026"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Examination Center Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={admitCenterName}
+                    onChange={(e) => setAdmitCenterName(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Center Code / Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={admitCenterNo}
+                    onChange={(e) => setAdmitCenterNo(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Candidate Instructions (one rule per line)</label>
+                <textarea
+                  rows={4}
+                  value={admitInstructions}
+                  onChange={(e) => setAdmitInstructions(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
+                <strong>🔒 Principal Authorization:</strong> Once generated, all enrolled students in this class will immediately receive their official admit cards in their student and parent mobile apps & web portals.
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdmitCardDesk(false)}
+                  className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={generatingAdmitCards}
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-600/30 transition flex items-center gap-2"
+                >
+                  {generatingAdmitCards ? 'Assigning...' : '🚀 Generate Entire Class Admit Cards'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

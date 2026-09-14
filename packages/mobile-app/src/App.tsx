@@ -4,6 +4,7 @@ import {
   fetchSchoolByCode,
   checkAppUpdate,
   fetchLiveNotices,
+  fetchUserNotifications,
   fetchMe,
   fetchLiveStudents,
   fetchLiveClasses,
@@ -51,6 +52,7 @@ export const App: React.FC = () => {
     } catch {}
     return null;
   });
+  const [allLinkedStudents, setAllLinkedStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_attendance');
@@ -145,6 +147,7 @@ export const App: React.FC = () => {
         }
 
         if (res.linkedStudents && res.linkedStudents.length > 0) {
+          setAllLinkedStudents(res.linkedStudents);
           setStudent(res.linkedStudents[0]);
           refreshUserData(res.user, res.linkedStudents[0]);
         } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher') {
@@ -152,6 +155,7 @@ export const App: React.FC = () => {
         } else {
           const liveStus = await fetchLiveStudents();
           if (liveStus && liveStus.length > 0) {
+            setAllLinkedStudents(liveStus);
             setStudent(liveStus[0]);
             refreshUserData(res.user, liveStus[0]);
           }
@@ -175,10 +179,10 @@ export const App: React.FC = () => {
       }
     });
 
-    // 3. Fetch live notices/circulars from ERP
-    fetchLiveNotices().then((liveNotices) => {
-      if (liveNotices && liveNotices.length > 0) {
-        setNotifications(liveNotices);
+    // 3. Fetch live notifications (attendance, fee due, circulars) from ERP
+    fetchUserNotifications().then((liveNotifs) => {
+      if (liveNotifs && liveNotifs.length > 0) {
+        setNotifications(liveNotifs);
       }
     });
 

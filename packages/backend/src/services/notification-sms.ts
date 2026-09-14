@@ -16,46 +16,53 @@ export async function dispatchStudentNotification({
   message,
   type,
 }: DispatchNotificationParams) {
-  // 1. Fetch student and parent details
   const student = db
     .select()
     .from(schema.students)
     .where(eq(schema.students.id, studentId))
     .get();
 
-  if (!student || !student.parentId) {
-    return { success: false, reason: 'Student or Parent link not found' };
+  if (!student) {
+    return { success: false, reason: 'Student record not found' };
   }
 
-  const parent = db
-    .select()
-    .from(schema.parents)
-    .where(eq(schema.parents.id, student.parentId))
-    .get();
+  let targetUserId: string | null = null;
+  let targetPhone = student.primaryPhone || student.emergencyPhone || '';
 
-  if (!parent) {
-    return { success: false, reason: 'Parent record not found' };
-  }
-
-  // 2. Check if parent user account has app installed and active
-  let parentUser = null;
-  if (parent.userId) {
-    parentUser = db
+  if (student.parentId) {
+    const parent = db
       .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, parent.userId))
+      .from(schema.parents)
+      .where(eq(schema.parents.id, student.parentId))
       .get();
+    if (parent?.userId) targetUserId = parent.userId;
+    if (parent?.primaryPhone) targetPhone = parent.primaryPhone;
   }
 
-  // In-App Notification Dispatch (SMS service deactivated per requirements)
+  // Fallback: search users table by parent phone if targetUserId is null
+  if (!targetUserId && targetPhone) {
+    const cleanPhone = targetPhone.replace(/\D/g, '');
+    if (cleanPhone.length >= 10) {
+      const allUsers = db.select().from(schema.users).all();
+      const matchedUser = allUsers.find((u: any) => {
+        const uPhone = (u.phone || '').replace(/\D/g, '');
+        return u.role === 'parent' && (uPhone === cleanPhone || (uPhone.length >= 10 && uPhone.endsWith(cleanPhone.slice(-10))));
+      });
+      if (matchedUser) {
+        targetUserId = matchedUser.id;
+      }
+    }
+  }
+
+  // In-App Notification Dispatch
   const notifId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  if (parent.userId) {
+  if (targetUserId) {
     db.insert(schema.notifications).values({
       id: notifId,
       schoolId,
-      userId: parent.userId,
+      userId: targetUserId,
       title,
       message,
       type,
@@ -69,7 +76,7 @@ export async function dispatchStudentNotification({
   return {
     success: true,
     channel: 'APP_PUSH_NOTIFICATION',
-    recipientPhone: parent.primaryPhone,
+    recipientPhone: targetPhone,
     message,
     notificationId: notifId,
   };
