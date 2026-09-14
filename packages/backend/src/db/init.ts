@@ -540,6 +540,11 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     sqlite.exec('ALTER TABLE marks ADD COLUMN is_published INTEGER DEFAULT 0;');
   } catch {}
 
+  // Auto-merge legacy accountant / cashier accounts into Principal
+  try {
+    sqlite.exec("UPDATE users SET role = 'principal' WHERE role IN ('accountant', 'cashier');");
+  } catch {}
+
   // If schools count is 0, auto-restore from persistent backup snapshot first
   try {
     const schoolRow = sqlite.prepare('SELECT count(*) as count FROM schools').get() as { count: number };

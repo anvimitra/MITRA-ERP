@@ -87,7 +87,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     | 'transport'
     | 'notices'
     | 'settings'
-  >(userRole === 'accountant' ? 'fees' : 'dashboard');
+  >('dashboard');
 
   // Core Data
   const [classesData, setClassesData] = useState<any>(null);
@@ -3903,7 +3903,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                 >
                   <option value="teacher">Teacher / Faculty</option>
-                  <option value="accountant">Accountant / Cashier</option>
+                  <option value="staff">Administrative / Support Staff</option>
                 </select>
               </div>
 

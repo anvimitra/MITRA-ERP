@@ -513,7 +513,7 @@ export const PrincipalView: React.FC<Props> = ({
               <p className="text-2xl font-black text-slate-900">
                 {loading ? '...' : staffList.filter((s) => s.isActive).length}
               </p>
-              <span className="text-[10px] font-semibold text-slate-400">Teachers & Accountants</span>
+              <span className="text-[10px] font-semibold text-slate-400">Teachers & Support Staff</span>
             </div>
 
             <div
@@ -879,9 +879,9 @@ export const PrincipalView: React.FC<Props> = ({
                         className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
                           m.role === 'principal'
                             ? 'bg-amber-100 text-amber-900'
-                            : m.role === 'accountant'
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : 'bg-purple-100 text-purple-900'
+                            : m.role === 'teacher'
+                            ? 'bg-purple-100 text-purple-900'
+                            : 'bg-blue-100 text-blue-900'
                         }`}
                       >
                         {m.role}
@@ -1358,7 +1358,7 @@ export const PrincipalView: React.FC<Props> = ({
             <div className="flex items-center justify-between border-b pb-3">
               <div>
                 <h3 className="font-black text-base text-slate-900">Recruit Faculty / Staff</h3>
-                <p className="text-xs text-slate-500">Assign Teacher or Accountant roles</p>
+                <p className="text-xs text-slate-500">Assign Teacher or Support Staff roles</p>
               </div>
               <button onClick={() => setShowAddStaff(false)} className="p-1.5 text-slate-400">
                 <X className="w-5 h-5" />
@@ -1410,7 +1410,7 @@ export const PrincipalView: React.FC<Props> = ({
                     className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold"
                   >
                     <option value="teacher">Teacher</option>
-                    <option value="accountant">Accountant</option>
+                    <option value="staff">Support Staff</option>
                   </select>
                 </div>
                 <div>

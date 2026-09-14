@@ -50,6 +50,12 @@ authRoutes.post('/login', async (c) => {
     }
   }
 
+  // Auto-merge legacy accountant / cashier accounts into Principal
+  if (user.role === 'accountant' || user.role === 'cashier') {
+    db.update(schema.users).set({ role: 'principal' }).where(eq(schema.users.id, user.id)).run();
+    user.role = 'principal';
+  }
+
   // Update last active time & set appInstalled if request indicates mobile client
   const now = new Date().toISOString();
   db.update(schema.users)
