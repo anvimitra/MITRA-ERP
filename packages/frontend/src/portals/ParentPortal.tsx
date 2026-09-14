@@ -39,6 +39,8 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
   const [exams, setExams] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [student, setStudent] = useState<any>(null);
+  const [school, setSchool] = useState<any>(null);
 
   // New modules state
   const [studentTransport, setStudentTransport] = useState<StudentTransportItem | null>(null);
@@ -71,11 +73,15 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
       const logs = await ApiService.getStudentLogs(studentId).catch(() => ({ logs: [] }));
       setStudentLogs(logs.logs || []);
 
-      // Load Timetable
+      // Load Current Student Profile & School
       const me = await ApiService.getMe().catch(() => null);
-      const child = me?.linkedStudents?.find((s: any) => s.id === studentId);
-      if (child?.classId && child?.sectionId) {
-        const tt = await ApiService.getTimetableByClass(child.classId, child.sectionId).catch(() => ({ periods: [] }));
+      setSchool(me?.school || null);
+      const currentStudent = me?.linkedStudents?.find((s: any) => s.id === studentId) || me?.studentRecord || me?.linkedStudents?.[0];
+      setStudent(currentStudent || null);
+
+      // Load Timetable
+      if (currentStudent?.classId && currentStudent?.sectionId) {
+        const tt = await ApiService.getTimetableByClass(currentStudent.classId, currentStudent.sectionId).catch(() => ({ periods: [] }));
         setTimetable(tt.periods || []);
       } else {
         setTimetable([]);
@@ -133,17 +139,31 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
     }
   };
 
-  const isRahul = studentId === 'stu-rahul-01';
-  const studentName = isRahul ? 'Rahul Sharma' : 'Priya Patel';
+  const studentName = student
+    ? `${student.firstName} ${student.lastName || ''}`.trim()
+    : (user.name || 'Student');
+  const classSectionDisplay = student?.className
+    ? `${student.className} - Section ${student.sectionName || 'A'}`
+    : 'Class Roster';
+  const schoolNameDisplay = school?.name || user?.schoolName || 'Institutional Campus';
+  const admissionDisplay = student?.admissionNo ? ` • Adm #${student.admissionNo}` : '';
 
   return (
     <div className="space-y-8">
       {/* Student Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-3xl font-black shadow-lg">
-            🎓
-          </div>
+          {student?.photoUrl ? (
+            <img
+              src={student.photoUrl}
+              alt={studentName}
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-lg bg-slate-800"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-3xl font-black shadow-lg">
+              🎓
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Student Ward Profile</span>
@@ -158,7 +178,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
               )}
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight mt-0.5">{studentName}</h1>
-            <p className="text-slate-300 text-xs mt-1">Class 10 - Section A • Delhi Public Global Academy</p>
+            <p className="text-slate-300 text-xs mt-1">{classSectionDisplay} • {schoolNameDisplay}{admissionDisplay}</p>
           </div>
         </div>
 
@@ -280,7 +300,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Class Teacher in Charge</span>
-              <div className="text-base font-black text-slate-900 mt-1">Mrs. Sunita Sharma</div>
+              <div className="text-base font-black text-slate-900 mt-1">{student?.classTeacherName || "Designated Class Teacher"}</div>
               <p className="text-[11px] text-slate-500 mt-0.5">Verified via ERP authorization</p>
             </div>
           </div>
@@ -302,7 +322,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
                   {attendanceData?.history?.map((att: any) => (
                     <tr key={att.id} className="hover:bg-slate-50/50">
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">{att.date}</td>
-                      <td className="py-3 px-4 text-slate-600">Class 10-A</td>
+                      <td className="py-3 px-4 text-slate-600">{classSectionDisplay}</td>
                       <td className="py-3 px-4">
                         {att.status === 'present' && (
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -384,7 +404,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
               <span className="text-xs font-bold text-slate-400 uppercase">Total Fee Demand</span>
               <div className="text-2xl font-black text-slate-900 mt-1">
-                ₹ {feesData?.totalFeeAmount?.toLocaleString() || '23,000'}
+                ₹ {feesData?.totalFeeAmount !== undefined ? feesData.totalFeeAmount.toLocaleString() : '0'}
               </div>
               <span className="text-[11px] text-slate-500 mt-0.5 block">Academic Year 2026-27</span>
             </div>
@@ -400,7 +420,7 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
               <span className="text-xs font-bold text-slate-400 uppercase">Outstanding Balance</span>
               <div className="text-2xl font-black text-rose-600 mt-1">
-                ₹ {feesData?.balanceDue?.toLocaleString() || '23,000'}
+                ₹ {feesData?.balanceDue !== undefined ? feesData.balanceDue.toLocaleString() : '0'}
               </div>
               <span className="text-[11px] text-rose-700 font-semibold mt-0.5 block">Due by 10th of Month</span>
             </div>

@@ -116,6 +116,7 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     CREATE TABLE IF NOT EXISTS subjects (
       id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
+      class_id TEXT,
       name TEXT NOT NULL,
       code TEXT
     );
@@ -510,6 +511,19 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       // Column already exists
     }
   }
+
+  // Auto-migrate class-wise subjects & exam result publishing columns
+  try {
+    sqlite.exec('ALTER TABLE subjects ADD COLUMN class_id TEXT;');
+  } catch {}
+
+  try {
+    sqlite.exec('ALTER TABLE exams ADD COLUMN is_published INTEGER DEFAULT 0;');
+  } catch {}
+
+  try {
+    sqlite.exec('ALTER TABLE marks ADD COLUMN is_published INTEGER DEFAULT 0;');
+  } catch {}
 
   // Ensure default Super Admin root account exists
   try {

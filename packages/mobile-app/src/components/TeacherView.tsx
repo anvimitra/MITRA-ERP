@@ -10,6 +10,7 @@ import {
   fetchMarksSheet,
   saveExamMarks,
   fetchLiveNotices,
+  fetchMyAllocations,
 } from '../api';
 import {
   Check,
@@ -59,6 +60,9 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [selectedExam, setSelectedExam] = useState('exam-sa1');
   const [selectedSubject, setSelectedSubject] = useState('Mathematics');
   const [savingMarks, setSavingMarks] = useState(false);
+  const [allocations, setAllocations] = useState<any>(null);
+  const [maxMarks, setMaxMarks] = useState<number>(50);
+  const [selectedAllocationId, setSelectedAllocationId] = useState<string>('');
 
   // Leaves state
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
@@ -87,19 +91,31 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const loadClassData = async () => {
     setLoading(true);
     try {
-      const [classesData, studentsData] = await Promise.all([
-        fetchLiveClasses(),
+      const [alloc, studentsData] = await Promise.all([
+        fetchMyAllocations(),
         fetchLiveStudents(),
       ]);
+      setAllocations(alloc);
 
-      if (classesData?.classes?.length > 0) {
-        setClassList(classesData.classes);
-        const defaultClass = classesData.classes[0].id;
-        setSelectedClassId(defaultClass);
-        if (classesData.sections?.length > 0) {
-          setSectionList(classesData.sections);
-          setSelectedSectionId(classesData.sections[0].id);
-        }
+      // 1. Filter attendance classes to ONLY those where teacher is Class Teacher
+      if (alloc.classTeacherOf && alloc.classTeacherOf.length > 0) {
+        const allowedClassIds = new Set(alloc.classTeacherOf.map((ct: any) => ct.classId));
+        const allowedClasses = (alloc.allClasses || []).filter((c: any) => allowedClassIds.has(c.id));
+        setClassList(allowedClasses);
+        setSelectedClassId(alloc.classTeacherOf[0].classId);
+        setSelectedSectionId(alloc.classTeacherOf[0].sectionId);
+      } else {
+        setClassList([]);
+        setSelectedClassId('');
+        setSelectedSectionId('');
+      }
+
+      // 2. Configure subjects assigned for Marks Entry
+      if (alloc.subjectsAssigned && alloc.subjectsAssigned.length > 0) {
+        const firstAlloc = alloc.subjectsAssigned[0];
+        setSelectedAllocationId(firstAlloc.id);
+        const sub = alloc.allSubjects?.find((s: any) => s.id === firstAlloc.subjectId);
+        setSelectedSubject(sub?.name || 'Subject');
       }
 
       if (studentsData?.length > 0) {
@@ -154,7 +170,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   };
 
   const updateStudentMarks = (id: string, val: string) => {
-    const num = val === '' ? '' : Math.min(100, Math.max(0, parseInt(val) || 0));
+    const limit = maxMarks > 0 ? maxMarks : 100;
+    const num = val === '' ? '' : Math.min(limit, Math.max(0, parseInt(val) || 0));
     setStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, marks: num } : s))
     );
@@ -187,22 +204,35 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
     setFeedback(null);
 
     try {
+      let targetClassId = selectedClassId;
+      let targetSectionId = selectedSectionId;
+      let targetSubjectId = selectedSubject;
+
+      if (allocations?.subjectsAssigned && selectedAllocationId) {
+        const curAlloc = allocations.subjectsAssigned.find((a: any) => a.id === selectedAllocationId);
+        if (curAlloc) {
+          targetClassId = curAlloc.classId;
+          targetSectionId = curAlloc.sectionId;
+          targetSubjectId = curAlloc.subjectId;
+        }
+      }
+
       const marksList = students.map((s) => ({
         studentId: s.id,
         marksObtained: typeof s.marks === 'number' ? s.marks : 0,
-        maxMarks: 100,
+        maxMarks: maxMarks || 100,
         remarks: 'Recorded by Teacher via Mobile App',
       }));
 
       await saveExamMarks(
         selectedExam || 'exam-sa1',
-        selectedClassId || 'class-1',
-        selectedSectionId || 'sec-a',
-        selectedSubject,
+        targetClassId || 'class-1',
+        targetSectionId || 'sec-a',
+        targetSubjectId,
         marksList
       );
 
-      setFeedback(`✅ Subject marks for ${selectedSubject} saved to Cloud ERP database successfully!`);
+      setFeedback(`✅ Subject marks for ${selectedSubject} (Out of ${maxMarks}) saved successfully!`);
     } catch (err: any) {
       setFeedback(err.message || 'Failed to save subject marks.');
     } finally {
@@ -309,6 +339,17 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
 
       {/* ATTENDANCE MODE */}
       {activeSubTab === 'attendance' && (
+        classList.length === 0 && !loading ? (
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-dashed border-amber-300 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-sm text-slate-800">Attendance Taking Restricted</h3>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+              Under school governance rules, attendance roll call is strictly restricted to designated Class Teachers. You are not currently assigned as a Class Teacher for any section.
+            </p>
+          </div>
+        ) : (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
@@ -418,6 +459,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             <span>{isSubmitting ? 'Recording & Notifying Parents...' : 'Submit Attendance & Notify Parents'}</span>
           </button>
         </div>
+        )
       )}
 
       {/* MARKS ENTRY MODE */}
@@ -451,18 +493,58 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Subject</label>
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="w-full text-xs font-semibold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 font-bold"
-              >
-                <option value="Mathematics">Mathematics</option>
-                <option value="Science">General Science</option>
-                <option value="English">English Language</option>
-                <option value="Social Studies">Social Studies</option>
-                <option value="Hindi">Hindi</option>
-              </select>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Assigned Subject</label>
+              {allocations?.subjectsAssigned?.length > 0 ? (
+                <select
+                  value={selectedAllocationId}
+                  onChange={(e) => {
+                    const aId = e.target.value;
+                    setSelectedAllocationId(aId);
+                    const curAlloc = allocations.subjectsAssigned.find((a: any) => a.id === aId);
+                    if (curAlloc) {
+                      setSelectedClassId(curAlloc.classId);
+                      setSelectedSectionId(curAlloc.sectionId);
+                      const sub = allocations.allSubjects?.find((s: any) => s.id === curAlloc.subjectId);
+                      setSelectedSubject(sub?.name || 'Subject');
+                    }
+                  }}
+                  className="w-full text-xs font-semibold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 font-bold"
+                >
+                  {allocations.subjectsAssigned.map((a: any) => {
+                    const sub = allocations.allSubjects?.find((s: any) => s.id === a.subjectId);
+                    const cls = allocations.allClasses?.find((c: any) => c.id === a.classId);
+                    const sec = allocations.allSections?.find((s: any) => s.id === a.sectionId);
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {sub?.name || 'Subject'} • {cls?.name || 'Class'} ({sec?.name || 'A'})
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <div className="text-[11px] p-2 bg-amber-50 text-amber-900 font-medium rounded-xl border border-amber-200">
+                  No subjects assigned to you
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Teacher Configurable Maximum Marks */}
+          <div className="flex items-center justify-between p-2.5 bg-purple-50/80 border border-purple-200 rounded-xl">
+            <div>
+              <span className="text-xs font-bold text-purple-950 block">Assessment Total (Max Marks)</span>
+              <span className="text-[10px] text-purple-700">Enter total out of which marks are scored</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={maxMarks}
+                onChange={(e) => setMaxMarks(Math.max(1, parseInt(e.target.value) || 50))}
+                className="w-16 p-1 text-center font-black text-xs text-purple-950 bg-white border border-purple-300 rounded-lg shadow-sm"
+              />
+              <span className="text-xs font-bold text-purple-900">Marks</span>
             </div>
           </div>
 
@@ -484,17 +566,28 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                     <p className="text-[10px] text-slate-400">Roll #{stu.rollNo || '-'} • Adm: {stu.admissionNo}</p>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <input
                       type="number"
                       min="0"
-                      max="100"
+                      max={maxMarks}
                       placeholder="--"
                       value={stu.marks ?? ''}
                       onChange={(e) => updateStudentMarks(stu.id, e.target.value)}
                       className="w-16 p-1 text-center font-black text-sm text-purple-900 bg-white border border-slate-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-600"
                     />
-                    <span className="text-xs text-slate-400 font-semibold">/ 100</span>
+                    <span className="text-xs text-slate-400 font-semibold">/ {maxMarks}</span>
+                    {stu.marks !== '' && typeof stu.marks === 'number' && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                        {stu.marks / (maxMarks || 1) >= 0.91 ? 'A1' :
+                         stu.marks / (maxMarks || 1) >= 0.81 ? 'A2' :
+                         stu.marks / (maxMarks || 1) >= 0.71 ? 'B1' :
+                         stu.marks / (maxMarks || 1) >= 0.61 ? 'B2' :
+                         stu.marks / (maxMarks || 1) >= 0.51 ? 'C1' :
+                         stu.marks / (maxMarks || 1) >= 0.41 ? 'C2' :
+                         stu.marks / (maxMarks || 1) >= 0.33 ? 'D' : 'E'}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))

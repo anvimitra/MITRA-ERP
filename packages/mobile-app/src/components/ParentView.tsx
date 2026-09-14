@@ -25,10 +25,10 @@ export const ParentView: React.FC<Props> = ({
   onOpenIdCard,
   onCheckUpdate,
 }) => {
-  const todayRecord = attendance[0];
-  const pendingFee = fees.find((f) => f.status === 'pending');
-  const presentCount = attendance.filter((a) => a.status === 'present').length;
-  const attendanceRate = Math.round((presentCount / (attendance.length || 1)) * 100);
+  const todayRecord = attendance && attendance.length > 0 ? attendance[0] : null;
+  const pendingFee = fees ? fees.find((f) => f.status === 'pending') : undefined;
+  const presentCount = attendance ? attendance.filter((a) => a.status === 'present').length : 0;
+  const attendanceRate = attendance && attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 100;
 
   const [transport, setTransport] = useState<StudentTransportItem | null>(null);
   const [certs, setCerts] = useState<CertificateItem[]>([]);
@@ -60,6 +60,8 @@ export const ParentView: React.FC<Props> = ({
     );
   }
 
+  const defaultPhoto = 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80';
+
   return (
     <div className="space-y-4 pb-20">
       {/* Student Profile Card */}
@@ -68,12 +70,15 @@ export const ParentView: React.FC<Props> = ({
         <div className="flex items-center space-x-3.5 relative z-10">
           <div className="relative">
             <img
-              src={student.photoUrl}
+              src={student.photoUrl || defaultPhoto}
               alt={student.firstName}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md"
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md bg-purple-800"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = defaultPhoto;
+              }}
             />
             <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border border-white">
-              Roll #{student.rollNo}
+              Roll #{student.rollNo || 1}
             </span>
           </div>
 
@@ -208,37 +213,51 @@ export const ParentView: React.FC<Props> = ({
             <Award className="w-4 h-4 text-purple-600" />
             <span>Latest Exam Performance</span>
           </h3>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 uppercase">
-            {latestReport.examType}
-          </span>
-        </div>
-
-        <p className="text-xs text-slate-500 mb-3">{latestReport.examName}</p>
-
-        <div className="grid grid-cols-3 gap-2 p-3 bg-purple-50/70 rounded-xl border border-purple-100 text-center">
-          <div>
-            <span className="text-[10px] text-slate-500 block font-semibold">Total Marks</span>
-            <span className="text-sm font-black text-purple-950">
-              {latestReport.totalMarks}/{latestReport.maxTotalMarks}
+          {latestReport && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 uppercase">
+              {latestReport.examType}
             </span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-500 block font-semibold">Percentage</span>
-            <span className="text-sm font-black text-purple-700">{latestReport.percentage}%</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-500 block font-semibold">Grade</span>
-            <span className="text-sm font-black text-emerald-600">{latestReport.overallGrade}</span>
-          </div>
+          )}
         </div>
 
-        <button
-          onClick={() => onChangeTab('report')}
-          className="w-full mt-3 py-2 text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center justify-center space-x-1 transition"
-        >
-          <span>Open Full Multi-Template Report Card</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        {latestReport ? (
+          <>
+            <p className="text-xs text-slate-500 mb-3">{latestReport.examName}</p>
+
+            <div className="grid grid-cols-3 gap-2 p-3 bg-purple-50/70 rounded-xl border border-purple-100 text-center">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-semibold">Total Marks</span>
+                <span className="text-sm font-black text-purple-950">
+                  {latestReport.totalMarks}/{latestReport.maxTotalMarks}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-semibold">Percentage</span>
+                <span className="text-sm font-black text-purple-700">{latestReport.percentage}%</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-semibold">Grade</span>
+                <span className="text-sm font-black text-emerald-600">{latestReport.overallGrade}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onChangeTab('report')}
+              className="w-full mt-3 py-2 text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center justify-center space-x-1 transition"
+            >
+              <span>Open Full Multi-Template Report Card</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </>
+        ) : (
+          <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+            <Award className="w-7 h-7 text-purple-300 mx-auto mb-1.5" />
+            <p className="text-xs font-bold text-slate-700">Academic Evaluation in Progress</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Examination marks will be displayed here once published by the Principal.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* School Bus Tracker Card */}

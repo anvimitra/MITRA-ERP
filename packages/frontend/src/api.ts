@@ -222,6 +222,19 @@ export class ApiService {
     return this.request<{ reportCard: ReportCardData }>(`/exams/report-card/${studentId}/${examId}`);
   }
 
+  static async publishExamResults(data: {
+    examId: string;
+    classId?: string;
+    sectionId?: string;
+    studentId?: string;
+    isPublished: boolean;
+  }) {
+    return this.request<{ success: boolean; message: string; isPublished: boolean }>('/exams/publish', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Fees
   static async getFeeStructures() {
     return this.request<{ structures: FeeStructure[] }>('/fees/structures');
@@ -346,10 +359,16 @@ export class ApiService {
     });
   }
 
-  static async createSubject(data: { name: string; code?: string }) {
+  static async createSubject(data: { name: string; code?: string; classId?: string }) {
     return this.request<{ success: boolean; message: string; id: string }>('/classes/subject', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteSubject(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/classes/subject/${id}`, {
+      method: 'DELETE',
     });
   }
 

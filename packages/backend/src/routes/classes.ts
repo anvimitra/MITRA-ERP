@@ -219,7 +219,7 @@ classRoutes.post('/section', async (c) => {
   return c.json({ success: true, message: 'Section created successfully', id });
 });
 
-// Create a new Subject (Principal or SuperAdmin)
+// Create a new Subject (Principal or SuperAdmin) - strictly per class
 classRoutes.post('/subject', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
@@ -228,17 +228,61 @@ classRoutes.post('/subject', async (c) => {
     return c.json({ error: 'Only Principal or Admin can create subjects' }, 403);
   }
 
-  const { name, code } = await c.req.json();
+  const { name, code, classId } = await c.req.json();
   if (!name) return c.json({ error: 'Subject name is required' }, 400);
 
   const id = `sub-${Date.now().toString().slice(-4)}`;
   db.insert(schema.subjects).values({
     id,
     schoolId: user.schoolId,
+    classId: classId || null,
     name,
     code: code || null,
   }).run();
 
   return c.json({ success: true, message: 'Subject created successfully', id });
+});
+
+// Delete a Subject (Principal or SuperAdmin)
+classRoutes.delete('/subject/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can delete subjects' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.subjects).where(
+    and(
+      eq(schema.subjects.schoolId, user.schoolId),
+      eq(schema.subjects.id, id)
+    )
+  ).run();
+
+  // Also clean up allocations for this subject
+  db.delete(schema.subjectAllocations).where(
+    and(
+      eq(schema.subjectAllocations.schoolId, user.schoolId),
+      eq(schema.subjectAllocations.subjectId, id)
+    )
+  ).run();
+
+  return c.json({ success: true, message: 'Subject removed successfully' });
+});
+
+// Get subjects specific to a class
+classRoutes.get('/:classId/subjects', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const classId = c.req.param('classId');
+  const allSubs = db.select().from(schema.subjects).where(eq(schema.subjects.schoolId, user.schoolId)).all();
+  // Filter for subjects designated for this class, or common (no classId set)
+  const classSubs = allSubs.filter((s: any) => !s.classId || s.classId === classId);
+
+  return c.json({ subjects: classSubs });
 });
 

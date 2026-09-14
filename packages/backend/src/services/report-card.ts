@@ -62,6 +62,7 @@ export interface StudentReportCardData {
     totalWorkingDays: number;
     presentDays: number;
   };
+  isPublished?: boolean;
 }
 
 export async function generateStudentReportCard(
@@ -183,5 +184,6 @@ export async function generateStudentReportCard(
       totalWorkingDays,
       presentDays,
     },
+    isPublished: !!(exam.isPublished === 1 || (studentMarks && studentMarks.some((m: any) => m.isPublished === 1))),
   };
 }

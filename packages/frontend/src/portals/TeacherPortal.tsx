@@ -45,6 +45,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
   const [selectedAllocationId, setSelectedAllocationId] = useState<string>('');
   const [marksStudents, setMarksStudents] = useState<any[]>([]);
   const [savingMarks, setSavingMarks] = useState(false);
+  const [defaultMaxMarks, setDefaultMaxMarks] = useState<number>(50);
 
   const loadData = async () => {
     setLoading(true);
@@ -227,7 +228,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
       prev.map((s) => {
         if (s.studentId === studentId) {
           const marksObtained = isNaN(num) ? 0 : num;
-          const maxMarks = s.maxMarks || 100;
+          const maxMarks = s.maxMarks || defaultMaxMarks || 50;
           const pct = maxMarks > 0 ? (marksObtained / maxMarks) * 100 : 0;
           let grade = 'E';
           if (pct >= 91) grade = 'A1';
@@ -238,7 +239,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
           else if (pct >= 41) grade = 'C2';
           else if (pct >= 33) grade = 'D';
 
-          return { ...s, marksObtained: value, grade };
+          return { ...s, marksObtained: value, maxMarks, grade };
         }
         return s;
       })
@@ -260,7 +261,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
         marksStudents.map((s) => ({
           studentId: s.studentId,
           marksObtained: Number(s.marksObtained) || 0,
-          maxMarks: Number(s.maxMarks) || 100,
+          maxMarks: Number(s.maxMarks) || defaultMaxMarks || 50,
           remarks: s.remarks,
         }))
       );
@@ -369,7 +370,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
               </div>
               <h2 className="text-lg font-bold text-amber-950">Permission Denied: Class Teacher Restricted</h2>
               <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
-                Per the ERP security policy, only the designated <strong>Class Teacher (Mrs. Sunita Sharma)</strong> is authorized to mark daily attendance for Class 10-A. You have subject evaluation permissions under the "Marks & Evaluation" tab.
+                Per the ERP security policy, only the designated <strong>Class Teacher</strong> is authorized to mark daily attendance for this section. You have subject evaluation permissions under the "Marks & Evaluation" tab.
               </p>
             </div>
           ) : (
@@ -589,7 +590,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
           </div>
 
           {/* Allocation & Exam Selectors */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Select Examination Cycle</label>
               <select
@@ -623,6 +624,38 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                 })}
               </select>
             </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Assessment Total (Max Marks)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={defaultMaxMarks}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 50);
+                    setDefaultMaxMarks(val);
+                    setMarksStudents((prev) =>
+                      prev.map((s) => {
+                        const marksObtained = Number(s.marksObtained) || 0;
+                        const pct = val > 0 ? (marksObtained / val) * 100 : 0;
+                        let grade = 'E';
+                        if (pct >= 91) grade = 'A1';
+                        else if (pct >= 81) grade = 'A2';
+                        else if (pct >= 71) grade = 'B1';
+                        else if (pct >= 61) grade = 'B2';
+                        else if (pct >= 51) grade = 'C1';
+                        else if (pct >= 41) grade = 'C2';
+                        else if (pct >= 33) grade = 'D';
+                        return { ...s, maxMarks: val, grade };
+                      })
+                    );
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Marks Table */}
@@ -655,7 +688,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                         className="w-24 border border-slate-300 rounded-lg px-3 py-1.5 font-bold text-slate-900 focus:outline-none focus:border-blue-500 text-sm"
                       />
                     </td>
-                    <td className="py-3 px-4 text-center text-slate-500 font-medium">100</td>
+                    <td className="py-3 px-4 text-center text-slate-700 font-bold">{s.maxMarks || defaultMaxMarks}</td>
                     <td className="py-3 px-4 text-center">
                       <span className="inline-block px-2.5 py-1 rounded-md text-xs font-black bg-blue-50 text-blue-700 border border-blue-200">
                         {s.grade || '—'}

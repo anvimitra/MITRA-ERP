@@ -25,6 +25,7 @@ import { NotificationsView } from './components/NotificationsView';
 import { LoginModal } from './components/LoginModal';
 import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LogIn, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -273,108 +274,110 @@ export const App: React.FC = () => {
 
         {/* Dynamic Main Body Content */}
         <main className="flex-1 p-4 overflow-y-auto no-scrollbar">
-          {/* Real-Time Auto-Update Alert Banner */}
-          {showUpdateBanner && updateInfo && (
-            <AutoUpdateBanner
-              updateInfo={updateInfo}
-              onDismiss={() => setShowUpdateBanner(false)}
-            />
-          )}
+          <ErrorBoundary>
+            {/* Real-Time Auto-Update Alert Banner */}
+            {showUpdateBanner && updateInfo && (
+              <AutoUpdateBanner
+                updateInfo={updateInfo}
+                onDismiss={() => setShowUpdateBanner(false)}
+              />
+            )}
 
-          {showNotifications ? (
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowNotifications(false)}
-                className="text-xs font-bold text-purple-700 hover:text-purple-900 mb-2 flex items-center space-x-1"
-              >
-                <span>← Back to Dashboard</span>
-              </button>
-              <NotificationsView notifications={notifications} onMarkAllRead={handleMarkAllRead} />
-            </div>
-          ) : !user ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="w-20 h-20 rounded-3xl bg-purple-100 flex items-center justify-center text-purple-700 mb-4 shadow-inner">
-                <Sparkles className="w-10 h-10" />
+            {showNotifications ? (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-xs font-bold text-purple-700 hover:text-purple-900 mb-2 flex items-center space-x-1"
+                >
+                  <span>← Back to Dashboard</span>
+                </button>
+                <NotificationsView notifications={notifications} onMarkAllRead={handleMarkAllRead} />
               </div>
-              <h2 className="text-xl font-black text-slate-800">Welcome to MITRA-ERP</h2>
-              <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
-                Log in with your registered Official Email or Mobile Number to access your institutional dashboard.
-              </p>
-              <button
-                onClick={() => setShowLogin(true)}
-                className="mt-6 px-6 py-3 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-bold rounded-2xl shadow-lg shadow-purple-600/30 active:scale-98 transition flex items-center space-x-2"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In to School ERP</span>
-              </button>
-            </div>
-          ) : (
-            user.role === 'super_admin' ? (
-              <SuperAdminView
-                user={user}
-                activeSubTab={(activeTab === 'add_school' || activeTab === 'system') ? activeTab : 'schools'}
-                onSubTabChange={(t) => setActiveTab(t as TabType)}
-              />
-            ) : user.role === 'principal' || user.role === 'accountant' ? (
-              <PrincipalView
-                principal={user}
-                school={
-                  school || {
-                    id: user.schoolId || 'school-1',
-                    name: 'School',
-                    code: 'SCH',
-                    domain: '',
-                    logoUrl: '',
-                    primaryColor: '#2563eb',
-                    secondaryColor: '#1e40af',
-                  }
-                }
-                activeSubTab={
-                  activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
-                    ? activeTab
-                    : 'overview'
-                }
-                onSubTabChange={(t) => setActiveTab(t as TabType)}
-              />
-            ) : user.role === 'teacher' ? (
-              <TeacherView
-                teacher={user}
-                activeSubTab={
-                  activeTab === 'marks' || activeTab === 'leaves' || activeTab === 'notices'
-                    ? activeTab
-                    : 'attendance'
-                }
-                onSubTabChange={(t) => setActiveTab(t as TabType)}
-              />
+            ) : !user ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div className="w-20 h-20 rounded-3xl bg-purple-100 flex items-center justify-center text-purple-700 mb-4 shadow-inner">
+                  <Sparkles className="w-10 h-10" />
+                </div>
+                <h2 className="text-xl font-black text-slate-800">Welcome to MITRA-ERP</h2>
+                <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
+                  Log in with your registered Official Email or Mobile Number to access your institutional dashboard.
+                </p>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="mt-6 px-6 py-3 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-bold rounded-2xl shadow-lg shadow-purple-600/30 active:scale-98 transition flex items-center space-x-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign In to School ERP</span>
+                </button>
+              </div>
             ) : (
-              <>
-                {activeTab === 'home' && (
-                  <ParentView
-                    student={student}
-                    school={school}
-                    attendance={attendance}
-                    fees={fees}
-                    latestReport={latestReport}
-                    onChangeTab={setActiveTab}
-                    onOpenIdCard={() => setShowIdCard(true)}
-                    onCheckUpdate={handleManualCheckUpdate}
-                  />
-                )}
+              user.role === 'super_admin' ? (
+                <SuperAdminView
+                  user={user}
+                  activeSubTab={(activeTab === 'add_school' || activeTab === 'system') ? activeTab : 'schools'}
+                  onSubTabChange={(t) => setActiveTab(t as TabType)}
+                />
+              ) : user.role === 'principal' || user.role === 'accountant' ? (
+                <PrincipalView
+                  principal={user}
+                  school={
+                    school || {
+                      id: user.schoolId || 'school-1',
+                      name: 'School',
+                      code: 'SCH',
+                      domain: '',
+                      logoUrl: '',
+                      primaryColor: '#2563eb',
+                      secondaryColor: '#1e40af',
+                    }
+                  }
+                  activeSubTab={
+                    activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
+                      ? activeTab
+                      : 'overview'
+                  }
+                  onSubTabChange={(t) => setActiveTab(t as TabType)}
+                />
+              ) : user.role === 'teacher' ? (
+                <TeacherView
+                  teacher={user}
+                  activeSubTab={
+                    activeTab === 'marks' || activeTab === 'leaves' || activeTab === 'notices'
+                      ? activeTab
+                      : 'attendance'
+                  }
+                  onSubTabChange={(t) => setActiveTab(t as TabType)}
+                />
+              ) : (
+                <>
+                  {activeTab === 'home' && (
+                    <ParentView
+                      student={student}
+                      school={school}
+                      attendance={attendance}
+                      fees={fees}
+                      latestReport={latestReport}
+                      onChangeTab={setActiveTab}
+                      onOpenIdCard={() => setShowIdCard(true)}
+                      onCheckUpdate={handleManualCheckUpdate}
+                    />
+                  )}
 
-                {activeTab === 'attendance' && (
-                  <AttendanceView student={student} attendance={attendance} />
-                )}
+                  {activeTab === 'attendance' && (
+                    <AttendanceView student={student} attendance={attendance} />
+                  )}
 
-                {activeTab === 'report' && (
-                  <ReportCardView student={student} school={school} />
-                )}
+                  {activeTab === 'report' && (
+                    <ReportCardView student={student} school={school} />
+                  )}
 
-                {activeTab === 'fees' && (
-                  <FeesView student={student} />
-                )}
-              </>
-            )
-          )}
+                  {activeTab === 'fees' && (
+                    <FeesView student={student} />
+                  )}
+                </>
+              )
+            )}
+          </ErrorBoundary>
         </main>
 
         {/* Persistent Mobile Bottom Navigation Bar */}

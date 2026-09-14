@@ -154,6 +154,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     primaryPhone: '',
     email: '',
     address: '',
+    photoUrl: '',
   });
 
   // Staff Form
@@ -173,6 +174,12 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [newClassGrade, setNewClassGrade] = useState('9');
 
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [newSubjectClassId, setNewSubjectClassId] = useState<string>('');
+  const [selectedSubjectClassFilter, setSelectedSubjectClassFilter] = useState<string>('ALL');
+  const [publishedStudentIds, setPublishedStudentIds] = useState<Set<string>>(new Set());
+  const [showPublishClassModal, setShowPublishClassModal] = useState(false);
+  const [publishTargetClassId, setPublishTargetClassId] = useState<string>('');
+  const [publishTargetExamId, setPublishTargetExamId] = useState<string>('');
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectCode, setNewSubjectCode] = useState('');
 
@@ -425,6 +432,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       primaryPhone: '',
       email: '',
       address: '',
+      photoUrl: '',
     });
     setShowStudentModal(true);
   };
@@ -450,6 +458,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       primaryPhone: s.primaryPhone || '',
       email: s.email || '',
       address: s.address || '',
+      photoUrl: s.photoUrl || '',
     });
     setShowStudentModal(true);
   };
@@ -559,11 +568,62 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     e.preventDefault();
     if (!newSubjectName) return;
     try {
-      await ApiService.createSubject({ name: newSubjectName, code: newSubjectCode });
-      alert(`✅ Subject "${newSubjectName}" added to curriculum!`);
+      await ApiService.createSubject({
+        name: newSubjectName,
+        code: newSubjectCode,
+        classId: newSubjectClassId || undefined,
+      });
+      alert(`✅ Subject "${newSubjectName}" added to curriculum successfully!`);
       setShowAddSubjectModal(false);
       setNewSubjectName('');
       setNewSubjectCode('');
+      setNewSubjectClassId('');
+      loadData();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDeleteSubject = async (subId: string, subName: string) => {
+    if (!confirm(`Are you sure you want to remove subject "${subName}" from the curriculum?`)) return;
+    try {
+      await ApiService.deleteSubject(subId);
+      alert('✅ Subject deleted.');
+      loadData();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleTogglePublishStudent = async (studentId: string, examId: string, currentlyPublished: boolean) => {
+    try {
+      const res = await ApiService.publishExamResults({
+        examId,
+        studentId,
+        isPublished: !currentlyPublished,
+      });
+      alert(res.message);
+      setPublishedStudentIds((prev) => {
+        const next = new Set(prev);
+        if (!currentlyPublished) next.add(studentId);
+        else next.delete(studentId);
+        return next;
+      });
+      loadData();
+    } catch (err: any) {
+      alert('Error publishing result: ' + err.message);
+    }
+  };
+
+  const handlePublishClassResults = async (examId: string, classId: string, isPublished: boolean) => {
+    try {
+      const res = await ApiService.publishExamResults({
+        examId,
+        classId: classId || undefined,
+        isPublished,
+      });
+      alert(res.message);
+      setShowPublishClassModal(false);
       loadData();
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -1467,21 +1527,50 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
               {/* Subjects Master */}
               <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide">
-                  Approved Curriculum Subjects ({classesData?.subjects?.length || 0})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                    Approved Curriculum Subjects ({classesData?.subjects?.length || 0})
+                  </h3>
+                  <select
+                    value={selectedSubjectClassFilter}
+                    onChange={(e) => setSelectedSubjectClassFilter(e.target.value)}
+                    className="text-xs font-bold px-2.5 py-1 bg-white border border-slate-300 rounded-xl"
+                  >
+                    <option value="ALL">All Classes</option>
+                    {classesData?.classes?.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="space-y-2">
-                  {classesData?.subjects?.map((sub: any) => (
-                    <div key={sub.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-slate-900">{sub.name}</span>
-                        <span className="text-[11px] font-mono text-slate-400 block">{sub.code || 'CORE-GEN'}</span>
-                      </div>
-                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold text-[10px]">
-                        Theory & Practical
-                      </span>
-                    </div>
-                  ))}
+                  {(classesData?.subjects || [])
+                    .filter((sub: any) => selectedSubjectClassFilter === 'ALL' || !sub.classId || sub.classId === selectedSubjectClassFilter)
+                    .map((sub: any) => {
+                      const designatedClass = classesData?.classes?.find((c: any) => c.id === sub.classId);
+                      return (
+                        <div key={sub.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-bold text-slate-900">{sub.name}</span>
+                            <span className="text-[11px] font-mono text-slate-400 block">
+                              {sub.code || 'CORE'} {designatedClass ? `• ${designatedClass.name}` : '• All Classes'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold text-[10px]">
+                              Curriculum
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubject(sub.id, sub.name)}
+                              className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50"
+                              title="Delete Subject"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>
@@ -1608,21 +1697,35 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 </p>
               </div>
 
-              <form onSubmit={handleCreateExam} className="flex items-center gap-2 text-xs">
-                <input
-                  type="text"
-                  placeholder="e.g. Unit Test 2 / SA-2"
-                  value={newExamName}
-                  onChange={(e) => setNewExamName(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
-                />
+              <div className="flex items-center gap-2">
                 <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"
+                  type="button"
+                  onClick={() => {
+                    setPublishTargetExamId(exams[0]?.id || '');
+                    setPublishTargetClassId(classesData?.classes?.[0]?.id || '');
+                    setShowPublishClassModal(true);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow text-xs transition flex items-center gap-1.5"
                 >
-                  Publish Exam
+                  <Award size={14} />
+                  <span>Publish Class Results</span>
                 </button>
-              </form>
+                <form onSubmit={handleCreateExam} className="flex items-center gap-2 text-xs">
+                  <input
+                    type="text"
+                    placeholder="e.g. Unit Test 2 / SA-2"
+                    value={newExamName}
+                    onChange={(e) => setNewExamName(e.target.value)}
+                    className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"
+                  >
+                    + Create Exam Cycle
+                  </button>
+                </form>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1646,6 +1749,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                       <th className="px-4 py-3">Student Name</th>
                       <th className="px-4 py-3">Class</th>
                       <th className="px-4 py-3">Exam Term</th>
+                      <th className="px-4 py-3 text-center">Result Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1656,14 +1760,38 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                         <td className="px-4 py-3 font-bold text-slate-900">{s.firstName} {s.lastName}</td>
                         <td className="px-4 py-3 font-medium text-slate-600">{s.className}</td>
                         <td className="px-4 py-3 font-medium text-slate-700">{exams[0]?.name || 'SA-1 (Term 1)'}</td>
+                        <td className="px-4 py-3 text-center">
+                          {publishedStudentIds.has(s.id) ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ PUBLISHED
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                              DRAFT (UNRELEASED)
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleGenerateReportCard(s.id)}
-                            className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ml-auto"
-                          >
-                            <Printer size={12} />
-                            <span>View Marksheet</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePublishStudent(s.id, exams[0]?.id || 'exam-sa1', publishedStudentIds.has(s.id))}
+                              className={`px-2.5 py-1 rounded-lg font-bold text-[10px] border transition ${
+                                publishedStudentIds.has(s.id)
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {publishedStudentIds.has(s.id) ? 'Unpublish' : 'Publish Result'}
+                            </button>
+                            <button
+                              onClick={() => handleGenerateReportCard(s.id)}
+                              className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1"
+                            >
+                              <Printer size={12} />
+                              <span>View Marksheet</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2382,6 +2510,46 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             <p className="text-xs text-slate-500 mb-6">Enter academic enrollment and parent contact details.</p>
 
             <form onSubmit={handleSaveStudent} className="space-y-4 text-xs">
+              {/* Student Photo Picker */}
+              <div className="flex items-center gap-4 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="relative">
+                  <img
+                    src={studentForm.photoUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80'}
+                    alt="Preview"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-blue-400 shadow-sm bg-slate-200"
+                  />
+                  {studentForm.photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setStudentForm({ ...studentForm, photoUrl: '' })}
+                      className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 shadow hover:bg-rose-700"
+                      title="Remove Photo"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="block font-bold text-slate-800 mb-0.5">Student Photograph</label>
+                  <p className="text-[11px] text-slate-500 mb-1.5">Upload student passport photo directly from computer / phone camera</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setStudentForm({ ...studentForm, photoUrl: reader.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-xl file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Admission No *</label>
@@ -2896,6 +3064,20 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                 />
               </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Target Class *</label>
+                <select
+                  value={newSubjectClassId}
+                  onChange={(e) => setNewSubjectClassId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                >
+                  <option value="">All Classes / Common Curriculum</option>
+                  {classesData?.classes?.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Subject Code</label>
                 <input

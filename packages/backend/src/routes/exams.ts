@@ -127,6 +127,7 @@ examRoutes.post('/marks', async (c) => {
         grade: gradeInfo.grade,
         remarks: item.remarks || gradeInfo.remarks,
         markedByTeacherId: user.userId,
+        isPublished: 0,
       }).run();
     }
 
@@ -200,6 +201,7 @@ examRoutes.get('/marks-sheet', async (c) => {
       maxMarks: m ? m.maxMarks : 100,
       grade: m ? m.grade : '',
       remarks: m ? m.remarks : '',
+      isPublished: m ? !!m.isPublished : false,
     };
   });
 
@@ -222,5 +224,111 @@ examRoutes.get('/report-card/:studentId/:examId', async (c) => {
     return c.json({ error: 'Report card could not be generated. Missing exam, student, or school data.' }, 404);
   }
 
+  // If requested by parent or student, and result is NOT published:
+  if ((user.role === 'parent' || user.role === 'student') && !reportCard.isPublished) {
+    return c.json({
+      error: 'Academic Evaluation in Progress: Examination results have not been released by the Principal yet.',
+      published: false,
+    }, 403);
+  }
+
   return c.json({ reportCard });
+});
+
+// Publish Results (STRICT: Principal or SuperAdmin only)
+examRoutes.post('/publish', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Forbidden: Only Principal or Admin can publish exam results' }, 403);
+  }
+
+  const body = await c.req.json();
+  const { examId, classId, sectionId, studentId, isPublished } = body;
+
+  if (!examId) {
+    return c.json({ error: 'examId is required' }, 400);
+  }
+
+  const pubVal = isPublished ? 1 : 0;
+
+  if (studentId) {
+    // Student-wise publishing
+    db.update(schema.marks)
+      .set({ isPublished: pubVal })
+      .where(
+        and(
+          eq(schema.marks.schoolId, user.schoolId),
+          eq(schema.marks.examId, examId),
+          eq(schema.marks.studentId, studentId)
+        )
+      )
+      .run();
+    return c.json({
+      success: true,
+      message: `Result for student ${isPublished ? 'published' : 'unpublished'} successfully`,
+      isPublished: !!isPublished,
+    });
+  }
+
+  if (classId) {
+    // Class-wise publishing
+    if (sectionId) {
+      db.update(schema.marks)
+        .set({ isPublished: pubVal })
+        .where(
+          and(
+            eq(schema.marks.schoolId, user.schoolId),
+            eq(schema.marks.examId, examId),
+            eq(schema.marks.classId, classId),
+            eq(schema.marks.sectionId, sectionId)
+          )
+        )
+        .run();
+    } else {
+      db.update(schema.marks)
+        .set({ isPublished: pubVal })
+        .where(
+          and(
+            eq(schema.marks.schoolId, user.schoolId),
+            eq(schema.marks.examId, examId),
+            eq(schema.marks.classId, classId)
+          )
+        )
+        .run();
+    }
+    return c.json({
+      success: true,
+      message: `Results for class ${isPublished ? 'published' : 'unpublished'} successfully`,
+      isPublished: !!isPublished,
+    });
+  }
+
+  // Whole exam publishing
+  db.update(schema.exams)
+    .set({ isPublished: pubVal })
+    .where(
+      and(
+        eq(schema.exams.schoolId, user.schoolId),
+        eq(schema.exams.id, examId)
+      )
+    )
+    .run();
+
+  db.update(schema.marks)
+    .set({ isPublished: pubVal })
+    .where(
+      and(
+        eq(schema.marks.schoolId, user.schoolId),
+        eq(schema.marks.examId, examId)
+      )
+    )
+    .run();
+
+  return c.json({
+    success: true,
+    message: `Exam results ${isPublished ? 'published' : 'unpublished'} successfully`,
+    isPublished: !!isPublished,
+  });
 });

@@ -95,6 +95,7 @@ export const PrincipalView: React.FC<Props> = ({
     primaryPhone: '',
     emergencyPhone: '',
     address: '',
+    photoUrl: '',
   });
 
   // Auto Parent Credentials Modal
@@ -213,6 +214,7 @@ export const PrincipalView: React.FC<Props> = ({
         primaryPhone: '',
         emergencyPhone: '',
         address: '',
+        photoUrl: '',
       });
 
       if (res.parentCredentials) {
@@ -1141,6 +1143,36 @@ export const PrincipalView: React.FC<Props> = ({
             </div>
 
             <form onSubmit={handleEnrollStudent} className="space-y-3 text-xs">
+              {/* Student Photo Picker */}
+              <div className="flex items-center space-x-3 p-3 bg-purple-50/60 rounded-2xl border border-purple-100">
+                <div className="relative">
+                  <img
+                    src={newStudent.photoUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80'}
+                    alt="Student Preview"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-300 shadow-sm bg-purple-100"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="font-bold text-slate-800 text-xs block mb-0.5">Student Photograph</label>
+                  <p className="text-[10px] text-slate-500 mb-1.5">Upload student passport photo from device</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewStudent({ ...newStudent, photoUrl: reader.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-purple-700 file:text-white hover:file:bg-purple-800"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-600 block mb-1">Admission No *</label>

@@ -903,6 +903,51 @@ export async function restoreBackupSnapshot(dataset: any): Promise<any> {
   return data;
 }
 
+export async function fetchMyAllocations(): Promise<{
+  isClassTeacher: boolean;
+  classTeacherOf: any[];
+  subjectsAssigned: any[];
+  allClasses: any[];
+  allSections: any[];
+  allSubjects: any[];
+}> {
+  try {
+    const res = await authFetch('/classes/my-allocations');
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('fetchMyAllocations offline:', err);
+  }
+  return {
+    isClassTeacher: false,
+    classTeacherOf: [],
+    subjectsAssigned: [],
+    allClasses: [],
+    allSections: [],
+    allSubjects: [],
+  };
+}
+
+export async function publishExamResults(data: {
+  examId: string;
+  classId?: string;
+  sectionId?: string;
+  studentId?: string;
+  isPublished: boolean;
+}): Promise<any> {
+  const res = await authFetch('/exams/publish', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to publish results');
+  }
+  return resData;
+}
+
+
 
 
 
