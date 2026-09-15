@@ -310,6 +310,7 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       exam_title TEXT,
       center_number TEXT,
       center_name TEXT,
+      schedule_json TEXT,
       is_published INTEGER DEFAULT 1,
       created_at TEXT NOT NULL
     );
@@ -543,6 +544,11 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
   // Auto-merge legacy accountant / cashier accounts into Principal
   try {
     sqlite.exec("UPDATE users SET role = 'principal' WHERE role IN ('accountant', 'cashier');");
+  } catch {}
+
+  // Auto-migrate schedule_json for admit_cards
+  try {
+    sqlite.exec('ALTER TABLE admit_cards ADD COLUMN schedule_json TEXT;');
   } catch {}
 
   // If schools count is 0, auto-restore from persistent backup snapshot first

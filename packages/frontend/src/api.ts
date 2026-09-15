@@ -240,8 +240,8 @@ export class ApiService {
     return this.request<{ structures: FeeStructure[] }>('/fees/structures');
   }
 
-  static async createFeeStructure(data: { classId: string; title: string; amount: number; dueDate?: string; academicYear?: string }) {
-    return this.request<{ success: boolean; message: string; id: string }>('/fees/structures', {
+  static async createFeeStructure(data: { classId: string; title: string; amount: number; dueDate?: string; academicYear?: string; applyToAllClasses?: boolean }) {
+    return this.request<{ success: boolean; message: string; id?: string; count?: number }>('/fees/structures', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -497,6 +497,7 @@ export class ApiService {
     examTitle?: string;
     centerNumber?: string;
     centerName?: string;
+    schedule?: Array<{ subCode: string; subName: string; examDate: string; examTime: string; roomNo: string }>;
   }) {
     return this.request<{ success: boolean; message: string; count: number }>('/certificates/generate-class-admit-cards', {
       method: 'POST',

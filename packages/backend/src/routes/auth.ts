@@ -4,6 +4,81 @@ import { comparePassword, generateToken, verifyToken, hashPassword } from '../se
 
 export const authRoutes = new Hono();
 
+// Helper to resolve all sibling students for a parent
+function resolveLinkedStudentsForParent(user: any): any[] {
+  if (user.role !== 'parent') return [];
+
+  const schoolStudents = user.schoolId
+    ? db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all()
+    : db.select().from(schema.students).all();
+
+  const allParents = user.schoolId
+    ? db.select().from(schema.parents).where(eq(schema.parents.schoolId, user.schoolId)).all()
+    : db.select().from(schema.parents).all();
+
+  const parentMap = new Map(allParents.map((p: any) => [p.id, p]));
+
+  const uPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+  const uEmail = (user.email || '').toLowerCase().trim();
+  const uName = (user.name || '').toLowerCase().trim();
+
+  // Find all parentIds that belong to this parent account
+  const matchingParentIds = new Set<string>();
+  for (const p of allParents) {
+    const pPhone = (p.primaryPhone || p.primary_phone || '').replace(/\D/g, '').slice(-10);
+    const pAlt = (p.altPhone || p.alt_phone || '').replace(/\D/g, '').slice(-10);
+    const isUserMatch = p.userId === user.id || p.user_id === user.id;
+    const isPhoneMatch = uPhone.length >= 10 && (pPhone === uPhone || pAlt === uPhone);
+    const isEmailMatch = uEmail && (p.email || '').toLowerCase().trim() === uEmail;
+    const isNameMatch = uName.length >= 4 && (
+      (p.fatherName || p.father_name || '').toLowerCase().trim() === uName ||
+      (p.motherName || p.mother_name || '').toLowerCase().trim() === uName
+    );
+    if (isUserMatch || isPhoneMatch || isEmailMatch || isNameMatch) {
+      matchingParentIds.add(p.id);
+    }
+  }
+
+  const matched = schoolStudents.filter((s: any) => {
+    if (s.parentId && matchingParentIds.has(s.parentId)) return true;
+    const p: any = parentMap.get(s.parentId);
+    if (p) {
+      const pPhone = (p.primaryPhone || p.primary_phone || '').replace(/\D/g, '').slice(-10);
+      const pAlt = (p.altPhone || p.alt_phone || '').replace(/\D/g, '').slice(-10);
+      if (uPhone.length >= 10 && (pPhone === uPhone || pAlt === uPhone)) return true;
+    }
+    const sEmerg = (s.emergencyPhone || s.emergency_phone || '').replace(/\D/g, '').slice(-10);
+    if (uPhone.length >= 10 && sEmerg === uPhone) return true;
+    return false;
+  });
+
+  const seenIds = new Set<string>();
+  const rawStudents: any[] = [];
+  for (const s of matched) {
+    if (!seenIds.has(s.id)) {
+      seenIds.add(s.id);
+      rawStudents.push(s);
+    }
+  }
+
+  const allClasses = db.select().from(schema.classes).all();
+  const allSections = db.select().from(schema.sections).all();
+  const classMap = new Map(allClasses.map((c: any) => [c.id, c.name]));
+  const sectionMap = new Map(allSections.map((sc: any) => [sc.id, sc.name]));
+
+  return rawStudents.map((s: any) => {
+    const p: any = parentMap.get(s.parentId);
+    return {
+      ...s,
+      className: classMap.get(s.classId) || 'Class',
+      sectionName: sectionMap.get(s.sectionId) || 'A',
+      fatherName: p?.fatherName || '',
+      motherName: p?.motherName || '',
+      primaryPhone: p?.primaryPhone || '',
+    };
+  });
+}
+
 // Universal login for all roles: Super Admin, Principal, Teacher, Staff/Accountant, Parent
 authRoutes.post('/login', async (c) => {
   const body = await c.req.json();
@@ -70,57 +145,7 @@ authRoutes.post('/login', async (c) => {
   let linkedStudents: any[] = [];
   let studentRecord: any = null;
   if (user.role === 'parent') {
-    let parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
-    if (!parentRecord && user.phone) {
-      const allParents = db.select().from(schema.parents).all();
-      parentRecord = allParents.find((p: any) => {
-        const pPhone = (p.primaryPhone || '').replace(/\D/g, '');
-        const uPhone = (user.phone || '').replace(/\D/g, '');
-        return pPhone && uPhone && pPhone.endsWith(uPhone.slice(-10));
-      });
-    }
-
-    const schoolStudents = user.schoolId
-      ? db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all()
-      : db.select().from(schema.students).all();
-
-    const uPhone = (user.phone || '').replace(/\D/g, '');
-    const pPhone = (parentRecord?.primaryPhone || '').replace(/\D/g, '');
-
-    const matched = schoolStudents.filter((s: any) => {
-      if (parentRecord?.id && s.parentId === parentRecord.id) return true;
-      const sPhone = (s.primaryPhone || '').replace(/\D/g, '');
-      const sEmerg = (s.emergencyPhone || '').replace(/\D/g, '');
-      if (uPhone.length >= 10 && (sPhone.endsWith(uPhone.slice(-10)) || sEmerg.endsWith(uPhone.slice(-10)))) return true;
-      if (pPhone.length >= 10 && (sPhone.endsWith(pPhone.slice(-10)) || sEmerg.endsWith(pPhone.slice(-10)))) return true;
-      if (user.name && user.name.trim().length > 3) {
-        const uName = user.name.trim().toLowerCase();
-        if ((s.fatherName || '').trim().toLowerCase() === uName) return true;
-        if ((s.motherName || '').trim().toLowerCase() === uName) return true;
-      }
-      return false;
-    });
-
-    const seenIds = new Set<string>();
-    const rawStudents: any[] = [];
-    for (const s of matched) {
-      if (!seenIds.has(s.id)) {
-        seenIds.add(s.id);
-        rawStudents.push(s);
-      }
-    }
-
-    const allClasses = db.select().from(schema.classes).all();
-    const allSections = db.select().from(schema.sections).all();
-    linkedStudents = rawStudents.map((s: any) => {
-      const cls = allClasses.find((c: any) => c.id === s.classId);
-      const sec = allSections.find((sc: any) => sc.id === s.sectionId);
-      return {
-        ...s,
-        className: cls ? cls.name : 'Class',
-        sectionName: sec ? sec.name : 'A',
-      };
-    });
+    linkedStudents = resolveLinkedStudentsForParent(user);
   } else if (user.role === 'student') {
     studentRecord = db.select().from(schema.students).where(eq(schema.students.userId, user.id)).get();
     if (!studentRecord && user.schoolId) {
@@ -197,57 +222,7 @@ authRoutes.get('/me', async (c) => {
   let linkedStudents: any[] = [];
   let studentRecord: any = null;
   if (user.role === 'parent') {
-    let parentRecord = db.select().from(schema.parents).where(eq(schema.parents.userId, user.id)).get();
-    if (!parentRecord && user.phone) {
-      const allParents = db.select().from(schema.parents).all();
-      parentRecord = allParents.find((p: any) => {
-        const pPhone = (p.primaryPhone || '').replace(/\D/g, '');
-        const uPhone = (user.phone || '').replace(/\D/g, '');
-        return pPhone && uPhone && pPhone.endsWith(uPhone.slice(-10));
-      });
-    }
-
-    const schoolStudents = user.schoolId
-      ? db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all()
-      : db.select().from(schema.students).all();
-
-    const uPhone = (user.phone || '').replace(/\D/g, '');
-    const pPhone = (parentRecord?.primaryPhone || '').replace(/\D/g, '');
-
-    const matched = schoolStudents.filter((s: any) => {
-      if (parentRecord?.id && s.parentId === parentRecord.id) return true;
-      const sPhone = (s.primaryPhone || '').replace(/\D/g, '');
-      const sEmerg = (s.emergencyPhone || '').replace(/\D/g, '');
-      if (uPhone.length >= 10 && (sPhone.endsWith(uPhone.slice(-10)) || sEmerg.endsWith(uPhone.slice(-10)))) return true;
-      if (pPhone.length >= 10 && (sPhone.endsWith(pPhone.slice(-10)) || sEmerg.endsWith(pPhone.slice(-10)))) return true;
-      if (user.name && user.name.trim().length > 3) {
-        const uName = user.name.trim().toLowerCase();
-        if ((s.fatherName || '').trim().toLowerCase() === uName) return true;
-        if ((s.motherName || '').trim().toLowerCase() === uName) return true;
-      }
-      return false;
-    });
-
-    const seenIds = new Set<string>();
-    const rawStudents: any[] = [];
-    for (const s of matched) {
-      if (!seenIds.has(s.id)) {
-        seenIds.add(s.id);
-        rawStudents.push(s);
-      }
-    }
-
-    const allClasses = db.select().from(schema.classes).all();
-    const allSections = db.select().from(schema.sections).all();
-    linkedStudents = rawStudents.map((s: any) => {
-      const cls = allClasses.find((c: any) => c.id === s.classId);
-      const sec = allSections.find((sc: any) => sc.id === s.sectionId);
-      return {
-        ...s,
-        className: cls ? cls.name : 'Class',
-        sectionName: sec ? sec.name : 'A',
-      };
-    });
+    linkedStudents = resolveLinkedStudentsForParent(user);
   } else if (user.role === 'student') {
     studentRecord = db.select().from(schema.students).where(eq(schema.students.userId, user.id)).get();
     if (!studentRecord && user.schoolId) {

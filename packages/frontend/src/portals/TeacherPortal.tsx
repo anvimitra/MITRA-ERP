@@ -34,6 +34,10 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Search state
+  const [attSearch, setAttSearch] = useState('');
+  const [marksSearch, setMarksSearch] = useState('');
+
   // Attendance state
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
   const [studentsAttendance, setStudentsAttendance] = useState<AttendanceRecord[]>([]);
@@ -403,6 +407,18 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                 </div>
               </div>
 
+              {/* Search by student name or roll number */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search attendance by student name, admission number, roll no..."
+                  value={attSearch}
+                  onChange={(e) => setAttSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+                />
+              </div>
+
               {/* Attendance Table */}
               <div className="overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="w-full text-left text-xs">
@@ -416,7 +432,17 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {studentsAttendance.map((s) => (
+                    {studentsAttendance
+                      .filter((s) => {
+                        if (!attSearch.trim()) return true;
+                        const q = attSearch.toLowerCase().trim();
+                        return (
+                          (s.name || '').toLowerCase().includes(q) ||
+                          String(s.admissionNo || '').toLowerCase().includes(q) ||
+                          String(s.rollNo || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .map((s) => (
                       <tr key={s.studentId} className="hover:bg-slate-50/50">
                         <td className="py-3 px-4 font-bold text-slate-900">{s.rollNo || '-'}</td>
                         <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">{s.admissionNo}</td>
@@ -658,6 +684,18 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
             </div>
           </div>
 
+          {/* Search by student name or roll number */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Search marks roster by student name, admission number, roll no..."
+              value={marksSearch}
+              onChange={(e) => setMarksSearch(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+            />
+          </div>
+
           {/* Marks Table */}
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full text-left text-xs">
@@ -672,7 +710,17 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {marksStudents.map((s) => (
+                {marksStudents
+                  .filter((s) => {
+                    if (!marksSearch.trim()) return true;
+                    const q = marksSearch.toLowerCase().trim();
+                    return (
+                      (s.name || '').toLowerCase().includes(q) ||
+                      String(s.admissionNo || '').toLowerCase().includes(q) ||
+                      String(s.rollNo || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((s) => (
                   <tr key={s.studentId} className="hover:bg-slate-50/50">
                     <td className="py-3 px-4 font-bold text-slate-900">{s.rollNo || '-'}</td>
                     <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">{s.admissionNo}</td>

@@ -113,6 +113,66 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [selectedAdmitCardDetails, setSelectedAdmitCardDetails] = useState<any>(null);
   const [showAdmitCardModal, setShowAdmitCardModal] = useState(false);
   const [showBulkAdmitModal, setShowBulkAdmitModal] = useState(false);
+  const [admitCardSchedule, setAdmitCardSchedule] = useState<Array<{
+    subCode: string;
+    subName: string;
+    examDate: string;
+    examTime: string;
+    roomNo: string;
+  }>>([]);
+  const [admitCardStudentSearch, setAdmitCardStudentSearch] = useState('');
+
+  const initAdmitCardScheduleForClass = (cId: string) => {
+    if (!cId) return;
+    const classSubs = classesData?.subjects?.filter((sub: any) => sub.classId === cId) || [];
+    const subsToUse = classSubs.length > 0 ? classSubs : [
+      { code: 'ENG-101', name: 'English Core / Language' },
+      { code: 'HIN-102', name: 'Hindi / Regional Language' },
+      { code: 'MATH-103', name: 'Mathematics' },
+      { code: 'SCI-104', name: 'Science & Technology' },
+      { code: 'SST-105', name: 'Social Science' },
+    ];
+
+    const today = new Date();
+    const startDate = new Date(today.getFullYear(), today.getMonth() + 1, 10);
+
+    const schedule = subsToUse.map((sub: any, idx: number) => {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + idx * 2);
+      const dateStr = d.toISOString().split('T')[0];
+      return {
+        subCode: sub.code || `SUB-${idx + 101}`,
+        subName: sub.name,
+        examDate: dateStr,
+        examTime: '10:00 AM - 01:00 PM',
+        roomNo: `Hall-${Math.floor(idx / 2) + 1}`,
+      };
+    });
+    setAdmitCardSchedule(schedule);
+  };
+
+  const handleAutoSpaceDates = () => {
+    const today = new Date();
+    const startDate = new Date(today.getFullYear(), today.getMonth() + 1, 10);
+    setAdmitCardSchedule((prev) =>
+      prev.map((item, idx) => {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + idx * 2);
+        return {
+          ...item,
+          examDate: d.toISOString().split('T')[0],
+          examTime: '10:00 AM - 01:00 PM',
+          roomNo: `Hall-${Math.floor(idx / 2) + 1}`,
+        };
+      })
+    );
+  };
+
+  useEffect(() => {
+    if (admitCardClassId && classesData?.classes) {
+      initAdmitCardScheduleForClass(admitCardClassId);
+    }
+  }, [admitCardClassId, classesData?.subjects]);
 
   const loadClassAdmitCards = async (cId: string) => {
     if (!cId) return;
@@ -141,6 +201,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         examTitle: admitCardExamTitle,
         centerNumber: admitCardCenterNumber,
         centerName: admitCardCenterName,
+        schedule: admitCardSchedule,
       });
       alert(`🎉 ${res.message || 'Admit cards successfully generated and assigned for the entire class!'}`);
       loadClassAdmitCards(targetClassId);
@@ -170,6 +231,9 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [structures, setStructures] = useState<any[]>([]);
   const [feeSubTab, setFeeSubTab] = useState<'ledger' | 'defaulters' | 'structures'>('ledger');
   const [feeSearch, setFeeSearch] = useState('');
+  const [collectStudentSearch, setCollectStudentSearch] = useState('');
+  const [defaulterSearch, setDefaulterSearch] = useState('');
+  const [ledgerSearch, setLedgerSearch] = useState('');
   const [showCollectModal, setShowCollectModal] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedFeeStructId, setSelectedFeeStructId] = useState('');
@@ -767,8 +831,8 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 // --- Merged Fee Handlers ---
   const handleCollectFee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStudentId || !selectedFeeStructId) {
-      alert('Please select both a student and a fee structure');
+    if (!selectedStudentId) {
+      alert('Please select a student to collect fee.');
       return;
     }
 
@@ -777,24 +841,26 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       return;
     }
 
+    const selectedStudent = students.find((s) => s.id === selectedStudentId);
+    const matchingStruct = structures.find((st) => st.id === selectedFeeStructId) ||
+                           structures.find((st) => st.classId === selectedStudent?.classId) ||
+                           structures[0];
+
     try {
       const res = await ApiService.collectFee({
         studentId: selectedStudentId,
-        feeStructureId: selectedFeeStructId,
+        feeStructureId: matchingStruct?.id || 'general',
         amountPaid: Number(amountPaid),
         paymentMode,
         remarks: paymentRemarks,
       });
 
-      const selectedStudent = students.find((s) => s.id === selectedStudentId);
-      const selectedStruct = structures.find((st) => st.id === selectedFeeStructId);
-
       setLatestReceipt({
         ...res.payment,
         studentName: selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName || ''}`.trim() : 'Student',
         admissionNo: selectedStudent?.admissionNo || 'N/A',
-        className: selectedStudent?.className || 'Class 10',
-        feeTitle: selectedStruct?.title || 'Tuition Fee',
+        className: selectedStudent?.className || 'Class',
+        feeTitle: matchingStruct?.title || res.payment?.feeTitle || 'Academic Fee',
         paymentMode,
         remarks: paymentRemarks,
       });
@@ -810,22 +876,23 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
   const handleCreateStructure = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetClassId = structClassId || classesData?.classes?.[0]?.id;
-    if (!structTitle.trim() || !structAmount || !targetClassId) {
-      alert('Please enter a Fee Title, Amount, and select a Target Class.');
+    const targetClassId = structClassId || 'ALL';
+    if (!structTitle.trim() || !structAmount) {
+      alert('Please enter a Fee Title and Amount.');
       return;
     }
 
     try {
-      await ApiService.createFeeStructure({
+      const res = await ApiService.createFeeStructure({
         classId: targetClassId,
-        title: structTitle,
+        title: structTitle.trim(),
         amount: Number(structAmount),
         dueDate: structDueDate,
         academicYear: '2026-2027',
+        applyToAllClasses: targetClassId === 'ALL',
       });
 
-      alert('✅ New Fee Head added to institutional ledger!');
+      alert(`✅ ${res.message || 'New Fee Head added to institutional ledger!'}`);
       setShowAddStructModal(false);
       setStructTitle('');
       setStructAmount('');
@@ -2136,6 +2203,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   </button>
                 </div>
 
+                {/* Search Defaulters */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Search defaulters by student name, roll no, or admission no..."
+                    value={defaulterSearch}
+                    onChange={(e) => setDefaulterSearch(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+                  />
+                </div>
+
                 <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
@@ -2152,23 +2231,35 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     <tbody className="divide-y divide-slate-100">
                       {(() => {
                         const defaulters = students.map((s) => {
-                          const sFees = structures.filter((st) => st.classId === s.classId).reduce((a, st) => a + (Number(st.amount) || 0), 0);
+                          const sFees = structures.filter((st) => st.classId === s.classId || st.classId === 'ALL').reduce((a, st) => a + (Number(st.amount) || 0), 0);
                           const sPaid = payments.filter((p) => p.studentId === s.id).reduce((a, p) => a + (Number(p.amountPaid) || 0), 0);
                           const due = Math.max(0, sFees - sPaid);
                           return { ...s, totalAssignedFee: sFees, totalPaid: sPaid, dueAmount: due };
                         }).filter((s) => s.dueAmount > 0);
 
-                        if (defaulters.length === 0) {
+                        const q = defaulterSearch.toLowerCase().trim();
+                        const filteredDefaulters = defaulters.filter((s) => {
+                          if (!q) return true;
+                          const name = `${s.firstName} ${s.lastName || ''}`.toLowerCase();
+                          const adm = String(s.admissionNo || '').toLowerCase();
+                          const roll = String(s.rollNo || '').toLowerCase();
+                          const cls = String(s.className || '').toLowerCase();
+                          return name.includes(q) || adm.includes(q) || roll.includes(q) || cls.includes(q);
+                        });
+
+                        if (filteredDefaulters.length === 0) {
                           return (
                             <tr>
                               <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
-                                🎉 No fee defaulters found! All enrolled students are clear of dues.
+                                {defaulters.length === 0
+                                  ? '🎉 No fee defaulters found! All enrolled students are clear of dues.'
+                                  : 'No defaulters matching your search query.'}
                               </td>
                             </tr>
                           );
                         }
 
-                        return defaulters.map((s) => (
+                        return filteredDefaulters.map((s) => (
                           <tr key={s.id} className="hover:bg-slate-50/80 transition">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2.5">
@@ -2232,6 +2323,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   </span>
                 </div>
 
+                {/* Search in Payments Ledger */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Search transactions by student name or receipt number..."
+                    value={ledgerSearch}
+                    onChange={(e) => setLedgerSearch(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+                  />
+                </div>
+
                 <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
@@ -2246,14 +2349,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {payments.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                            No transactions recorded yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        payments.map((p) => (
+                      {(() => {
+                        const filteredPayments = payments.filter((p) => {
+                          if (!ledgerSearch.trim()) return true;
+                          const q = ledgerSearch.toLowerCase().trim();
+                          return (
+                            (p.studentName || '').toLowerCase().includes(q) ||
+                            (p.receiptNo || '').toLowerCase().includes(q) ||
+                            (p.feeTitle || '').toLowerCase().includes(q)
+                          );
+                        });
+
+                        if (filteredPayments.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                                {payments.length === 0 ? 'No transactions recorded yet.' : 'No transactions matching your search.'}
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filteredPayments.map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50/80">
                             <td className="px-4 py-3 font-mono font-bold text-emerald-700">{p.receiptNo}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">{p.studentName}</td>
@@ -2263,16 +2380,23 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                             <td className="px-4 py-3 font-mono text-slate-500">{p.paymentDate}</td>
                             <td className="px-4 py-3 text-right">
                               <button
-                                onClick={() => setLatestReceipt(p)}
-                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-[11px] hover:bg-emerald-100 transition flex items-center gap-1 ml-auto"
+                                onClick={() => {
+                                  setLatestReceipt({
+                                    ...p,
+                                    studentName: p.studentName || 'Student',
+                                    admissionNo: p.admissionNo || 'N/A',
+                                    className: p.className || 'Class',
+                                    feeTitle: p.feeTitle || 'Tuition Fee',
+                                  });
+                                }}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg transition"
                               >
-                                <Printer size={12} />
-                                <span>Receipt</span>
+                                View Receipt
                               </button>
                             </td>
                           </tr>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -2376,6 +2500,158 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 </div>
               </div>
 
+              {/* Subject Exam Dates, Time & Room Schedule */}
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Calendar size={14} className="text-blue-600" />
+                      Class Subject Exam Schedule & Time Slots
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Set official examination dates, start/end timing, and exam halls for each subject. These will be printed on the official hall ticket.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoSpaceDates}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-[11px] transition flex items-center gap-1"
+                    >
+                      <Sparkles size={13} />
+                      <span>⚡ Auto-Space Exam Dates</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdmitCardSchedule((prev) => [
+                          ...prev,
+                          {
+                            subCode: `SUB-${prev.length + 101}`,
+                            subName: 'Elective / Practical Paper',
+                            examDate: new Date().toISOString().split('T')[0],
+                            examTime: '10:00 AM - 01:00 PM',
+                            roomNo: 'Hall-1',
+                          },
+                        ]);
+                      }}
+                      className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-[11px] transition flex items-center gap-1"
+                    >
+                      <Plus size={13} />
+                      <span>Add Paper</span>
+                    </button>
+                  </div>
+                </div>
+
+                {admitCardSchedule.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    No subjects found for this class. Click "Add Paper" above to enter exam papers manually.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
+                        <tr>
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Subject Name</th>
+                          <th className="p-2.5">Subject Code</th>
+                          <th className="p-2.5">Exam Date</th>
+                          <th className="p-2.5">Exam Time / Shift</th>
+                          <th className="p-2.5">Hall / Room</th>
+                          <th className="p-2.5 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {admitCardSchedule.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="p-2 font-mono font-bold text-slate-400">{idx + 1}</td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.subName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdmitCardSchedule((prev) =>
+                                    prev.map((s, i) => (i === idx ? { ...s, subName: val } : s))
+                                  );
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.subCode}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdmitCardSchedule((prev) =>
+                                    prev.map((s, i) => (i === idx ? { ...s, subCode: val } : s))
+                                  );
+                                }}
+                                className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-blue-700"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="date"
+                                value={item.examDate}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdmitCardSchedule((prev) =>
+                                    prev.map((s, i) => (i === idx ? { ...s, examDate: val } : s))
+                                  );
+                                }}
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.examTime}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdmitCardSchedule((prev) =>
+                                    prev.map((s, i) => (i === idx ? { ...s, examTime: val } : s))
+                                  );
+                                }}
+                                placeholder="10:00 AM - 01:00 PM"
+                                className="w-36 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.roomNo}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdmitCardSchedule((prev) =>
+                                    prev.map((s, i) => (i === idx ? { ...s, roomNo: val } : s))
+                                  );
+                                }}
+                                placeholder="Hall A"
+                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAdmitCardSchedule((prev) => prev.filter((_, i) => i !== idx));
+                                }}
+                                className="text-rose-500 hover:text-rose-700 p-1"
+                                title="Remove Subject"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] text-slate-500 italic">
                   * Note: Re-generating will overwrite previous roll codes for this class batch with updated center details.
@@ -2434,6 +2710,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 </span>
               </div>
 
+              {/* Search candidate by name or admission number */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search candidates by student name, admission number, roll no..."
+                  value={admitCardStudentSearch}
+                  onChange={(e) => setAdmitCardStudentSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+                />
+              </div>
+
               <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
@@ -2449,17 +2737,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   <tbody className="divide-y divide-slate-100">
                     {(() => {
                       const classStudents = students.filter((s) => s.classId === admitCardClassId);
-                      if (classStudents.length === 0) {
+                      const q = admitCardStudentSearch.toLowerCase().trim();
+                      const filteredStudents = classStudents.filter((s) => {
+                        if (!q) return true;
+                        const name = `${s.firstName} ${s.lastName || ''}`.toLowerCase();
+                        const adm = String(s.admissionNo || '').toLowerCase();
+                        const roll = String(s.rollNo || '').toLowerCase();
+                        return name.includes(q) || adm.includes(q) || roll.includes(q);
+                      });
+
+                      if (filteredStudents.length === 0) {
                         return (
                           <tr>
                             <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                              No students found in this class. Select another class above or admit students.
+                              {classStudents.length === 0
+                                ? 'No students found in this class. Select another class above or admit students.'
+                                : 'No candidates matching your search.'}
                             </td>
                           </tr>
                         );
                       }
 
-                      return classStudents.map((s) => {
+                      return filteredStudents.map((s) => {
                         const card = classAdmitCards.find((c) => c.studentId === s.id);
                         return (
                           <tr key={s.id} className="hover:bg-slate-50/80 transition">
@@ -3292,6 +3591,27 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {(() => {
+                      const schedule = selectedAdmitCardDetails?.schedule;
+                      if (Array.isArray(schedule) && schedule.length > 0) {
+                        return schedule.map((item: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="p-2 font-mono font-bold border-r border-slate-200">
+                              {item.examDate || '-'}
+                            </td>
+                            <td className="p-2 font-mono border-r border-slate-200">
+                              {item.examTime || '10:00 AM - 01:00 PM'}
+                            </td>
+                            <td className="p-2 font-mono font-bold text-blue-700 border-r border-slate-200">
+                              {item.subCode || `SUB-${idx + 101}`}
+                            </td>
+                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                              {item.subName || 'Subject'}{item.roomNo ? ` (${item.roomNo})` : ''}
+                            </td>
+                            <td className="p-2 text-center border-slate-200"></td>
+                          </tr>
+                        ));
+                      }
+
                       const subs = classesData?.subjects?.filter((s: any) => !s.classId || s.classId === selectedAdmitCardStudent.classId) || [];
                       const defaultDates = ['2026-10-10', '2026-10-12', '2026-10-14', '2026-10-16', '2026-10-18', '2026-10-20'];
                       const displayList = subs.length > 0 ? subs : [
@@ -4420,16 +4740,35 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             <form onSubmit={handleCollectFee} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Select Student *</label>
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Type student name or admission number to filter..."
+                    value={collectStudentSearch}
+                    onChange={(e) => setCollectStudentSearch(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs font-medium focus:bg-white"
+                  />
+                </div>
                 <select
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                 >
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.firstName} {s.lastName} ({s.admissionNo} - {s.className})
-                    </option>
-                  ))}
+                  {students
+                    .filter((s) => {
+                      if (!collectStudentSearch.trim()) return true;
+                      const q = collectStudentSearch.toLowerCase().trim();
+                      const name = `${s.firstName} ${s.lastName || ''}`.toLowerCase();
+                      const adm = String(s.admissionNo || '').toLowerCase();
+                      const cls = String(s.className || '').toLowerCase();
+                      return name.includes(q) || adm.includes(q) || cls.includes(q);
+                    })
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.firstName} {s.lastName || ''} ({s.admissionNo} - {s.className || 'Class'})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -4541,6 +4880,27 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   onChange={(e) => setStructTitle(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                 />
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[
+                    { title: 'Annual Composite Fee 2026-27', amount: '24000' },
+                    { title: 'Quarterly Tuition Fee (Q1)', amount: '6000' },
+                    { title: 'Board Exam & Registration Fee', amount: '2500' },
+                    { title: 'Sports & Development Charges', amount: '3500' },
+                  ].map((preset, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => {
+                        setStructTitle(preset.title);
+                        setStructAmount(preset.amount);
+                      }}
+                      className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-200 transition"
+                    >
+                      + {preset.title.split(' ')[0]} {preset.title.split(' ')[1]}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -4562,6 +4922,9 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     onChange={(e) => setStructClassId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                   >
+                    <option value="ALL" className="font-extrabold text-indigo-700 bg-indigo-50">
+                      🌟 All Classes (Entire School - Nursery to 12)
+                    </option>
                     {classesData?.classes?.map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {c.name}

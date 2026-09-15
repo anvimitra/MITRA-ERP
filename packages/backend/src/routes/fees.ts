@@ -32,10 +32,45 @@ feeRoutes.post('/structures', async (c) => {
   }
 
   const body = await c.req.json();
-  const { classId, title, amount, dueDate, academicYear } = body;
+  const { classId, title, amount, dueDate, academicYear, applyToAllClasses } = body;
 
   if (!classId || !title || !amount) {
     return c.json({ error: 'classId, title, and amount are required' }, 400);
+  }
+
+  const isAllClasses = classId === 'ALL' || classId === 'all' || !!applyToAllClasses;
+  if (isAllClasses) {
+    const classes = db
+      .select()
+      .from(schema.classes)
+      .where(eq(schema.classes.schoolId, user.schoolId))
+      .all();
+
+    if (classes.length === 0) {
+      return c.json({ error: 'No classes found for this school' }, 400);
+    }
+
+    const createdIds: string[] = [];
+    for (const cls of classes) {
+      const structId = crypto.randomUUID();
+      db.insert(schema.feeStructures).values({
+        id: structId,
+        schoolId: user.schoolId,
+        classId: cls.id,
+        title,
+        amount: Number(amount),
+        dueDate: dueDate || '2026-10-15',
+        academicYear: academicYear || '2026-2027',
+      }).run();
+      createdIds.push(structId);
+    }
+
+    return c.json({
+      success: true,
+      message: `Fee structure "${title}" created for all ${classes.length} classes (Nursery to 12).`,
+      count: classes.length,
+      ids: createdIds,
+    });
   }
 
   const id = crypto.randomUUID();
@@ -124,13 +159,34 @@ feeRoutes.post('/collect', async (c) => {
   const body = await c.req.json();
   const { studentId, feeStructureId, amountPaid, paymentMode, remarks } = body;
 
-  if (!studentId || !feeStructureId || !amountPaid || !paymentMode) {
-    return c.json({ error: 'studentId, feeStructureId, amountPaid, and paymentMode are required' }, 400);
+  if (!studentId || !amountPaid || !paymentMode) {
+    return c.json({ error: 'studentId, amountPaid, and paymentMode are required' }, 400);
   }
 
-  const feeStruct = db.select().from(schema.feeStructures).where(eq(schema.feeStructures.id, feeStructureId)).get();
+  const student = db.select().from(schema.students).where(eq(schema.students.id, studentId)).get();
+  if (!student) {
+    return c.json({ error: 'Student record not found' }, 404);
+  }
+
+  let feeStruct = feeStructureId ? db.select().from(schema.feeStructures).where(eq(schema.feeStructures.id, feeStructureId)).get() : null;
   if (!feeStruct) {
-    return c.json({ error: 'Fee structure not found' }, 404);
+    // If student has a fee structure for their class, use that, otherwise auto-create or use general
+    const classStruct = db.select().from(schema.feeStructures).where(and(eq(schema.feeStructures.schoolId, user.schoolId), eq(schema.feeStructures.classId, student.classId))).get();
+    if (classStruct) {
+      feeStruct = classStruct;
+    } else {
+      const genId = `struct-gen-${Date.now()}`;
+      db.insert(schema.feeStructures).values({
+        id: genId,
+        schoolId: user.schoolId,
+        classId: student.classId || 'ALL',
+        title: remarks && remarks.trim() ? remarks.slice(0, 50) : 'Tuition & Academic Fee',
+        amount: Number(amountPaid),
+        dueDate: new Date().toISOString().split('T')[0],
+        academicYear: '2026-2027',
+      }).run();
+      feeStruct = { id: genId, title: remarks || 'Tuition & Academic Fee', amount: Number(amountPaid) };
+    }
   }
 
   const paymentId = crypto.randomUUID();
@@ -143,18 +199,17 @@ feeRoutes.post('/collect', async (c) => {
     id: paymentId,
     schoolId: user.schoolId,
     studentId,
-    feeStructureId,
+    feeStructureId: feeStruct.id,
     amountPaid: Number(amountPaid),
     paymentDate: now,
     paymentMode,
     receiptNo,
     status,
-    remarks,
+    remarks: remarks || 'Fee payment recorded',
   }).run();
 
   // Send Fee Receipt Notification / SMS to parent
-  const student = db.select().from(schema.students).where(eq(schema.students.id, studentId)).get();
-  const studentName = student ? `${student.firstName} ${student.lastName || ''}`.trim() : 'student';
+  const studentName = `${student.firstName} ${student.lastName || ''}`.trim();
 
   await dispatchStudentNotification({
     schoolId: user.schoolId,
@@ -173,6 +228,7 @@ feeRoutes.post('/collect', async (c) => {
       amountPaid,
       paymentDate: now,
       status,
+      feeTitle: feeStruct.title,
     },
   });
 });
@@ -188,17 +244,16 @@ feeRoutes.get('/student/:studentId', async (c) => {
   const student = db.select().from(schema.students).where(eq(schema.students.id, studentId)).get();
   if (!student) return c.json({ error: 'Student not found' }, 404);
 
-  // Applicable fee structures for student's class
-  const classFees = db
+  // Applicable fee structures for student's class (including school-wide structures)
+  const allSchoolFees = db
     .select()
     .from(schema.feeStructures)
-    .where(
-      and(
-        eq(schema.feeStructures.schoolId, user.schoolId),
-        eq(schema.feeStructures.classId, student.classId)
-      )
-    )
+    .where(eq(schema.feeStructures.schoolId, user.schoolId))
     .all();
+
+  const classFees = allSchoolFees.filter(
+    (f: any) => f.classId === student.classId || f.classId === 'ALL' || f.classId === 'all'
+  );
 
   // Payments made by student
   const payments = db
@@ -212,8 +267,8 @@ feeRoutes.get('/student/:studentId', async (c) => {
     )
     .all();
 
-  const totalFeeAmount = classFees.reduce((acc, f) => acc + f.amount, 0);
-  const totalPaidAmount = payments.reduce((acc, p) => acc + p.amountPaid, 0);
+  const totalFeeAmount = classFees.reduce((acc, f) => acc + (Number(f.amount) || 0), 0);
+  const totalPaidAmount = payments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0);
   const balanceDue = Math.max(0, totalFeeAmount - totalPaidAmount);
 
   return c.json({
@@ -273,15 +328,22 @@ feeRoutes.get('/payments', async (c) => {
 
   const students = db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all();
   const structures = db.select().from(schema.feeStructures).where(eq(schema.feeStructures.schoolId, user.schoolId)).all();
+  const classes = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
 
-  const studentMap = new Map(students.map((s: any) => [s.id, `${s.firstName} ${s.lastName || ''}`.trim()]));
+  const classMap = new Map(classes.map((c: any) => [c.id, c.name]));
+  const studentMap = new Map(students.map((s: any) => [s.id, s]));
   const structMap = new Map(structures.map((st: any) => [st.id, st.title]));
 
-  const enriched = payments.map((p: any) => ({
-    ...p,
-    studentName: studentMap.get(p.studentId) || 'Student',
-    feeTitle: structMap.get(p.feeStructureId) || 'Tuition Fee',
-  }));
+  const enriched = payments.map((p: any) => {
+    const s: any = studentMap.get(p.studentId);
+    return {
+      ...p,
+      studentName: s ? `${s.firstName} ${s.lastName || ''}`.trim() : 'Student',
+      admissionNo: s?.admissionNo || 'N/A',
+      className: s ? (classMap.get(s.classId) || s.classId) : 'Class',
+      feeTitle: structMap.get(p.feeStructureId) || 'Tuition Fee',
+    };
+  });
 
   return c.json({ payments: enriched.reverse() });
 });

@@ -120,6 +120,7 @@ export const PrincipalView: React.FC<Props> = ({
 
   // Fee collection modal
   const [showCollectFee, setShowCollectFee] = useState(false);
+  const [feeStudentFilter, setFeeStudentFilter] = useState('');
   const [collecting, setCollecting] = useState(false);
   const [feeForm, setFeeForm] = useState({
     studentId: '',
@@ -1456,6 +1457,16 @@ export const PrincipalView: React.FC<Props> = ({
             <form onSubmit={handleCollectFee} className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-600 block mb-1">Select Student *</label>
+                <div className="relative mb-1.5">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search student by name or admission #..."
+                    value={feeStudentFilter}
+                    onChange={(e) => setFeeStudentFilter(e.target.value)}
+                    className="w-full pl-8 pr-2.5 py-1.5 border rounded-xl bg-slate-50 text-xs focus:bg-white"
+                  />
+                </div>
                 <select
                   required
                   value={feeForm.studentId}
@@ -1463,11 +1474,21 @@ export const PrincipalView: React.FC<Props> = ({
                   className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold"
                 >
                   <option value="">-- Select Enrolled Student --</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.firstName} {s.lastName} ({s.className} - {s.admissionNo})
-                    </option>
-                  ))}
+                  {students
+                    .filter((s) => {
+                      if (!feeStudentFilter.trim()) return true;
+                      const q = feeStudentFilter.toLowerCase().trim();
+                      return (
+                        `${s.firstName} ${s.lastName || ''}`.toLowerCase().includes(q) ||
+                        String(s.admissionNo || '').toLowerCase().includes(q) ||
+                        String(s.className || '').toLowerCase().includes(q)
+                      );
+                    })
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.firstName} {s.lastName || ''} ({s.className || 'Class'} - {s.admissionNo})
+                      </option>
+                    ))}
                 </select>
               </div>
 

@@ -27,6 +27,7 @@ import {
   BellRing,
   Layers,
   Save,
+  Search,
 } from 'lucide-react';
 
 interface Props {
@@ -54,6 +55,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [attSearch, setAttSearch] = useState('');
+  const [marksSearch, setMarksSearch] = useState('');
 
   // Marks Entry state
   const [exams, setExams] = useState<ExamItem[]>([]);
@@ -382,13 +385,35 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             </div>
           </div>
 
+          {/* Search student by name or roll */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search student by name or roll no..."
+              value={attSearch}
+              onChange={(e) => setAttSearch(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium focus:bg-white"
+            />
+          </div>
+
           <div className="space-y-2">
             {students.length === 0 ? (
               <div className="text-center py-8 text-slate-400 text-xs">
                 {loading ? 'Loading class students...' : 'No students found in this class.'}
               </div>
             ) : (
-              students.map((stu) => (
+              students
+                .filter((stu) => {
+                  if (!attSearch.trim()) return true;
+                  const q = attSearch.toLowerCase().trim();
+                  return (
+                    `${stu.firstName} ${stu.lastName || ''}`.toLowerCase().includes(q) ||
+                    String(stu.admissionNo || '').toLowerCase().includes(q) ||
+                    String(stu.rollNo || '').toLowerCase().includes(q)
+                  );
+                })
+                .map((stu) => (
                 <div
                   key={stu.id}
                   className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
@@ -548,13 +573,35 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             </div>
           </div>
 
+          {/* Search student by name or roll */}
+          <div className="relative mt-2">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search student by name or roll no..."
+              value={marksSearch}
+              onChange={(e) => setMarksSearch(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium focus:bg-white"
+            />
+          </div>
+
           <div className="space-y-2 mt-2">
             {students.length === 0 ? (
               <div className="text-center py-6 text-slate-400 text-xs">
                 No students enrolled to grade.
               </div>
             ) : (
-              students.map((stu) => (
+              students
+                .filter((stu) => {
+                  if (!marksSearch.trim()) return true;
+                  const q = marksSearch.toLowerCase().trim();
+                  return (
+                    `${stu.firstName} ${stu.lastName || ''}`.toLowerCase().includes(q) ||
+                    String(stu.admissionNo || '').toLowerCase().includes(q) ||
+                    String(stu.rollNo || '').toLowerCase().includes(q)
+                  );
+                })
+                .map((stu) => (
                 <div
                   key={stu.id}
                   className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"

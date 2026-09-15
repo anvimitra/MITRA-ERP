@@ -203,6 +203,16 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
     };
   });
 
+  let customSchedule = null;
+  if (cardRecord?.scheduleJson || cardRecord?.schedule_json) {
+    try {
+      const parsed = JSON.parse(cardRecord.scheduleJson || cardRecord.schedule_json);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        customSchedule = parsed;
+      }
+    } catch {}
+  }
+
   return c.json({
     admitCard: {
       rollNo: cardRecord?.rollNo || student.rollNo || 1,
@@ -227,12 +237,12 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
         'Electronic gadgets, smartwatches, and study notes are strictly forbidden inside the hall.',
         'Use only blue/black ballpoint pen for filling OMR sheets and answer booklets.',
       ],
-      schedule: timetableSchedule.length > 0 ? timetableSchedule : [
+      schedule: customSchedule || (timetableSchedule.length > 0 ? timetableSchedule : [
         { subCode: 'MATH-10', subName: 'Mathematics Standard', examDate: '2026-10-10', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
         { subCode: 'SCI-10', subName: 'Science Theory', examDate: '2026-10-12', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
         { subCode: 'ENG-10', subName: 'English Language & Lit', examDate: '2026-10-14', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
         { subCode: 'SST-10', subName: 'Social Science', examDate: '2026-10-16', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
-      ],
+      ]),
     },
   });
 });
@@ -247,8 +257,10 @@ certificateRoutes.post('/generate-class-admit-cards', async (c) => {
   }
 
   const body = await c.req.json();
-  const { classId, examId, examTitle, centerNumber, centerName } = body;
+  const { classId, examId, examTitle, centerNumber, centerName, schedule } = body;
   if (!classId) return c.json({ error: 'classId is required' }, 400);
+
+  const scheduleJson = schedule && Array.isArray(schedule) && schedule.length > 0 ? JSON.stringify(schedule) : null;
 
   const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
   const students = db
@@ -279,6 +291,7 @@ certificateRoutes.post('/generate-class-admit-cards', async (c) => {
       examTitle: examTitle || 'Official Annual Examination Admit Card 2026',
       centerNumber: centerNumber || '8402',
       centerName: centerName || `${school?.name || 'Institutional Campus'} Center A`,
+      scheduleJson,
       isPublished: 1,
       createdAt: now,
     }).run();

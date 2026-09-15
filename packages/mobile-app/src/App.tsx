@@ -52,7 +52,13 @@ export const App: React.FC = () => {
     } catch {}
     return null;
   });
-  const [allLinkedStudents, setAllLinkedStudents] = useState<Student[]>([]);
+  const [allLinkedStudents, setAllLinkedStudents] = useState<Student[]>(() => {
+    try {
+      const cached = localStorage.getItem('anvimitra_cached_linked_students');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     try {
       const cached = localStorage.getItem('anvimitra_cached_attendance');
@@ -148,8 +154,11 @@ export const App: React.FC = () => {
 
         if (res.linkedStudents && res.linkedStudents.length > 0) {
           setAllLinkedStudents(res.linkedStudents);
-          setStudent(res.linkedStudents[0]);
-          refreshUserData(res.user, res.linkedStudents[0]);
+          localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(res.linkedStudents));
+          const currentCachedStu = student || res.linkedStudents[0];
+          const matchedCurrent = res.linkedStudents.find((s: any) => s.id === currentCachedStu?.id) || res.linkedStudents[0];
+          setStudent(matchedCurrent);
+          refreshUserData(res.user, matchedCurrent);
         } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher') {
           refreshUserData(res.user);
         } else {
@@ -216,14 +225,19 @@ export const App: React.FC = () => {
     localStorage.setItem('anvimitra_cached_school', JSON.stringify(newSchool));
 
     if (linkedStudents && linkedStudents.length > 0) {
+      setAllLinkedStudents(linkedStudents);
+      localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(linkedStudents));
       setStudent(linkedStudents[0]);
       refreshUserData(newUser, linkedStudents[0]);
     } else {
       const liveStudents = await fetchLiveStudents();
       if (liveStudents && liveStudents.length > 0) {
+        setAllLinkedStudents(liveStudents);
+        localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(liveStudents));
         setStudent(liveStudents[0]);
         refreshUserData(newUser, liveStudents[0]);
       } else {
+        setAllLinkedStudents([]);
         setStudent(null);
         refreshUserData(newUser);
       }
@@ -354,6 +368,42 @@ export const App: React.FC = () => {
                 />
               ) : (
                 <>
+                  {/* Multi-Child Switcher Banner across all tabs */}
+                  {allLinkedStudents.length > 1 && (
+                    <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white rounded-2xl p-3 shadow-md mb-3 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-xs font-black tracking-tight">Active Ward:</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                        {allLinkedStudents.map((child) => {
+                          const isSelected = child.id === student?.id;
+                          return (
+                            <button
+                              key={child.id}
+                              onClick={() => {
+                                setStudent(child);
+                                localStorage.setItem('anvimitra_cached_student', JSON.stringify(child));
+                                if (user) refreshUserData(user, child);
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                                isSelected
+                                  ? 'bg-amber-400 text-purple-950 shadow-sm scale-105'
+                                  : 'bg-white/10 hover:bg-white/20 text-purple-100'
+                              }`}
+                            >
+                              <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[9px]">
+                                {child.firstName[0]}
+                              </span>
+                              <span>{child.firstName}</span>
+                              <span className="text-[10px] opacity-75 font-mono">({child.className})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {activeTab === 'home' && (
                     <ParentView
                       student={student}
@@ -361,6 +411,12 @@ export const App: React.FC = () => {
                       attendance={attendance}
                       fees={fees}
                       latestReport={latestReport}
+                      linkedStudents={allLinkedStudents}
+                      onSelectStudent={(child) => {
+                        setStudent(child);
+                        localStorage.setItem('anvimitra_cached_student', JSON.stringify(child));
+                        if (user) refreshUserData(user, child);
+                      }}
                       onChangeTab={setActiveTab}
                       onOpenIdCard={() => setShowIdCard(true)}
                       onCheckUpdate={handleManualCheckUpdate}
