@@ -9,10 +9,11 @@ import { Printer, X, Sparkles, Layout, FileText, Smile } from 'lucide-react';
 interface Props {
   data: ReportCardData;
   onClose: () => void;
+  canSelectTemplate?: boolean;
 }
 
-export const ReportCardModal: React.FC<Props> = ({ data, onClose }) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'cbse' | 'minimal' | 'junior'>('modern');
+export const ReportCardModal: React.FC<Props> = ({ data, onClose, canSelectTemplate = false }) => {
+  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'cbse' | 'minimal' | 'junior'>('cbse');
 
   const handlePrint = () => {
     window.print();
@@ -27,12 +28,15 @@ export const ReportCardModal: React.FC<Props> = ({ data, onClose }) => {
             <Layout size={18} />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">ANVIMITRA Attractive Report Card Engine</h2>
-            <p className="text-[11px] text-slate-400">Select an attractive template & print or export as PDF</p>
+            <h2 className="text-sm font-bold text-white">Official Academic Performance Marksheet</h2>
+            <p className="text-[11px] text-slate-400">
+              {canSelectTemplate ? 'Principal Desk: Select template design & print' : 'Verified institutional student progress report'}
+            </p>
           </div>
         </div>
 
-        {/* Template Switcher Buttons */}
+        {/* Template Switcher Buttons (Principal Only) */}
+        {canSelectTemplate ? (
         <div className="flex items-center bg-slate-950 border border-slate-800 p-1 rounded-xl gap-1">
           <button
             onClick={() => setSelectedTemplate('modern')}
@@ -82,6 +86,12 @@ export const ReportCardModal: React.FC<Props> = ({ data, onClose }) => {
             <span>Junior Vibrant</span>
           </button>
         </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Official Institutional Marksheet</span>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-3">

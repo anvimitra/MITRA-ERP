@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
 import { CbseOfficialTemplate } from '../templates/CbseOfficialTemplate';
+import { ModernGradientTemplate } from '../templates/ModernGradientTemplate';
+import { MinimalExecutiveTemplate } from '../templates/MinimalExecutiveTemplate';
+import { JuniorVibrantTemplate } from '../templates/JuniorVibrantTemplate';
 import { TimetablePeriod, StudentLog } from '../types';
 import {
   LayoutDashboard,
@@ -28,6 +31,7 @@ import {
   Printer,
   FileText,
   Clock,
+  History,
   ExternalLink,
   ChevronRight,
   School as SchoolIcon,
@@ -320,16 +324,41 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [newExamName, setNewExamName] = useState('');
   const [newExamType, setNewExamType] = useState('sa2');
   const [selectedReportCard, setSelectedReportCard] = useState<any | null>(null);
+  const [principalReportTemplate, setPrincipalReportTemplate] = useState<'cbse' | 'modern' | 'minimal' | 'junior'>('cbse');
 
   // Notice broadcast state
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
 
-  // Attendance quick test
-  const [attClassId, setAttClassId] = useState('');
+  // Institutional Attendance Register state
+  const [attClassId, setAttClassId] = useState('ALL');
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attRecords, setAttRecords] = useState<any[]>([]);
+  const [attRegisterData, setAttRegisterData] = useState<{
+    date: string;
+    isAttendanceTaken: boolean;
+    totalStudents: number;
+    recordedCount: number;
+    unrecordedCount: number;
+    records: any[];
+    allRecords: any[];
+    summary: { present: number; absent: number; late: number; half_day: number };
+  } | null>(null);
+  const [loadingAttRegister, setLoadingAttRegister] = useState(false);
+  const [attRegisterSearch, setAttRegisterSearch] = useState('');
+  const [showOnlyTaken, setShowOnlyTaken] = useState(true);
+
+  const loadAttendanceRegister = async (date: string, classId: string) => {
+    setLoadingAttRegister(true);
+    try {
+      const res = await ApiService.getAttendanceRegister(date, classId);
+      setAttRegisterData(res);
+    } catch (err) {
+      console.warn('Failed to load attendance register:', err);
+    } finally {
+      setLoadingAttRegister(false);
+    }
+  };
 
   // Timetable State
   const [ttClassId, setTtClassId] = useState('');
@@ -533,6 +562,12 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'attendance') {
+      loadAttendanceRegister(attDate, attClassId);
+    }
+  }, [activeTab, attDate, attClassId]);
 
   // --- Student Handlers ---
   const handleOpenAddStudent = () => {
@@ -1874,59 +1909,225 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         {/* ================= MODULE 4: ATTENDANCE REGISTER ================= */}
         {activeTab === 'attendance' && (
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <Calendar className="text-blue-600" size={24} />
                   Institutional Daily Attendance Register
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Live attendance register. Track presence, absences, and instant In-App Push notifications to parents.
+                  Verified daily pupil attendance log. Only displays actual recorded attendance submitted by class teachers.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                {/* Class Selector */}
+                <select
+                  value={attClassId}
+                  onChange={(e) => setAttClassId(e.target.value)}
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-800"
+                >
+                  <option value="ALL">🌟 All Classes (Entire School)</option>
+                  {classesData?.classes?.map((c: any) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Date Picker */}
                 <input
                   type="date"
                   value={attDate}
                   onChange={(e) => setAttDate(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold"
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-800"
                 />
+
+                {/* Reload button */}
+                <button
+                  type="button"
+                  onClick={() => loadAttendanceRegister(attDate, attClassId)}
+                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition font-bold text-xs flex items-center gap-1"
+                  title="Refresh Register"
+                >
+                  <Sparkles size={14} className="text-blue-600" />
+                  <span>Refresh</span>
+                </button>
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                  <tr>
-                    <th className="px-4 py-3">Roll</th>
-                    <th className="px-4 py-3">Student Name</th>
-                    <th className="px-4 py-3">Class</th>
-                    <th className="px-4 py-3">Status Today</th>
-                    <th className="px-4 py-3">Parent Phone</th>
-                    <th className="px-4 py-3 text-right">In-App Alert Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {students.map((s, idx) => (
-                    <tr key={s.id} className="hover:bg-slate-50/80">
-                      <td className="px-4 py-3 font-semibold text-slate-600">{s.rollNo || idx + 1}</td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{s.firstName} {s.lastName}</td>
-                      <td className="px-4 py-3 font-medium text-slate-600">{s.className}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-[10px]">
-                          Present (Verified)
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-600">{s.primaryPhone || '9876543210'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-[11px] font-bold text-emerald-600">Delivered</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Attendance Status Summary Banner */}
+            {loadingAttRegister ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-bold">
+                Loading attendance register...
+              </div>
+            ) : !attRegisterData?.isAttendanceTaken ? (
+              <div className="p-8 text-center bg-amber-50/80 border-2 border-dashed border-amber-200 rounded-3xl space-y-2">
+                <AlertCircle className="w-10 h-10 text-amber-600 mx-auto" />
+                <h3 className="font-black text-amber-950 text-base">
+                  No Attendance Recorded for {attDate}
+                </h3>
+                <p className="text-xs text-amber-800 max-w-md mx-auto">
+                  Class teachers have not taken attendance for this date yet. Only dates where attendance has actually been marked and submitted are recorded in this register.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Metric cards when attendance WAS taken */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] font-black uppercase text-slate-500">Recorded Pupils</span>
+                    <div className="text-2xl font-black text-slate-900 mt-0.5">
+                      {attRegisterData.recordedCount} / {attRegisterData.totalStudents}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 font-bold">Attendance Taken</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] font-black uppercase text-emerald-700">Present</span>
+                    <div className="text-2xl font-black text-emerald-800 mt-0.5">
+                      {attRegisterData.summary.present}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 font-bold">Verified In Class</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+                    <span className="text-[10px] font-black uppercase text-rose-700">Absent</span>
+                    <div className="text-2xl font-black text-rose-800 mt-0.5">
+                      {attRegisterData.summary.absent}
+                    </div>
+                    <span className="text-[10px] text-rose-600 font-bold">Parents Alerted</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] font-black uppercase text-amber-700">Late / Half Day</span>
+                    <div className="text-2xl font-black text-amber-800 mt-0.5">
+                      {attRegisterData.summary.late + attRegisterData.summary.half_day}
+                    </div>
+                    <span className="text-[10px] text-amber-600 font-bold">Arrival Discrepancies</span>
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input
+                      type="text"
+                      placeholder="Search register by student name, roll number, or admission number..."
+                      value={attRegisterSearch}
+                      onChange={(e) => setAttRegisterSearch(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium focus:bg-white"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 select-none shrink-0 bg-slate-50 px-3 py-2 border border-slate-200 rounded-xl">
+                    <input
+                      type="checkbox"
+                      checked={showOnlyTaken}
+                      onChange={(e) => setShowOnlyTaken(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                    <span>Show Only Recorded Attendance (li ho tohi dikhe)</span>
+                  </label>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                      <tr>
+                        <th className="px-4 py-3">Roll</th>
+                        <th className="px-4 py-3">Admission No</th>
+                        <th className="px-4 py-3">Student Name</th>
+                        <th className="px-4 py-3">Class</th>
+                        <th className="px-4 py-3 text-center">Status on {attDate}</th>
+                        <th className="px-4 py-3">Remarks</th>
+                        <th className="px-4 py-3 text-right">Notification</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(() => {
+                        const sourceList = showOnlyTaken ? attRegisterData.records : attRegisterData.allRecords;
+                        const q = attRegisterSearch.toLowerCase().trim();
+                        const filtered = sourceList.filter((r) => {
+                          if (!q) return true;
+                          return (
+                            r.name.toLowerCase().includes(q) ||
+                            String(r.admissionNo || '').toLowerCase().includes(q) ||
+                            String(r.rollNo || '').toLowerCase().includes(q) ||
+                            r.className.toLowerCase().includes(q)
+                          );
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                                No attendance records match your search filter.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map((r, idx) => (
+                          <tr key={r.studentId} className="hover:bg-slate-50/80 transition">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-600">
+                              {r.rollNo || idx + 1}
+                            </td>
+                            <td className="px-4 py-3 font-mono font-bold text-blue-700">
+                              {r.admissionNo}
+                            </td>
+                            <td className="px-4 py-3 font-extrabold text-slate-900 text-sm">
+                              {r.name}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">
+                              {r.className}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {r.status === 'present' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold rounded-lg text-[10px]">
+                                  <CheckCircle2 size={11} className="text-emerald-600" />
+                                  <span>Present (Verified)</span>
+                                </span>
+                              ) : r.status === 'absent' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 font-bold rounded-lg text-[10px]">
+                                  <AlertCircle size={11} className="text-rose-600" />
+                                  <span>Absent</span>
+                                </span>
+                              ) : r.status === 'late' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-lg text-[10px]">
+                                  <Clock size={11} className="text-amber-600" />
+                                  <span>Late</span>
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 font-bold rounded-lg text-[10px]">
+                                  Not Marked
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 italic text-[11px]">
+                              {r.remarks || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {r.isTaken ? (
+                                <span className="text-[11px] font-bold text-emerald-600">
+                                  ✓ In-App Alert Dispatched
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">
+                                  Pending
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -4154,27 +4355,57 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         </div>
       )}
 
-      {/* ================= MODAL: PRINTABLE REPORT CARD ================= */}
+      {/* ================= MODAL: PRINTABLE REPORT CARD (PRINCIPAL TEMPLATE SELECTOR) ================= */}
       {selectedReportCard && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 relative my-6">
-            <div className="no-print flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-              <span className="text-xs font-bold text-slate-600">Official CBSE Academic Performance Report Card</span>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 relative my-6 print:border-none print:shadow-none print:my-0 print:p-0">
+            <div className="no-print flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 mb-4 gap-3">
+              <div>
+                <span className="text-xs font-black uppercase text-indigo-700 tracking-wider">Principal Marksheet Engine</span>
+                <h4 className="text-sm font-extrabold text-slate-900">Academic Evaluation Card</h4>
+              </div>
+
+              {/* Principal Template Switcher (Exclusive to Principal) */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                {[
+                  { id: 'cbse', label: 'CBSE Official' },
+                  { id: 'modern', label: 'Modern Gradient' },
+                  { id: 'minimal', label: 'Executive Minimal' },
+                  { id: 'junior', label: 'Junior Vibrant' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setPrincipalReportTemplate(t.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      principalReportTemplate === t.id
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="px-4 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow"
                 >
                   <Printer size={14} />
                   <span>Print Report Card</span>
                 </button>
-                <button onClick={() => setSelectedReportCard(null)} className="text-slate-400 hover:text-slate-700">
+                <button onClick={() => setSelectedReportCard(null)} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            <CbseOfficialTemplate data={selectedReportCard} />
+            {principalReportTemplate === 'cbse' && <CbseOfficialTemplate data={selectedReportCard} />}
+            {principalReportTemplate === 'modern' && <ModernGradientTemplate data={selectedReportCard} />}
+            {principalReportTemplate === 'minimal' && <MinimalExecutiveTemplate data={selectedReportCard} />}
+            {principalReportTemplate === 'junior' && <JuniorVibrantTemplate data={selectedReportCard} />}
           </div>
         </div>
       )}

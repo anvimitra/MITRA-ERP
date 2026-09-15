@@ -213,3 +213,79 @@ attendanceRoutes.get('/student/:studentId', async (c) => {
     history: history.sort((a, b) => b.date.localeCompare(a.date)),
   });
 });
+
+// Institutional Attendance Register for Principal & Management
+attendanceRoutes.get('/register', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0];
+  const classId = c.req.query('classId');
+
+  // Query students
+  const studentQuery = classId && classId !== 'ALL'
+    ? and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.classId, classId))
+    : eq(schema.students.schoolId, user.schoolId);
+
+  const studentList = db.select().from(schema.students).where(studentQuery).all();
+
+  // Query attendance records for date
+  const attendanceQuery = classId && classId !== 'ALL'
+    ? and(
+        eq(schema.attendance.schoolId, user.schoolId),
+        eq(schema.attendance.date, date),
+        eq(schema.attendance.classId, classId)
+      )
+    : and(
+        eq(schema.attendance.schoolId, user.schoolId),
+        eq(schema.attendance.date, date)
+      );
+
+  const records = db.select().from(schema.attendance).where(attendanceQuery).all();
+  const attendanceMap = new Map(records.map((r) => [r.studentId, r]));
+
+  // Class names mapping
+  const classesList = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
+  const classMap = new Map(classesList.map((cl) => [cl.id, cl.name]));
+
+  // Combine
+  const allRows = studentList.map((s) => {
+    const rec = attendanceMap.get(s.id);
+    return {
+      studentId: s.id,
+      admissionNo: s.admissionNo,
+      rollNo: s.rollNo,
+      name: `${s.firstName} ${s.lastName || ''}`.trim(),
+      className: classMap.get(s.classId) || s.classId,
+      classId: s.classId,
+      primaryPhone: s.emergencyPhone || '',
+      isTaken: !!rec,
+      status: rec?.status || 'not_marked',
+      remarks: rec?.remarks || '',
+      recordedAt: rec?.createdAt || null,
+    };
+  });
+
+  const takenCount = records.length;
+  const isAttendanceTaken = takenCount > 0;
+  const onlyTaken = allRows.filter((r) => r.isTaken);
+
+  return c.json({
+    date,
+    isAttendanceTaken,
+    totalStudents: allRows.length,
+    recordedCount: takenCount,
+    unrecordedCount: Math.max(0, allRows.length - takenCount),
+    records: onlyTaken, // Only students whose attendance was actually taken
+    allRecords: allRows,
+    summary: {
+      present: records.filter((r) => r.status === 'present').length,
+      absent: records.filter((r) => r.status === 'absent').length,
+      late: records.filter((r) => r.status === 'late').length,
+      half_day: records.filter((r) => r.status === 'half_day').length,
+    },
+  });
+});
+

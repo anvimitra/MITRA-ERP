@@ -7,11 +7,12 @@ interface Props {
   student?: Student | null;
   school?: School | null;
   report?: ExamReport | null;
+  canSelectTemplate?: boolean;
 }
 
 export type TemplateMode = 'modern' | 'cbse' | 'minimal' | 'vibrant';
 
-export const ReportCardView: React.FC<Props> = ({ student, school, report: initialReport }) => {
+export const ReportCardView: React.FC<Props> = ({ student, school, report: initialReport, canSelectTemplate = false }) => {
   const [selectedExamKey, setSelectedExamKey] = useState<string>('sa1');
   const [template, setTemplate] = useState<TemplateMode>('modern');
   const [report, setReport] = useState<ExamReport | null>(initialReport || null);
@@ -73,25 +74,27 @@ export const ReportCardView: React.FC<Props> = ({ student, school, report: initi
           </div>
         </div>
 
-        <div>
-          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1 flex items-center space-x-1">
-            <Palette className="w-3 h-3 text-purple-600" />
-            <span>Card Template Style</span>
-          </label>
-          <div className="grid grid-cols-4 gap-1">
-            {(['modern', 'cbse', 'minimal', 'vibrant'] as TemplateMode[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTemplate(t)}
-                className={`py-1 text-[11px] capitalize font-bold rounded-lg transition ${
-                  template === t ? 'bg-purple-100 text-purple-900 border border-purple-300' : 'bg-slate-50 text-slate-600 border border-slate-200'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+        {canSelectTemplate && (
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1 flex items-center space-x-1">
+              <Palette className="w-3 h-3 text-purple-600" />
+              <span>Card Template Style (Principal Only)</span>
+            </label>
+            <div className="grid grid-cols-4 gap-1">
+              {(['modern', 'cbse', 'minimal', 'vibrant'] as TemplateMode[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTemplate(t)}
+                  className={`py-1 text-[11px] capitalize font-bold rounded-lg transition ${
+                    template === t ? 'bg-purple-100 text-purple-900 border border-purple-300' : 'bg-slate-50 text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* THE REPORT CARD PREVIEW */}

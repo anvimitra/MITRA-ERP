@@ -189,6 +189,33 @@ export class ApiService {
     }>(`/attendance/class?classId=${classId}&sectionId=${sectionId}&date=${date}`);
   }
 
+  static async getAttendanceRegister(date: string, classId?: string) {
+    const q = new URLSearchParams({ date });
+    if (classId && classId !== 'ALL') q.append('classId', classId);
+    return this.request<{
+      date: string;
+      isAttendanceTaken: boolean;
+      totalStudents: number;
+      recordedCount: number;
+      unrecordedCount: number;
+      records: Array<{
+        studentId: string;
+        admissionNo: string;
+        rollNo: number;
+        name: string;
+        className: string;
+        classId: string;
+        primaryPhone: string;
+        isTaken: boolean;
+        status: string;
+        remarks: string;
+        recordedAt: string | null;
+      }>;
+      allRecords: any[];
+      summary: { present: number; absent: number; late: number; half_day: number };
+    }>(`/attendance/register?${q.toString()}`);
+  }
+
   static async getStudentAttendance(studentId: string) {
     return this.request<any>(`/attendance/student/${studentId}`);
   }

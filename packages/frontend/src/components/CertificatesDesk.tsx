@@ -14,6 +14,7 @@ import {
   GraduationCap,
   X,
   Building,
+  School as SchoolIcon,
 } from 'lucide-react';
 
 interface CertificatesDeskProps {
@@ -160,14 +161,9 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
   };
 
   const handlePrintCertificatePdf = (cert: any) => {
-    const win = window.open('', '_blank', 'width=850,height=1100');
-    if (!win) {
-      alert('Please allow popups in your browser to print / save certificate as PDF.');
-      return;
-    }
-
-    const typeTitle = getTypeName(cert.certificateType);
-    const htmlContent = `<!DOCTYPE html>
+    try {
+      const typeTitle = getTypeName(cert.certificateType);
+      const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -373,9 +369,15 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
 </body>
 </html>`;
 
-    win.document.open();
-    win.document.write(htmlContent);
-    win.document.close();
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      const win = window.open(blobUrl, '_blank', 'width=900,height=1100');
+      if (!win) {
+        window.print();
+      }
+    } catch (err) {
+      window.print();
+    }
   };
 
   const handleOpenPrint = async (certId: string) => {
