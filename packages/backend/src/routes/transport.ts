@@ -30,7 +30,7 @@ transportRoutes.post('/vehicles', async (c) => {
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
-  if (user.role !== 'principal' && user.role !== 'super_admin' && user.role !== 'accountant') {
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
@@ -57,6 +57,65 @@ transportRoutes.post('/vehicles', async (c) => {
 
   return c.json({ success: true, message: 'Vehicle added successfully', vehicleId }, 201);
 });
+
+// Update vehicle (Principal or SuperAdmin only)
+transportRoutes.put('/vehicles/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { vehicleNo, vehicleModel, seatingCapacity, driverName, driverPhone, driverLicense, status } = body;
+
+  const existing = db
+    .select()
+    .from(schema.transportVehicles)
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Vehicle not found' }, 404);
+
+  db.update(schema.transportVehicles)
+    .set({
+      vehicleNo: vehicleNo ?? existing.vehicleNo,
+      vehicleModel: vehicleModel ?? existing.vehicleModel,
+      seatingCapacity: seatingCapacity !== undefined ? Number(seatingCapacity) : existing.seatingCapacity,
+      driverName: driverName ?? existing.driverName,
+      driverPhone: driverPhone ?? existing.driverPhone,
+      driverLicense: driverLicense ?? existing.driverLicense,
+      status: status ?? existing.status,
+    })
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Vehicle updated successfully' });
+});
+
+// Delete vehicle (Principal or SuperAdmin only)
+transportRoutes.delete('/vehicles/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.transportVehicles)
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Vehicle removed from fleet' });
+});
+
 
 // ==================== ROUTES & STOPS ====================
 
@@ -133,6 +192,67 @@ transportRoutes.post('/routes', async (c) => {
   return c.json({ success: true, message: 'Route created successfully', routeId }, 201);
 });
 
+// Update route (Principal or SuperAdmin only)
+transportRoutes.put('/routes/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { routeName, startLocation, endLocation, vehicleId, monthlyFare } = body;
+
+  const existing = db
+    .select()
+    .from(schema.transportRoutes)
+    .where(and(eq(schema.transportRoutes.schoolId, user.schoolId), eq(schema.transportRoutes.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Route not found' }, 404);
+
+  db.update(schema.transportRoutes)
+    .set({
+      routeName: routeName ?? existing.routeName,
+      startLocation: startLocation ?? existing.startLocation,
+      endLocation: endLocation ?? existing.endLocation,
+      vehicleId: vehicleId !== undefined ? vehicleId : existing.vehicleId,
+      monthlyFare: monthlyFare !== undefined ? Number(monthlyFare) : existing.monthlyFare,
+    })
+    .where(and(eq(schema.transportRoutes.schoolId, user.schoolId), eq(schema.transportRoutes.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Route updated successfully' });
+});
+
+// Delete route (Principal or SuperAdmin only)
+transportRoutes.delete('/routes/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.transportStops)
+    .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.routeId, id)))
+    .run();
+
+  db.delete(schema.transportRoutes)
+    .where(and(eq(schema.transportRoutes.schoolId, user.schoolId), eq(schema.transportRoutes.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Route and its stops deleted' });
+});
+
+
 // Add stop to route
 transportRoutes.post('/stops', async (c) => {
   const authHeader = c.req.header('Authorization');
@@ -161,6 +281,62 @@ transportRoutes.post('/stops', async (c) => {
 
   return c.json({ success: true, message: 'Stop added', stopId }, 201);
 });
+
+// Update stop (Principal or SuperAdmin only)
+transportRoutes.put('/stops/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { stopName, pickupTime, dropTime, sequenceOrder } = body;
+
+  const existing = db
+    .select()
+    .from(schema.transportStops)
+    .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Stop not found' }, 404);
+
+  db.update(schema.transportStops)
+    .set({
+      stopName: stopName ?? existing.stopName,
+      pickupTime: pickupTime ?? existing.pickupTime,
+      dropTime: dropTime ?? existing.dropTime,
+      sequenceOrder: sequenceOrder !== undefined ? Number(sequenceOrder) : existing.sequenceOrder,
+    })
+    .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Stop updated successfully' });
+});
+
+// Delete stop (Principal or SuperAdmin only)
+transportRoutes.delete('/stops/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.transportStops)
+    .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Stop deleted' });
+});
+
 
 // ==================== STUDENT ALLOCATIONS ====================
 
@@ -277,6 +453,26 @@ transportRoutes.post('/student-allocations', async (c) => {
 
   return c.json({ success: true, message: 'Student bus allocation saved', allocId }, 201);
 });
+
+// Delete student bus allocation (Principal or SuperAdmin only)
+transportRoutes.delete('/student-allocations/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.studentTransport)
+    .where(and(eq(schema.studentTransport.schoolId, user.schoolId), eq(schema.studentTransport.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Student bus allocation removed' });
+});
+
 
 // Student / Parent lookup: personal transport information
 transportRoutes.get('/student/:studentId', async (c) => {

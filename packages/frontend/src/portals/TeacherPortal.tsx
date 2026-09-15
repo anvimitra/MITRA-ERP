@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ApiService } from '../api';
 import { TeacherAllocation, AttendanceRecord, Exam, TimetablePeriod, StudentLog, StaffLeaveItem } from '../types';
 import { LibraryDesk } from '../components/LibraryDesk';
-import { TransportDesk } from '../components/TransportDesk';
-import { CheckCircle2, UserCheck, Award, Calendar, AlertTriangle, MessageSquare, Send, ShieldAlert, BookOpen, Clock, Plus, Trash2, X, Briefcase, FileCheck, Bus, Search } from 'lucide-react';
+import { CheckCircle2, UserCheck, Award, Calendar, AlertTriangle, MessageSquare, Send, ShieldAlert, BookOpen, Clock, Plus, Trash2, X, Briefcase, FileCheck, Search } from 'lucide-react';
 
 export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'marks' | 'schedule' | 'discipline' | 'leaves' | 'library' | 'transport'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'marks' | 'schedule' | 'discipline' | 'leaves' | 'library'>('attendance');
   const [teacherSchedule, setTeacherSchedule] = useState<TimetablePeriod[]>([]);
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<string>('Monday');
   const [studentLogs, setStudentLogs] = useState<StudentLog[]>([]);
@@ -40,6 +39,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
 
   // Attendance state
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAttKey, setSelectedAttKey] = useState<string>('');
   const [studentsAttendance, setStudentsAttendance] = useState<AttendanceRecord[]>([]);
   const [submittingAtt, setSubmittingAtt] = useState(false);
   const [attDispatchResult, setAttDispatchResult] = useState<any[] | null>(null);
@@ -67,10 +67,22 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
         setSelectedAllocationId(alloc.subjectsAssigned[0].id);
       }
 
-      // If class teacher, load attendance for assigned class
-      if (alloc.classTeacherOf?.length > 0) {
-        const ct = alloc.classTeacherOf[0];
-        const attRes = await ApiService.getClassAttendance(ct.classId, ct.sectionId, attDate);
+      // Collect all assigned classes (Class Teacher + Subject Allocations)
+      const assignedList: Array<{ classId: string; sectionId: string }> = [];
+      const seenKeys = new Set<string>();
+      (alloc.classTeacherOf || []).forEach((ct: any) => {
+        const key = `${ct.classId}_${ct.sectionId}`;
+        if (!seenKeys.has(key)) { seenKeys.add(key); assignedList.push({ classId: ct.classId, sectionId: ct.sectionId }); }
+      });
+      (alloc.subjectsAssigned || []).forEach((sa: any) => {
+        const key = `${sa.classId}_${sa.sectionId}`;
+        if (!seenKeys.has(key)) { seenKeys.add(key); assignedList.push({ classId: sa.classId, sectionId: sa.sectionId }); }
+      });
+
+      if (assignedList.length > 0) {
+        const first = assignedList[0];
+        setSelectedAttKey(`${first.classId}_${first.sectionId}`);
+        const attRes = await ApiService.getClassAttendance(first.classId, first.sectionId, attDate).catch(() => ({ students: [] }));
         setStudentsAttendance(attRes.students || []);
       }
 
@@ -131,9 +143,20 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
 
   const handleDateChange = async (newDate: string) => {
     setAttDate(newDate);
-    if (allocations?.classTeacherOf?.length) {
-      const ct = allocations.classTeacherOf[0];
-      const attRes = await ApiService.getClassAttendance(ct.classId, ct.sectionId, newDate);
+    if (selectedAttKey) {
+      const [cId, sId] = selectedAttKey.split('_');
+      if (cId && sId) {
+        const attRes = await ApiService.getClassAttendance(cId, sId, newDate).catch(() => ({ students: [] }));
+        setStudentsAttendance(attRes.students || []);
+      }
+    }
+  };
+
+  const handleAttClassChange = async (newKey: string) => {
+    setSelectedAttKey(newKey);
+    const [cId, sId] = newKey.split('_');
+    if (cId && sId) {
+      const attRes = await ApiService.getClassAttendance(cId, sId, attDate).catch(() => ({ students: [] }));
       setStudentsAttendance(attRes.students || []);
     }
   };
@@ -180,15 +203,19 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
   };
 
   const handleSubmitAttendance = async () => {
-    if (!allocations?.classTeacherOf?.length) return;
-    const ct = allocations.classTeacherOf[0];
+    if (!selectedAttKey) {
+      alert('Please select an assigned class first.');
+      return;
+    }
+    const [cId, sId] = selectedAttKey.split('_');
+    if (!cId || !sId) return;
 
     setSubmittingAtt(true);
     setAttDispatchResult(null);
     try {
       const res = await ApiService.markAttendance(
-        ct.classId,
-        ct.sectionId,
+        cId,
+        sId,
         attDate,
         studentsAttendance.map((s) => ({
           studentId: s.studentId,
@@ -253,7 +280,10 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
   const handleSaveMarks = async () => {
     if (!allocations || !selectedExamId || !selectedAllocationId) return;
     const alloc = allocations.subjectsAssigned.find((a) => a.id === selectedAllocationId);
-    if (!alloc) return;
+    if (!alloc) {
+      alert('Unauthorized: You can only record marks for subjects assigned to you.');
+      return;
+    }
 
     setSavingMarks(true);
     try {
@@ -277,6 +307,58 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
     }
   };
 
+    // Collect all assigned classes (Class Teacher + Subject Allocations)
+  const assignedClassesList = React.useMemo(() => {
+    if (!allocations) return [];
+    const list: Array<{
+      key: string;
+      classId: string;
+      sectionId: string;
+      className: string;
+      sectionName: string;
+      isClassTeacher: boolean;
+    }> = [];
+    const seen = new Set<string>();
+
+    (allocations.classTeacherOf || []).forEach((ct: any) => {
+      const key = `${ct.classId}_${ct.sectionId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const cls = allocations.allClasses?.find((c: any) => c.id === ct.classId);
+        const sec = allocations.allSections?.find((s: any) => s.id === ct.sectionId);
+        list.push({
+          key,
+          classId: ct.classId,
+          sectionId: ct.sectionId,
+          className: cls?.name || `Class ${ct.classId}`,
+          sectionName: sec?.name || 'A',
+          isClassTeacher: true,
+        });
+      }
+    });
+
+    (allocations.subjectsAssigned || []).forEach((sa: any) => {
+      const key = `${sa.classId}_${sa.sectionId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const cls = allocations.allClasses?.find((c: any) => c.id === sa.classId);
+        const sec = allocations.allSections?.find((s: any) => s.id === sa.sectionId);
+        list.push({
+          key,
+          classId: sa.classId,
+          sectionId: sa.sectionId,
+          className: cls?.name || `Class ${sa.classId}`,
+          sectionName: sec?.name || 'A',
+          isClassTeacher: false,
+        });
+      }
+    });
+
+    return list;
+  }, [allocations]);
+
+  const currentAttClass = assignedClassesList.find((c) => c.key === selectedAttKey) || assignedClassesList[0];
+
   const isClassTeacher = allocations?.isClassTeacher;
 
   return (
@@ -289,9 +371,21 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight">{user.name}</h1>
           <p className="text-slate-300 text-sm mt-1 max-w-xl">
-            {isClassTeacher
-              ? '✅ You are the designated Class Teacher for Class 10-A (Authorized to mark daily attendance).'
-              : '🔒 You are a Subject Faculty (Science). Attendance is restricted to the Class Teacher.'}
+            {(() => {
+              const ctClasses = (allocations?.classTeacherOf || []).map((ct: any) => {
+                const cls = allocations?.allClasses?.find((c: any) => c.id === ct.classId);
+                const sec = allocations?.allSections?.find((s: any) => s.id === ct.sectionId);
+                return `${cls?.name || 'Class'} (${sec?.name || 'A'})`;
+              });
+              const subCount = allocations?.subjectsAssigned?.length || 0;
+              if (ctClasses.length > 0) {
+                return `⭐ Class Teacher for: ${ctClasses.join(', ')} • Subject Allocations: ${subCount} subject(s)`;
+              }
+              if (subCount > 0) {
+                return `📚 Faculty Teacher • Subject Allocations: ${subCount} active class subject(s)`;
+              }
+              return '🔒 No classes or subjects assigned yet. Please contact the Principal.';
+            })()}
           </p>
         </div>
 
@@ -351,30 +445,22 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
             <BookOpen size={14} />
             <span>Library & Books</span>
           </button>
-          <button
-            onClick={() => setActiveTab('transport')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
-              activeTab === 'transport' ? 'bg-white text-blue-950 shadow' : 'text-white/80 hover:text-white'
-            }`}
-          >
-            <Bus size={14} />
-            <span>School Buses & Routes</span>
-          </button>
+          
         </div>
       </div>
 
       {/* Tab 1: Attendance Taking */}
       {activeTab === 'attendance' && (
         <div className="space-y-6">
-          {!isClassTeacher ? (
+          {assignedClassesList.length === 0 ? (
             /* Restricted Security Banner */
             <div className="bg-amber-50 border-2 border-amber-200 rounded-3xl p-8 text-center max-w-2xl mx-auto shadow-sm">
               <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 mx-auto mb-3">
                 <ShieldAlert size={28} />
               </div>
-              <h2 className="text-lg font-bold text-amber-950">Permission Denied: Class Teacher Restricted</h2>
+              <h2 className="text-lg font-bold text-amber-950">No Assigned Classes: Attendance Restricted</h2>
               <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
-                Per the ERP security policy, only the designated <strong>Class Teacher</strong> is authorized to mark daily attendance for this section. You have subject evaluation permissions under the "Marks & Evaluation" tab.
+                Per school policy, teachers can only view and mark daily attendance for the classes officially assigned to them (as Class Teacher or Subject Faculty). Please ask the Principal to allocate your classes.
               </p>
             </div>
           ) : (
@@ -382,13 +468,28 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Daily Attendance Entry • Class 10 (Section A)</h2>
+                  <h2 className="text-lg font-bold text-slate-900">Daily Attendance Entry • {currentAttClass ? `${currentAttClass.className} (Section ${currentAttClass.sectionName})` : 'Assigned Class'}</h2>
                   <p className="text-xs text-slate-500">
                     Mark presence or absence. Parents receive instant In-App Push Notifications.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-900">
+                    <label className="text-[11px] uppercase tracking-wide text-blue-700">Class:</label>
+                    <select
+                      value={selectedAttKey || (currentAttClass ? currentAttClass.key : '')}
+                      onChange={(e) => handleAttClassChange(e.target.value)}
+                      className="bg-transparent font-extrabold focus:outline-none cursor-pointer"
+                    >
+                      {assignedClassesList.map((c) => (
+                        <option key={c.key} value={c.key} className="text-slate-900">
+                          {c.className} (Sec {c.sectionName}) {c.isClassTeacher ? '⭐ Class Teacher' : '• Subject Faculty'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700">
                     <Calendar size={14} className="text-blue-600" />
                     <input
@@ -607,6 +708,17 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
 
       {/* Tab 2: Marks & Assessment Entry */}
       {activeTab === 'marks' && (
+        (!allocations?.subjectsAssigned || allocations.subjectsAssigned.length === 0) ? (
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-3xl p-8 text-center max-w-2xl mx-auto shadow-sm">
+            <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 mx-auto mb-3">
+              <ShieldAlert size={28} />
+            </div>
+            <h2 className="text-lg font-bold text-amber-950">No Assigned Subjects for Marks Evaluation</h2>
+            <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
+              Per ERP policy, teachers can ONLY award marks for classes and subjects officially allocated to them by the Principal. Currently, no subject teaching assignments are linked to your profile.
+            </p>
+          </div>
+        ) : (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
           <div className="border-b border-slate-100 pb-5">
             <h2 className="text-lg font-bold text-slate-900">Subject Marks & Grade Evaluation</h2>
@@ -644,7 +756,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
                   const cls = allocations.allClasses?.find((c) => c.id === a.classId);
                   return (
                     <option key={a.id} value={a.id}>
-                      {sub?.name || 'Subject'} • {cls?.name || 'Class'}
+                      {sub?.name || 'Subject'} — {cls?.name || 'Class'} (Sec {allocations.allSections?.find((s) => s.id === a.sectionId)?.name || 'A'})
                     </option>
                   );
                 })}
@@ -758,6 +870,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
             </button>
           </div>
         </div>
+        )
       )}
 
       {/* Tab 3: My Teaching Schedule */}
@@ -1009,12 +1122,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
         </div>
       )}
 
-      {/* Tab 7: Transport Desk */}
-      {activeTab === 'transport' && (
-        <div>
-          <TransportDesk />
-        </div>
-      )}
+      
 
       {/* Modal: Apply for Leave */}
       {showLeaveModal && (

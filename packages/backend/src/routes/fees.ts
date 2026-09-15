@@ -104,6 +104,44 @@ feeRoutes.delete('/structures/:id', async (c) => {
   return c.json({ success: true, message: 'Fee structure removed' });
 });
 
+// Update fee structure (Principal, SuperAdmin, Accountant)
+feeRoutes.put('/structures/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'accountant' && user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Forbidden: Accountant or Principal only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { classId, title, amount, dueDate, academicYear } = body;
+
+  const existing = db
+    .select()
+    .from(schema.feeStructures)
+    .where(and(eq(schema.feeStructures.schoolId, user.schoolId), eq(schema.feeStructures.id, id)))
+    .get();
+
+  if (!existing) {
+    return c.json({ error: 'Fee structure not found' }, 404);
+  }
+
+  db.update(schema.feeStructures)
+    .set({
+      classId: classId ?? existing.classId,
+      title: title ?? existing.title,
+      amount: amount !== undefined ? Number(amount) : existing.amount,
+      dueDate: dueDate ?? existing.dueDate,
+      academicYear: academicYear ?? existing.academicYear,
+    })
+    .where(and(eq(schema.feeStructures.schoolId, user.schoolId), eq(schema.feeStructures.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Fee structure updated successfully' });
+});
+
+
 // Broadcast Due Fee Reminders to All Parents with Balances (Principal or Accountant)
 feeRoutes.post('/broadcast-due-reminders', async (c) => {
   const authHeader = c.req.header('Authorization');

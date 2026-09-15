@@ -20,7 +20,23 @@ export async function isDesignatedClassTeacher(
     )
     .get();
 
-  return !!match;
+  if (match) return true;
+
+  // Also allow teacher if they are assigned subjects in this class & section
+  const subMatch = db
+    .select()
+    .from(schema.subjectAllocations)
+    .where(
+      and(
+        eq(schema.subjectAllocations.schoolId, schoolId),
+        eq(schema.subjectAllocations.teacherId, teacherId),
+        eq(schema.subjectAllocations.classId, classId),
+        eq(schema.subjectAllocations.sectionId, sectionId)
+      )
+    )
+    .get();
+
+  return !!subMatch;
 }
 
 export async function isDesignatedSubjectTeacher(

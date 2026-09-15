@@ -298,6 +298,13 @@ export class ApiService {
     });
   }
 
+  static async updateFeeStructure(id: string, data: { classId?: string; title?: string; amount?: number; dueDate?: string; academicYear?: string }) {
+    return this.request<{ success: boolean; message: string }>(`/fees/structures/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   static async broadcastDueFeeReminders() {
     return this.request<{ success: boolean; message: string; count: number }>('/fees/broadcast-due-reminders', {
       method: 'POST',
@@ -408,6 +415,20 @@ export class ApiService {
   static async deleteSubject(id: string) {
     return this.request<{ success: boolean; message: string }>(`/classes/subject/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  static async updateClass(id: string, data: { name?: string; gradeLevel?: number }) {
+    return this.request<{ success: boolean; message: string }>(`/classes/class/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateSubject(id: string, data: { name?: string; code?: string; classId?: string }) {
+    return this.request<{ success: boolean; message: string }>(`/classes/subject/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 
@@ -799,6 +820,70 @@ export class ApiService {
 
   static async getStudentTransport(studentId: string) {
     return this.request<{ transport: any }>(`/transport/student/${studentId}`);
+  }
+
+  static async updateTransportVehicle(id: string, data: {
+    vehicleNo?: string;
+    vehicleModel?: string;
+    seatingCapacity?: number;
+    driverName?: string;
+    driverPhone?: string;
+    driverLicense?: string;
+    status?: string;
+  }) {
+    return this.request<{ success: boolean; message: string }>(`/transport/vehicles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteTransportVehicle(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/transport/vehicles/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async updateTransportRoute(id: string, data: {
+    routeName?: string;
+    startLocation?: string;
+    endLocation?: string;
+    vehicleId?: string;
+    monthlyFare?: number;
+  }) {
+    return this.request<{ success: boolean; message: string }>(`/transport/routes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteTransportRoute(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/transport/routes/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async updateTransportStop(id: string, data: {
+    stopName?: string;
+    pickupTime?: string;
+    dropTime?: string;
+    sequenceOrder?: number;
+  }) {
+    return this.request<{ success: boolean; message: string }>(`/transport/stops/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteTransportStop(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/transport/stops/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async deleteStudentTransportAllocation(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/transport/student-allocations/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // ==================== STOCK & INVENTORY ====================

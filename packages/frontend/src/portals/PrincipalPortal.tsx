@@ -245,6 +245,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [paymentMode, setPaymentMode] = useState('cash');
   const [paymentRemarks, setPaymentRemarks] = useState('Quarter 1 Tuition Fee Paid');
   const [showAddStructModal, setShowAddStructModal] = useState(false);
+  const [editingStructId, setEditingStructId] = useState<string | null>(null);
   const [structTitle, setStructTitle] = useState('');
   const [structAmount, setStructAmount] = useState('');
   const [structClassId, setStructClassId] = useState('');
@@ -296,10 +297,12 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
   // Academic Masters Modal
   const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [newClassGrade, setNewClassGrade] = useState('9');
 
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [newSubjectClassId, setNewSubjectClassId] = useState<string>('');
   const [selectedSubjectClassFilter, setSelectedSubjectClassFilter] = useState<string>('ALL');
   const [publishedStudentIds, setPublishedStudentIds] = useState<Set<string>>(new Set());
@@ -717,13 +720,50 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   };
 
   // --- Academic Masters Handlers ---
+  
+  const handleOpenAddClass = () => {
+    setEditingClassId(null);
+    setNewClassName('');
+    setNewClassGrade('9');
+    setShowAddClassModal(true);
+  };
+
+  const handleOpenEditClass = (c: any) => {
+    setEditingClassId(c.id);
+    setNewClassName(c.name);
+    setNewClassGrade(String(c.gradeLevel || '9'));
+    setShowAddClassModal(true);
+  };
+
+  const handleOpenAddSubject = () => {
+    setEditingSubjectId(null);
+    setNewSubjectName('');
+    setNewSubjectCode('');
+    setNewSubjectClassId('');
+    setShowAddSubjectModal(true);
+  };
+
+  const handleOpenEditSubject = (sub: any) => {
+    setEditingSubjectId(sub.id);
+    setNewSubjectName(sub.name);
+    setNewSubjectCode(sub.code || '');
+    setNewSubjectClassId(sub.classId || '');
+    setShowAddSubjectModal(true);
+  };
+
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClassName) return;
     try {
-      await ApiService.createClass({ name: newClassName, gradeLevel: Number(newClassGrade) });
-      alert(`✅ Class "${newClassName}" created with default Section A!`);
+      if (editingClassId) {
+        await ApiService.updateClass(editingClassId, { name: newClassName, gradeLevel: Number(newClassGrade) });
+        alert(`✅ Class "${newClassName}" updated successfully!`);
+      } else {
+        await ApiService.createClass({ name: newClassName, gradeLevel: Number(newClassGrade) });
+        alert(`✅ Class "${newClassName}" created with default Section A!`);
+      }
       setShowAddClassModal(false);
+      setEditingClassId(null);
       setNewClassName('');
       loadData();
     } catch (err: any) {
@@ -735,13 +775,23 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     e.preventDefault();
     if (!newSubjectName) return;
     try {
-      await ApiService.createSubject({
-        name: newSubjectName,
-        code: newSubjectCode,
-        classId: newSubjectClassId || undefined,
-      });
-      alert(`✅ Subject "${newSubjectName}" added to curriculum successfully!`);
+      if (editingSubjectId) {
+        await ApiService.updateSubject(editingSubjectId, {
+          name: newSubjectName,
+          code: newSubjectCode,
+          classId: newSubjectClassId || undefined,
+        });
+        alert(`✅ Subject "${newSubjectName}" updated successfully!`);
+      } else {
+        await ApiService.createSubject({
+          name: newSubjectName,
+          code: newSubjectCode,
+          classId: newSubjectClassId || undefined,
+        });
+        alert(`✅ Subject "${newSubjectName}" added to curriculum successfully!`);
+      }
       setShowAddSubjectModal(false);
+      setEditingSubjectId(null);
       setNewSubjectName('');
       setNewSubjectCode('');
       setNewSubjectClassId('');
@@ -909,6 +959,25 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     }
   };
 
+  
+  const handleOpenAddStructure = () => {
+    setEditingStructId(null);
+    setStructTitle('');
+    setStructAmount('');
+    setStructClassId('ALL');
+    setStructDueDate('2026-10-15');
+    setShowAddStructModal(true);
+  };
+
+  const handleOpenEditStructure = (st: any) => {
+    setEditingStructId(st.id);
+    setStructTitle(st.title);
+    setStructAmount(String(st.amount));
+    setStructClassId(st.classId);
+    setStructDueDate(st.dueDate || '2026-10-15');
+    setShowAddStructModal(true);
+  };
+
   const handleCreateStructure = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetClassId = structClassId || 'ALL';
@@ -918,17 +987,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     }
 
     try {
-      const res = await ApiService.createFeeStructure({
-        classId: targetClassId,
-        title: structTitle.trim(),
-        amount: Number(structAmount),
-        dueDate: structDueDate,
-        academicYear: '2026-2027',
-        applyToAllClasses: targetClassId === 'ALL',
-      });
-
-      alert(`✅ ${res.message || 'New Fee Head added to institutional ledger!'}`);
+      if (editingStructId) {
+        await ApiService.updateFeeStructure(editingStructId, {
+          classId: targetClassId,
+          title: structTitle.trim(),
+          amount: Number(structAmount),
+          dueDate: structDueDate,
+          academicYear: '2026-2027',
+        });
+        alert('✅ Fee Head updated successfully!');
+      } else {
+        const res = await ApiService.createFeeStructure({
+          classId: targetClassId,
+          title: structTitle.trim(),
+          amount: Number(structAmount),
+          dueDate: structDueDate,
+          academicYear: '2026-2027',
+          applyToAllClasses: targetClassId === 'ALL',
+        });
+        alert(`✅ ${res.message || 'New Fee Head added to institutional ledger!'}`);
+      }
       setShowAddStructModal(false);
+      setEditingStructId(null);
       setStructTitle('');
       setStructAmount('');
       const fRes = await ApiService.getFeeStructures();
@@ -1769,14 +1849,14 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowAddClassModal(true)}
+                  onClick={handleOpenAddClass}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
                 >
                   <Plus size={14} />
                   <span>Add Class</span>
                 </button>
                 <button
-                  onClick={() => setShowAddSubjectModal(true)}
+                  onClick={handleOpenAddSubject}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
                 >
                   <Plus size={14} />
@@ -2329,7 +2409,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     <p className="text-xs text-slate-500">Institutional fee rates defined per class batch.</p>
                   </div>
                   <button
-                    onClick={() => setShowAddStructModal(true)}
+                    onClick={handleOpenAddStructure}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow"
                   >
                     <Plus size={14} />
@@ -2351,13 +2431,22 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                             <span className="text-[10px] font-black uppercase text-indigo-700 px-2.5 py-1 bg-indigo-100/80 border border-indigo-200 rounded-lg">
                               {className}
                             </span>
-                            <button
-                              onClick={() => handleDeleteStructure(st.id)}
-                              className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition"
-                              title="Delete Fee Head"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleOpenEditStructure(st)}
+                                className="text-slate-400 hover:text-indigo-600 p-1 rounded-lg hover:bg-indigo-50 transition"
+                                title="Edit Fee Head"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStructure(st.id)}
+                                className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition"
+                                title="Delete Fee Head"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <h4 className="font-black text-slate-900 text-base">{st.title}</h4>
@@ -4534,7 +4623,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             >
               <X size={18} />
             </button>
-            <h3 className="text-lg font-black text-slate-900 mb-1">Add Academic Class</h3>
+            <h3 className="text-lg font-black text-slate-900 mb-1">{editingClassId ? 'Edit Academic Class' : 'Add Academic Class'}</h3>
             <p className="text-xs text-slate-500 mb-4">Creates a new class level with default Section A.</p>
             <form onSubmit={handleCreateClass} className="space-y-3 text-xs">
               <div>
@@ -4588,7 +4677,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             >
               <X size={18} />
             </button>
-            <h3 className="text-lg font-black text-slate-900 mb-1">Add Curriculum Subject</h3>
+            <h3 className="text-lg font-black text-slate-900 mb-1">{editingSubjectId ? 'Edit Curriculum Subject' : 'Add Curriculum Subject'}</h3>
             <p className="text-xs text-slate-500 mb-4">Adds a new subject for examinations and report cards.</p>
             <form onSubmit={handleCreateSubject} className="space-y-3 text-xs">
               <div>

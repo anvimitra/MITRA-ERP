@@ -243,6 +243,38 @@ classRoutes.post('/class', async (c) => {
   return c.json({ success: true, message: 'Class created successfully', id });
 });
 
+// Update Class (Principal or SuperAdmin)
+classRoutes.put('/class/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can edit classes' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const { name, gradeLevel } = await c.req.json();
+
+  const existing = db
+    .select()
+    .from(schema.classes)
+    .where(and(eq(schema.classes.schoolId, user.schoolId), eq(schema.classes.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Class not found' }, 404);
+
+  db.update(schema.classes)
+    .set({
+      name: name ?? existing.name,
+      gradeLevel: gradeLevel !== undefined ? Number(gradeLevel) : existing.gradeLevel,
+    })
+    .where(and(eq(schema.classes.schoolId, user.schoolId), eq(schema.classes.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Class updated successfully' });
+});
+
+
 // Create a new Section (Principal or SuperAdmin)
 classRoutes.post('/section', async (c) => {
   const authHeader = c.req.header('Authorization');
@@ -289,6 +321,39 @@ classRoutes.post('/subject', async (c) => {
 
   return c.json({ success: true, message: 'Subject created successfully', id });
 });
+
+// Update Subject (Principal or SuperAdmin)
+classRoutes.put('/subject/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can edit subjects' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const { name, code, classId } = await c.req.json();
+
+  const existing = db
+    .select()
+    .from(schema.subjects)
+    .where(and(eq(schema.subjects.schoolId, user.schoolId), eq(schema.subjects.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Subject not found' }, 404);
+
+  db.update(schema.subjects)
+    .set({
+      name: name ?? existing.name,
+      code: code !== undefined ? code : existing.code,
+      classId: classId !== undefined ? classId : existing.classId,
+    })
+    .where(and(eq(schema.subjects.schoolId, user.schoolId), eq(schema.subjects.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Subject updated successfully' });
+});
+
 
 // Delete a Subject (Principal or SuperAdmin)
 classRoutes.delete('/subject/:id', async (c) => {

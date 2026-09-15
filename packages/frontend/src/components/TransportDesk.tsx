@@ -7,6 +7,8 @@ import {
   Student,
 } from '../types';
 import {
+  Edit2,
+  Trash2,
   Bus,
   MapPin,
   Users,
@@ -36,6 +38,11 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
   }, [propStudents]);
 
   const [subTab, setSubTab] = useState<'routes' | 'vehicles' | 'allocations'>('routes');
+  // Edit states
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+
 
   // Vehicles
   const [vehicles, setVehicles] = useState<TransportVehicleItem[]>([]);
@@ -72,6 +79,115 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
 
   const [loading, setLoading] = useState(true);
 
+  
+  // Vehicle handlers
+  const handleOpenAddVehicle = () => {
+    setEditingVehicleId(null);
+    setVehNo('');
+    setVehModel('Tata Starbus 42-Seater');
+    setVehCapacity(42);
+    setDriverName('');
+    setDriverPhone('');
+    setDriverLicense('');
+    setShowVehicleModal(true);
+  };
+
+  const handleOpenEditVehicle = (v: TransportVehicleItem) => {
+    setEditingVehicleId(v.id);
+    setVehNo(v.vehicleNo);
+    setVehModel(v.vehicleModel || 'Tata Starbus 42-Seater');
+    setVehCapacity(v.seatingCapacity || 42);
+    setDriverName(v.driverName || '');
+    setDriverPhone(v.driverPhone || '');
+    setDriverLicense(v.driverLicense || '');
+    setShowVehicleModal(true);
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    if (!window.confirm('Are you sure you want to remove this vehicle from the fleet?')) return;
+    try {
+      await ApiService.deleteTransportVehicle(id);
+      alert('✅ Vehicle removed from fleet!');
+      loadAll();
+    } catch (err: any) {
+      alert('Error deleting vehicle: ' + err.message);
+    }
+  };
+
+  // Route handlers
+  const handleOpenAddRoute = () => {
+    setEditingRouteId(null);
+    setRouteName('');
+    setStartLoc('');
+    setEndLoc('');
+    setSelectedVehId(vehicles[0]?.id || '');
+    setMonthlyFare(2200);
+    setShowRouteModal(true);
+  };
+
+  const handleOpenEditRoute = (r: TransportRouteItem) => {
+    setEditingRouteId(r.id);
+    setRouteName(r.routeName);
+    setStartLoc(r.startLocation);
+    setEndLoc(r.endLocation);
+    setSelectedVehId(r.vehicleId || '');
+    setMonthlyFare(r.monthlyFare || 2200);
+    setShowRouteModal(true);
+  };
+
+  const handleDeleteRoute = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this route and its stops?')) return;
+    try {
+      await ApiService.deleteTransportRoute(id);
+      alert('✅ Route deleted!');
+      loadAll();
+    } catch (err: any) {
+      alert('Error deleting route: ' + err.message);
+    }
+  };
+
+  // Stop handlers
+  const handleOpenAddStop = (routeId: string) => {
+    setTargetRouteId(routeId);
+    setEditingStopId(null);
+    setStopName('');
+    setPickupTime('07:30 AM');
+    setDropTime('02:30 PM');
+    setShowStopModal(true);
+  };
+
+  const handleOpenEditStop = (routeId: string, stop: any) => {
+    setTargetRouteId(routeId);
+    setEditingStopId(stop.id);
+    setStopName(stop.stopName);
+    setPickupTime(stop.pickupTime);
+    setDropTime(stop.dropTime);
+    setShowStopModal(true);
+  };
+
+  const handleDeleteStop = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this stop?')) return;
+    try {
+      await ApiService.deleteTransportStop(id);
+      alert('✅ Stop removed!');
+      loadAll();
+    } catch (err: any) {
+      alert('Error deleting stop: ' + err.message);
+    }
+  };
+
+  // Allocation handlers
+  const handleDeleteAllocation = async (id: string) => {
+    if (!window.confirm('Are you sure you want to remove this student bus allocation?')) return;
+    try {
+      await ApiService.deleteStudentTransportAllocation(id);
+      alert('✅ Student bus allocation removed!');
+      loadAll();
+    } catch (err: any) {
+      alert('Error removing allocation: ' + err.message);
+    }
+  };
+
   const loadAll = async () => {
     try {
       setLoading(true);
@@ -94,19 +210,32 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
     loadAll();
   }, []);
 
-  const handleAddVehicle = async (e: React.FormEvent) => {
+  const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createTransportVehicle({
-        vehicleNo: vehNo,
-        vehicleModel: vehModel,
-        seatingCapacity: vehCapacity,
-        driverName,
-        driverPhone,
-        driverLicense,
-      });
-      alert('✅ Vehicle added to fleet!');
+      if (editingVehicleId) {
+        await ApiService.updateTransportVehicle(editingVehicleId, {
+          vehicleNo: vehNo,
+          vehicleModel: vehModel,
+          seatingCapacity: vehCapacity,
+          driverName,
+          driverPhone,
+          driverLicense,
+        });
+        alert('✅ Vehicle details updated!');
+      } else {
+        await ApiService.createTransportVehicle({
+          vehicleNo: vehNo,
+          vehicleModel: vehModel,
+          seatingCapacity: vehCapacity,
+          driverName,
+          driverPhone,
+          driverLicense,
+        });
+        alert('✅ Vehicle added to fleet!');
+      }
       setShowVehicleModal(false);
+      setEditingVehicleId(null);
       setVehNo('');
       setDriverName('');
       setDriverPhone('');
@@ -116,18 +245,30 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
     }
   };
 
-  const handleAddRoute = async (e: React.FormEvent) => {
+  const handleSaveRoute = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createTransportRoute({
-        routeName,
-        startLocation: startLoc,
-        endLocation: endLoc,
-        vehicleId: selectedVehId || undefined,
-        monthlyFare,
-      });
-      alert('✅ Transport route established!');
+      if (editingRouteId) {
+        await ApiService.updateTransportRoute(editingRouteId, {
+          routeName,
+          startLocation: startLoc,
+          endLocation: endLoc,
+          vehicleId: selectedVehId || undefined,
+          monthlyFare,
+        });
+        alert('✅ Route updated successfully!');
+      } else {
+        await ApiService.createTransportRoute({
+          routeName,
+          startLocation: startLoc,
+          endLocation: endLoc,
+          vehicleId: selectedVehId || undefined,
+          monthlyFare,
+        });
+        alert('✅ Transport route established!');
+      }
       setShowRouteModal(false);
+      setEditingRouteId(null);
       setRouteName('');
       setStartLoc('');
       setEndLoc('');
@@ -137,17 +278,27 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
     }
   };
 
-  const handleAddStop = async (e: React.FormEvent) => {
+  const handleSaveStop = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createTransportStop({
-        routeId: targetRouteId,
-        stopName,
-        pickupTime,
-        dropTime,
-      });
-      alert('✅ Bus stop added to route schedule!');
+      if (editingStopId) {
+        await ApiService.updateTransportStop(editingStopId, {
+          stopName,
+          pickupTime,
+          dropTime,
+        });
+        alert('✅ Stop schedule updated!');
+      } else {
+        await ApiService.createTransportStop({
+          routeId: targetRouteId,
+          stopName,
+          pickupTime,
+          dropTime,
+        });
+        alert('✅ Bus stop added to route schedule!');
+      }
       setShowStopModal(false);
+      setEditingStopId(null);
       setStopName('');
       loadAll();
     } catch (err: any) {
@@ -197,7 +348,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
         <div className="flex items-center gap-2">
           {subTab === 'vehicles' && (
             <button
-              onClick={() => setShowVehicleModal(true)}
+              onClick={handleOpenAddVehicle}
               className="bg-white text-cyan-950 hover:bg-cyan-50 px-4 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-black/10 flex items-center gap-2 shrink-0 transition"
             >
               <Plus size={16} />
@@ -206,7 +357,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
           )}
           {subTab === 'routes' && (
             <button
-              onClick={() => setShowRouteModal(true)}
+              onClick={handleOpenAddRoute}
               className="bg-white text-cyan-950 hover:bg-cyan-50 px-4 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-black/10 flex items-center gap-2 shrink-0 transition"
             >
               <Plus size={16} />
@@ -274,9 +425,27 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                     {r.startLocation} ➔ {r.endLocation}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-black text-cyan-700">₹{r.monthlyFare}/mo</div>
-                  <div className="text-[10px] text-slate-400 font-mono">{r.vehicleNo}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <div className="text-xs font-black text-cyan-700">₹{r.monthlyFare}/mo</div>
+                    <div className="text-[10px] text-slate-400 font-mono">{r.vehicleNo}</div>
+                  </div>
+                  <div className="flex items-center gap-1 pl-2 border-l border-slate-100">
+                    <button
+                      onClick={() => handleOpenEditRoute(r)}
+                      className="p-1 text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 rounded-lg transition"
+                      title="Edit Route"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRoute(r.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                      title="Delete Route"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -296,7 +465,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                 <div className="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase">
                   <span>Scheduled Stops ({r.stops?.length || 0})</span>
                   <button
-                    onClick={() => { setTargetRouteId(r.id); setShowStopModal(true); }}
+                    onClick={() => handleOpenAddStop(r.id)}
                     className="text-cyan-700 hover:underline flex items-center gap-0.5"
                   >
                     <Plus size={12} />
@@ -312,8 +481,24 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                       </span>
                       <span className="font-semibold text-slate-700">{s.stopName}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">
-                      Pickup: {s.pickupTime} • Drop: {s.dropTime}
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        Pickup: {s.pickupTime} • Drop: {s.dropTime}
+                      </div>
+                      <button
+                        onClick={() => handleOpenEditStop(r.id, s)}
+                        className="text-slate-400 hover:text-cyan-700 p-0.5 rounded transition"
+                        title="Edit Stop"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStop(s.id)}
+                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
+                        title="Delete Stop"
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -337,6 +522,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                   <th className="py-3 px-4">Driver Contact Phone</th>
                   <th className="py-3 px-4">Driver License</th>
                   <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -367,6 +553,24 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                         {v.status}
                       </span>
                     </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditVehicle(v)}
+                          className="p-1.5 text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 rounded-lg transition"
+                          title="Edit Vehicle"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVehicle(v.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          title="Delete Vehicle"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -389,6 +593,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                   <th className="py-3 px-4">Morning Pickup</th>
                   <th className="py-3 px-4">Bus Vehicle</th>
                   <th className="py-3 px-4">Driver Contact</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -417,6 +622,16 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                       <div className="font-bold text-slate-800">{a.driverName}</div>
                       <div className="text-[11px] text-cyan-700 font-mono">{a.driverPhone}</div>
                     </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={() => handleDeleteAllocation(a.id)}
+                        className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ml-auto"
+                        title="Remove Student Bus Seat"
+                      >
+                        <Trash2 size={12} />
+                        <span>Remove</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -430,10 +645,10 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-5 bg-cyan-900 text-white flex justify-between items-center">
-              <h3 className="text-sm font-black">Add Fleet Bus / Van</h3>
+              <h3 className="text-sm font-black">{editingVehicleId ? "Edit Fleet Vehicle" : "Add Fleet Bus / Van"}</h3>
               <button onClick={() => setShowVehicleModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleAddVehicle} className="p-5 space-y-3 text-xs">
+            <form onSubmit={handleSaveVehicle} className="p-5 space-y-3 text-xs">
               <div>
                 <label className="block text-slate-600 font-bold mb-1">Vehicle Registration Number *</label>
                 <input required value={vehNo} onChange={(e) => setVehNo(e.target.value)} placeholder="e.g. DL-1PB-4521" className="w-full p-2 bg-slate-50 border rounded-xl" />
@@ -464,7 +679,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
               </div>
               <div className="pt-3 border-t flex justify-end gap-2">
                 <button type="button" onClick={() => setShowVehicleModal(false)} className="px-3 py-1.5 text-slate-500 font-bold">Cancel</button>
-                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">Save Vehicle</button>
+                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">{editingVehicleId ? "Update Vehicle" : "Save Vehicle"}</button>
               </div>
             </form>
           </div>
@@ -476,10 +691,10 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-5 bg-cyan-900 text-white flex justify-between items-center">
-              <h3 className="text-sm font-black">Establish Transport Route</h3>
+              <h3 className="text-sm font-black">{editingRouteId ? "Edit Transport Route" : "Establish Transport Route"}</h3>
               <button onClick={() => setShowRouteModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleAddRoute} className="p-5 space-y-3 text-xs">
+            <form onSubmit={handleSaveRoute} className="p-5 space-y-3 text-xs">
               <div>
                 <label className="block text-slate-600 font-bold mb-1">Route Name *</label>
                 <input required value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder="e.g. Route 3: Rohini - Pitampura" className="w-full p-2 bg-slate-50 border rounded-xl" />
@@ -511,7 +726,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
               </div>
               <div className="pt-3 border-t flex justify-end gap-2">
                 <button type="button" onClick={() => setShowRouteModal(false)} className="px-3 py-1.5 text-slate-500 font-bold">Cancel</button>
-                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">Save Route</button>
+                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">{editingRouteId ? "Update Route" : "Save Route"}</button>
               </div>
             </form>
           </div>
@@ -523,10 +738,10 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-5 bg-cyan-900 text-white flex justify-between items-center">
-              <h3 className="text-sm font-black">Add Bus Stop</h3>
+              <h3 className="text-sm font-black">{editingStopId ? "Edit Bus Stop" : "Add Bus Stop"}</h3>
               <button onClick={() => setShowStopModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleAddStop} className="p-5 space-y-3 text-xs">
+            <form onSubmit={handleSaveStop} className="p-5 space-y-3 text-xs">
               <div>
                 <label className="block text-slate-600 font-bold mb-1">Stop / Landmark Name *</label>
                 <input required value={stopName} onChange={(e) => setStopName(e.target.value)} placeholder="e.g. Metro Station Gate 1" className="w-full p-2 bg-slate-50 border rounded-xl" />
@@ -543,7 +758,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
               </div>
               <div className="pt-3 border-t flex justify-end gap-2">
                 <button type="button" onClick={() => setShowStopModal(false)} className="px-3 py-1.5 text-slate-500 font-bold">Cancel</button>
-                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">Add Stop</button>
+                <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">{editingStopId ? "Update Stop" : "Add Stop"}</button>
               </div>
             </form>
           </div>
