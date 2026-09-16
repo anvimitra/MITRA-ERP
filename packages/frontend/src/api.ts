@@ -111,6 +111,29 @@ export class ApiService {
     });
   }
 
+  static async updateProfile(data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) {
+    const res = await this.request<{
+      success: boolean;
+      message: string;
+      token: string;
+      user: User;
+    }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+
+    if (res.token) {
+      this.setToken(res.token);
+    }
+    return res;
+  }
+
   // Schools (Super Admin & Institution management)
   static async getSchools() {
     return this.request<{ schools: School[] }>('/schools');
@@ -137,6 +160,17 @@ export class ApiService {
     return this.request<{ success: boolean; message: string }>(`/schools/${schoolId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  static async toggleSchoolServices(schoolId: string, servicesEnabled?: boolean) {
+    return this.request<{
+      success: boolean;
+      servicesEnabled: boolean;
+      message: string;
+    }>(`/schools/${schoolId}/toggle-services`, {
+      method: 'POST',
+      body: JSON.stringify({ servicesEnabled }),
     });
   }
 

@@ -55,6 +55,8 @@ schoolRoutes.get('/branding/:codeOrDomain', async (c) => {
       website: schema.schools.website,
       establishedYear: schema.schools.establishedYear,
       tagline: schema.schools.tagline,
+      board: schema.schools.board,
+      servicesEnabled: schema.schools.servicesEnabled,
     })
     .from(schema.schools)
     .where(eq(schema.schools.code, query))
@@ -64,7 +66,13 @@ schoolRoutes.get('/branding/:codeOrDomain', async (c) => {
     return c.json({ error: 'School not found with given code' }, 404);
   }
 
-  return c.json({ school });
+  return c.json({
+    school: {
+      ...school,
+      board: (school as any).board || 'CBSE',
+      servicesEnabled: (school as any).servicesEnabled !== 0,
+    },
+  });
 });
 
 // Super Admin: List all schools
@@ -95,6 +103,8 @@ schoolRoutes.get('/', async (c) => {
 
     return {
       ...s,
+      board: (s as any).board || 'CBSE',
+      servicesEnabled: (s as any).servicesEnabled !== 0,
       studentCount,
       teacherCount,
     };
@@ -133,6 +143,7 @@ schoolRoutes.post('/', async (c) => {
     website,
     establishedYear,
     tagline,
+    board,
   } = body;
 
   if (!name || !code) {
@@ -168,6 +179,8 @@ schoolRoutes.post('/', async (c) => {
     website: website || '',
     establishedYear: establishedYear || '',
     tagline: tagline || '',
+    board: board || 'CBSE',
+    servicesEnabled: 1,
     apiSyncKey,
     isActive: 1,
     createdAt: now,
@@ -235,6 +248,13 @@ schoolRoutes.post('/', async (c) => {
     message: 'School created successfully with Principal credentials & classes (NURSERY, LKG, UKG, 1 to 12)',
     schoolId,
     apiSyncKey,
+    school: {
+      id: schoolId,
+      name,
+      code: code.toUpperCase(),
+      board: board || 'CBSE',
+      servicesEnabled: 1,
+    },
     principalCredentials: {
       schoolCode: code.toUpperCase(),
       email: pEmail,
@@ -316,15 +336,64 @@ schoolRoutes.put('/:id', async (c) => {
         primaryColor: body.primaryColor || existing.primaryColor,
         secondaryColor: body.secondaryColor || existing.secondaryColor,
         logoUrl: body.logoUrl !== undefined ? normalizeLogoUrl(body.logoUrl) : existing.logoUrl,
+        board: body.board !== undefined ? body.board : (existing as any).board,
+        servicesEnabled: body.servicesEnabled !== undefined ? (body.servicesEnabled ? 1 : 0) : (existing as any).servicesEnabled,
         isActive: body.isActive !== undefined ? body.isActive : existing.isActive,
       })
       .where(eq(schema.schools.id, schoolId))
       .run();
 
+    try {
+      saveLocalBackup(getDatabaseInstance());
+    } catch {}
+
     return c.json({ success: true, message: 'School profile and details updated successfully by Super Admin' });
   }
 
   return c.json({ error: 'Forbidden' }, 403);
+});
+
+// Super Admin: Dedicated endpoint to toggle school services ON/OFF
+schoolRoutes.post('/:id/toggle-services', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const schoolId = c.req.param('id');
+  const existing = db.select().from(schema.schools).where(eq(schema.schools.id, schoolId)).get();
+  if (!existing) {
+    return c.json({ error: 'School not found' }, 404);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const currentStatus = (existing as any).servicesEnabled !== 0 ? 1 : 0;
+  const targetStatus = body.servicesEnabled !== undefined 
+    ? (body.servicesEnabled ? 1 : 0)
+    : (currentStatus === 1 ? 0 : 1);
+
+  db.update(schema.schools)
+    .set({ servicesEnabled: targetStatus })
+    .where(eq(schema.schools.id, schoolId))
+    .run();
+
+  try {
+    saveLocalBackup(getDatabaseInstance());
+  } catch {}
+
+  return c.json({
+    success: true,
+    servicesEnabled: targetStatus === 1,
+    school: {
+      ...existing,
+      servicesEnabled: targetStatus,
+    },
+    message: targetStatus === 1
+      ? `Services for '${existing.name}' have been activated.`
+      : `Services for '${existing.name}' have been suspended. School users can still log in, but all operational ERP services are locked.`,
+  });
 });
 
 // Super Admin: Delete / Remove a school

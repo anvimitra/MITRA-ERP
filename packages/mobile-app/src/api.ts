@@ -998,6 +998,42 @@ export async function publishExamResults(data: {
   return resData;
 }
 
+// 44. Super Admin: Toggle School Services ON/OFF
+export async function toggleSchoolServices(schoolId: string, servicesEnabled?: boolean) {
+  const res = await authFetch(`/schools/${schoolId}/toggle-services`, {
+    method: 'POST',
+    body: JSON.stringify({ servicesEnabled }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to toggle school services');
+  }
+  return data;
+}
+
+// 45. Update User Profile (Super Admin, Principal, Teacher, Parent)
+export async function updateUserProfile(profileData: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}) {
+  const res = await authFetch('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+  if (data.token) {
+    setMobileToken(data.token);
+  }
+  return data;
+}
+
+
 
 
 

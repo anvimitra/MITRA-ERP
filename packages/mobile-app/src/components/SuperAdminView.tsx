@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { School, User } from '../types';
-import { fetchSchools, createSchool, deleteSchool, checkServerHealth, fetchDbStatus, fetchBackupSnapshot, restoreBackupSnapshot } from '../api';
+import {
+  fetchSchools,
+  createSchool,
+  deleteSchool,
+  checkServerHealth,
+  fetchDbStatus,
+  fetchBackupSnapshot,
+  restoreBackupSnapshot,
+  toggleSchoolServices,
+  updateUserProfile,
+} from '../api';
 import {
   ShieldCheck,
   Building2,
@@ -21,15 +31,20 @@ import {
   HardDrive,
   Download,
   Database,
+  Power,
+  UserCheck,
+  Lock,
+  Edit3,
 } from 'lucide-react';
 
 interface Props {
   user: User;
+  onUpdateUser?: (updatedUser: User) => void;
   activeSubTab?: 'schools' | 'add_school' | 'system';
   onSubTabChange?: (tab: 'schools' | 'add_school' | 'system') => void;
 }
 
-export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTab, onSubTabChange }) => {
+export const SuperAdminView: React.FC<Props> = ({ user, onUpdateUser, activeSubTab: externalTab, onSubTabChange }) => {
   const [internalTab, setInternalTab] = useState<'schools' | 'add_school' | 'system'>('schools');
   const activeTab = externalTab || internalTab;
   const setActiveTab = (tab: 'schools' | 'add_school' | 'system') => {
@@ -50,6 +65,8 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
   const [schoolForm, setSchoolForm] = useState({
     name: '',
     code: '',
+    board: 'CBSE',
+    customBoard: '',
     affiliationNo: '',
     logoUrl: '',
     principalName: '',
@@ -74,6 +91,80 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
     schoolCount: number;
     persistentStorage: string;
   } | null>(null);
+
+  // Profile edit modal
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Services toggle state
+  const [togglingSchoolId, setTogglingSchoolId] = useState<string | null>(null);
+
+  const handleToggleServices = async (school: School) => {
+    const currentStatus = school.servicesEnabled !== false && school.servicesEnabled !== 0;
+    const newStatus = !currentStatus;
+    const actionText = newStatus ? 'ACTIVATE' : 'SUSPEND (OFF)';
+    if (
+      !confirm(
+        `Are you sure you want to ${actionText} services for "${school.name}"?\n\n` +
+          (newStatus
+            ? 'School staff and students will be able to perform regular operations again.'
+            : 'School users can still log in, but all operational tasks (creating, editing data) will be blocked.')
+      )
+    ) {
+      return;
+    }
+    setTogglingSchoolId(school.id);
+    try {
+      const res = await toggleSchoolServices(school.id, newStatus);
+      setSchools((prev) =>
+        prev.map((s) =>
+          s.id === school.id
+            ? { ...s, servicesEnabled: res.school?.servicesEnabled ?? (newStatus ? 1 : 0) }
+            : s
+        )
+      );
+    } catch (err: any) {
+      alert(err.message || `Failed to ${actionText.toLowerCase()} services.`);
+    } finally {
+      setTogglingSchoolId(null);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (profileForm.newPassword && profileForm.newPassword !== profileForm.confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const payload: any = {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+      };
+      if (profileForm.newPassword) {
+        payload.newPassword = profileForm.newPassword;
+      }
+      const res = await updateUserProfile(payload);
+      alert('✅ Profile updated successfully!');
+      if (onUpdateUser && res.user) {
+        onUpdateUser(res.user);
+      }
+      setShowProfileModal(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const loadSchoolsData = async () => {
     setLoading(true);
@@ -115,9 +206,14 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
     try {
       const pEmail = schoolForm.principalEmail || `principal@${schoolForm.code.toLowerCase()}.edu`;
       const pPass = schoolForm.principalPassword || 'School@123';
+      const boardToSave =
+        schoolForm.board === 'Other' && schoolForm.customBoard.trim()
+          ? schoolForm.customBoard.trim()
+          : schoolForm.board;
 
       const res = await createSchool({
         ...schoolForm,
+        board: boardToSave,
         principalEmail: pEmail,
         principalPassword: pPass,
       });
@@ -126,7 +222,10 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
       setSchoolForm({
         name: '',
         code: '',
+        board: 'CBSE',
+        customBoard: '',
         affiliationNo: '',
+        logoUrl: '',
         principalName: '',
         principalEmail: '',
         principalPassword: '',
@@ -182,6 +281,22 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
             </span>
             <h2 className="font-black text-lg mt-1">{user.name || 'Super Admin'}</h2>
             <p className="text-xs text-purple-200">Global Tenant & Cloud Management</p>
+            <button
+              onClick={() => {
+                setProfileForm({
+                  name: user.name || '',
+                  email: user.email || '',
+                  phone: user.phone || '',
+                  newPassword: '',
+                  confirmPassword: '',
+                });
+                setShowProfileModal(true);
+              }}
+              className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold border border-white/20 transition active:scale-95"
+            >
+              <UserCheck className="w-3 h-3 text-amber-400" />
+              <span>Edit My Profile & Security</span>
+            </button>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
             <ShieldCheck className="w-6 h-6 text-emerald-400" />
@@ -305,9 +420,12 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                         )}
                       </div>
                       <div>
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-black uppercase bg-purple-100 text-purple-800">
                             {sch.code}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                            {sch.board || 'CBSE'}
                           </span>
                           <strong className="text-slate-900 font-bold text-sm leading-tight">{sch.name}</strong>
                         </div>
@@ -343,6 +461,49 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                         <span>{sch.teacherCount || 0}</span>
                       </span>
                     </div>
+                  </div>
+
+                  {/* Services Status & Toggle Button */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase flex items-center space-x-1 ${
+                        sch.servicesEnabled !== false && sch.servicesEnabled !== 0
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          sch.servicesEnabled !== false && sch.servicesEnabled !== 0
+                            ? 'bg-emerald-500'
+                            : 'bg-rose-500'
+                        }`}
+                      />
+                      <span>
+                        {sch.servicesEnabled !== false && sch.servicesEnabled !== 0
+                          ? 'Services Active'
+                          : 'Services Suspended'}
+                      </span>
+                    </span>
+
+                    <button
+                      disabled={togglingSchoolId === sch.id}
+                      onClick={() => handleToggleServices(sch)}
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition flex items-center space-x-1 ${
+                        sch.servicesEnabled !== false && sch.servicesEnabled !== 0
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      <Power className="w-3 h-3" />
+                      <span>
+                        {togglingSchoolId === sch.id
+                          ? 'Updating...'
+                          : sch.servicesEnabled !== false && sch.servicesEnabled !== 0
+                          ? 'Turn OFF'
+                          : 'Turn ON'}
+                      </span>
+                    </button>
                   </div>
                 </div>
               ))
@@ -442,6 +603,35 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Educational Board</label>
+                <select
+                  value={schoolForm.board}
+                  onChange={(e) => setSchoolForm({ ...schoolForm, board: e.target.value })}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold text-slate-800 focus:bg-white"
+                >
+                  <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
+                  <option value="RBSE">RBSE (Rajasthan Board of Secondary Education)</option>
+                  <option value="ICSE">ICSE / ISC</option>
+                  <option value="State Board">State Board</option>
+                  <option value="Other">Other (Custom Board)</option>
+                </select>
+              </div>
+
+              {schoolForm.board === 'Other' && (
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Custom Board Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Cambridge / IB / UP Board"
+                    value={schoolForm.customBoard}
+                    onChange={(e) => setSchoolForm({ ...schoolForm, customBoard: e.target.value })}
+                    className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="font-bold text-slate-600 block mb-1">School Crest / Logo URL or Image</label>
@@ -595,6 +785,99 @@ export const SuperAdminView: React.FC<Props> = ({ user, activeSubTab: externalTa
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT SUPER ADMIN PROFILE & SECURITY */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-black text-base text-slate-900">Edit My Profile & Security</h3>
+                <p className="text-xs text-slate-500">Update Super Admin name, email, phone & password</p>
+              </div>
+              <button onClick={() => setShowProfileModal(false)} className="p-1.5 text-slate-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="font-bold text-slate-700 block mb-1">New Password (optional)</label>
+                <input
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={profileForm.newPassword}
+                  onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              {profileForm.newPassword && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Re-type new password"
+                    value={profileForm.confirmPassword}
+                    onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
+                    className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 py-2.5 border rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="flex-1 py-2.5 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white font-bold rounded-xl shadow transition"
+                >
+                  {savingProfile ? 'Saving...' : 'Save Profile'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

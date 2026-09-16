@@ -26,6 +26,7 @@ build/
 *.db-shm
 data/*.db
 data/*.sqlite
+packages/**/data/
 packages/**/data/*.db
 packages/**/data/*.sqlite
 packages/**/local-storage/

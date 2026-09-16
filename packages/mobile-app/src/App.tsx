@@ -27,7 +27,7 @@ import { LoginModal } from './components/LoginModal';
 import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { LogIn, Sparkles } from 'lucide-react';
+import { LogIn, Sparkles, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [school, setSchool] = useState<School | null>(() => {
@@ -362,13 +362,33 @@ export const App: React.FC = () => {
                 </button>
               </div>
             ) : (
-              user.role === 'super_admin' ? (
-                <SuperAdminView
-                  user={user}
-                  activeSubTab={(activeTab === 'add_school' || activeTab === 'system') ? activeTab : 'schools'}
-                  onSubTabChange={(t) => setActiveTab(t as TabType)}
-                />
-              ) : user.role === 'principal' || user.role === 'accountant' ? (
+              <>
+                {/* Services Suspended Notice for School users */}
+                {school && school.servicesEnabled === false && user.role !== 'super_admin' && (
+                  <div className="mb-3 bg-rose-50 border border-rose-300 rounded-2xl p-3.5 shadow-sm text-slate-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full">
+                        Services Suspended
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-rose-950">
+                      ERP Services are Temporarily Suspended
+                    </p>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                      Super Admin ne is school ki services temporarily disable kar di hain. Aap dashboard dekh sakte hain lekin koi naya record add ya edit nahi kar sakte. Services reactivate karane ke liye Super Admin se sampark karein.
+                    </p>
+                  </div>
+                )}
+
+                {user.role === 'super_admin' ? (
+                  <SuperAdminView
+                    user={user}
+                    onUpdateUser={setUser}
+                    activeSubTab={(activeTab === 'add_school' || activeTab === 'system') ? activeTab : 'schools'}
+                    onSubTabChange={(t) => setActiveTab(t as TabType)}
+                  />
+                ) : user.role === 'principal' || user.role === 'accountant' ? (
                 <PrincipalView
                   principal={user}
                   school={
@@ -468,8 +488,9 @@ export const App: React.FC = () => {
                     <FeesView student={student} />
                   )}
                 </>
-              )
-            )}
+              )}
+            </>
+          )}
           </ErrorBoundary>
         </main>
 

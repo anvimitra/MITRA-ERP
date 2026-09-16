@@ -9,7 +9,7 @@ import { ParentPortal } from './portals/ParentPortal';
 import { StudentPortal } from './portals/StudentPortal';
 import { MobileAppSimulator } from './components/MobileAppSimulator';
 import { ReportCardModal } from './components/ReportCardModal';
-import { Smartphone, School as SchoolIcon, ShieldCheck, LogIn, Key, Sparkles } from 'lucide-react';
+import { Smartphone, School as SchoolIcon, ShieldCheck, LogIn, Key, Sparkles, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -189,7 +189,33 @@ export const App: React.FC = () => {
 
       {/* Main Content Rendered strictly based on Authenticated Role */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
-        {user.role === 'super_admin' && <SuperAdminPortal />}
+        {/* Institutional Services Suspended Notice */}
+        {school && school.servicesEnabled === false && user.role !== 'super_admin' && (
+          <div className="mb-6 bg-gradient-to-r from-rose-500/15 via-amber-500/15 to-rose-500/15 border-2 border-rose-500/40 rounded-3xl p-5 sm:p-6 shadow-lg flex items-start gap-4 text-slate-800">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-700 flex items-center justify-center shrink-0 border border-rose-500/30 font-black">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
+                  Institutional Services Suspended
+                </span>
+                <span className="text-xs text-rose-700 font-bold">• Login Active (Restricted Mode)</span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-rose-950 mt-1">
+                Notice: School ERP Services are Temporarily Suspended
+              </h2>
+              <p className="text-xs text-slate-700 mt-1 leading-relaxed">
+                Super Admin dwara is school (<strong>{school.name}</strong>) ki sabhi operational services (New Admissions, Attendance Marking, Fees Collection, Exams & Marks Entry, Certificates, Reports) temporarily band kar di gayi hain.
+              </p>
+              <p className="text-xs text-rose-900 font-bold mt-1">
+                Aap logged in hain aur records dekh sakte hain, lekin koi new data entry ya operational transaction process nahi kar sakte. Services reactivate karwane ke liye kripya Super Admin se sampark karein.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {user.role === 'super_admin' && <SuperAdminPortal user={user} onUpdateUser={setUser} />}
         {user.role === 'principal' && <PrincipalPortal school={school} />}
         {user.role === 'teacher' && <TeacherPortal user={user} />}
         {user.role === 'parent' && <ParentPortal user={user} studentId={selectedStudentId} />}

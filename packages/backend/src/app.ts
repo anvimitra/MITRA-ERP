@@ -20,6 +20,8 @@ import { libraryRoutes } from './routes/library.js';
 import { transportRoutes } from './routes/transport.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { isPostgresConnected } from './db/postgres-sync.js';
+import { verifyToken } from './services/auth.js';
+import { db, schema, eq } from './db/index.js';
 
 export const app = new Hono();
 
@@ -32,6 +34,51 @@ app.use(
     allowHeaders: ['Content-Type', 'Authorization', 'x-school-code', 'x-master-key'],
   })
 );
+
+// School Services Status Guard Middleware
+// If a school's services have been suspended by Super Admin:
+// - Public routes, /health, /api/auth/*, and /api/schools/branding are allowed
+// - Super Admin requests are always allowed
+// - For any tenant user whose school has services_enabled === 0:
+//   Write requests (POST, PUT, DELETE, PATCH) are blocked with 403 Forbidden
+//   (Login is permitted, but no services can be used!)
+app.use('/api/*', async (c, next) => {
+  const path = c.req.path;
+  // Always allow auth routes, public branding, health, and OPTIONS preflight
+  if (
+    c.req.method === 'OPTIONS' ||
+    path.startsWith('/api/auth') ||
+    path.startsWith('/api/schools/branding') ||
+    path.startsWith('/api/app') ||
+    path === '/health'
+  ) {
+    return next();
+  }
+
+  const authHeader = c.req.header('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const user = verifyToken(authHeader.substring(7));
+    // Super Admin has full platform access
+    if (user && user.role === 'super_admin') {
+      return next();
+    }
+
+    if (user && user.schoolId) {
+      const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
+      if (school && (school as any).servicesEnabled === 0) {
+        // Block state modifying actions
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(c.req.method)) {
+          return c.json({
+            error: `ERP services for '${(school as any).name}' have been temporarily suspended by the Super Admin. Operations and data modifications are locked.`,
+            servicesDisabled: true,
+          }, 403);
+        }
+      }
+    }
+  }
+
+  return next();
+});
 
 // Health check endpoint
 app.get('/health', (c) => {

@@ -19,6 +19,8 @@ export interface School {
   website?: string;
   establishedYear?: string;
   tagline?: string;
+  board?: string;
+  servicesEnabled?: boolean | number;
   apiSyncKey?: string;
   studentCount?: number;
   teacherCount?: number;

@@ -71,6 +71,8 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       website TEXT,
       established_year TEXT,
       tagline TEXT,
+      board TEXT DEFAULT 'CBSE',
+      services_enabled INTEGER DEFAULT 1,
       api_sync_key TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL
@@ -511,6 +513,13 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       // Column already exists
     }
   }
+
+  try {
+    sqlite.exec(`ALTER TABLE schools ADD COLUMN board TEXT DEFAULT 'CBSE';`);
+  } catch {}
+  try {
+    sqlite.exec(`ALTER TABLE schools ADD COLUMN services_enabled INTEGER DEFAULT 1;`);
+  } catch {}
 
   // Auto-migrate student profile columns (medical, emergency, caste category, user_id)
   const studentProfileCols = [

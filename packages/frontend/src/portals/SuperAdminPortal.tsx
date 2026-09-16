@@ -1,15 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { School, SMSLogItem } from '../types';
+import { School, SMSLogItem, User } from '../types';
 import { ApiService } from '../api';
-import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check, HardDrive, Download, Upload, Database, AlertTriangle } from 'lucide-react';
+import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check, HardDrive, Download, Upload, Database, AlertTriangle, UserCheck, Power } from 'lucide-react';
 
-export const SuperAdminPortal: React.FC = () => {
+interface Props {
+  user?: User | null;
+  onUpdateUser?: (updatedUser: User) => void;
+}
+
+export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateUser }) => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [showPassModal, setShowPassModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [smsLogs, setSmsLogs] = useState<SMSLogItem[]>([]);
+
+  // Super Admin Profile State
+  const [profileName, setProfileName] = useState(initialUser?.name || 'Super Admin');
+  const [profileEmail, setProfileEmail] = useState(initialUser?.email || 'admin@anvimitra.com');
+  const [profilePhone, setProfilePhone] = useState(initialUser?.phone || '');
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState('');
+  const [profileNewPassword, setProfileNewPassword] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialUser) {
+      setProfileName(initialUser.name || 'Super Admin');
+      setProfileEmail(initialUser.email || 'admin@anvimitra.com');
+      setProfilePhone(initialUser.phone || '');
+    }
+  }, [initialUser]);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -19,6 +41,8 @@ export const SuperAdminPortal: React.FC = () => {
   // Add school form state
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [board, setBoard] = useState('CBSE');
+  const [customBoard, setCustomBoard] = useState('');
   const [domain, setDomain] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#1e40af');
   const [phone, setPhone] = useState('');
@@ -126,6 +150,7 @@ export const SuperAdminPortal: React.FC = () => {
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const selectedBoard = board === 'Other' ? (customBoard.trim() || 'Other') : board;
       const res = await ApiService.createSchool({
         name,
         code,
@@ -144,12 +169,15 @@ export const SuperAdminPortal: React.FC = () => {
         website,
         establishedYear,
         tagline,
+        board: selectedBoard,
         logoUrl,
       });
 
       setShowAddModal(false);
       setName('');
       setCode('');
+      setBoard('CBSE');
+      setCustomBoard('');
       setDomain('');
       setPhone('');
       setEmail('');
@@ -175,6 +203,48 @@ export const SuperAdminPortal: React.FC = () => {
       }
     } catch (err: any) {
       alert('Error creating school: ' + err.message);
+    }
+  };
+
+  const handleToggleServices = async (schoolId: string, schoolName: string, currentlyActive: boolean) => {
+    const actionText = currentlyActive ? 'SUSPEND / TURN OFF' : 'ACTIVATE / TURN ON';
+    const message = currentlyActive
+      ? `⚠️ Are you sure you want to TURN OFF services for "${schoolName}"?\n\n- School users (Principal, Teachers, Parents, Students) will STILL be able to log in.\n- However, ALL operational ERP services (attendance, fees, exams, certificates, timetable, etc.) will be locked until re-enabled.`
+      : `Activate ERP services for "${schoolName}"? School users will regain full operational access to all ERP modules.`;
+
+    if (!confirm(message)) return;
+
+    try {
+      const res = await ApiService.toggleSchoolServices(schoolId, !currentlyActive);
+      alert(res.message || `Services updated for ${schoolName}`);
+      loadData();
+    } catch (err: any) {
+      alert('Error updating services: ' + err.message);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    try {
+      const res = await ApiService.updateProfile({
+        name: profileName,
+        email: profileEmail,
+        phone: profilePhone,
+        currentPassword: profileCurrentPassword || undefined,
+        newPassword: profileNewPassword || undefined,
+      });
+      alert('✅ Super Admin Profile updated successfully!');
+      if (onUpdateUser && res.user) {
+        onUpdateUser(res.user);
+      }
+      setShowProfileModal(false);
+      setProfileCurrentPassword('');
+      setProfileNewPassword('');
+    } catch (err: any) {
+      alert('Error updating profile: ' + err.message);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -258,11 +328,11 @@ export const SuperAdminPortal: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowPassModal(true)}
+            onClick={() => setShowProfileModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-bold text-xs border border-purple-700/60 shadow transition"
           >
-            <Lock size={15} />
-            <span>Change My Password</span>
+            <UserCheck size={16} />
+            <span>Edit My Profile & Security</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -462,9 +532,24 @@ export const SuperAdminPortal: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  ACTIVE
-                </span>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {s.board || 'CBSE'}
+                    </span>
+                    {s.servicesEnabled !== false ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        SERVICES ACTIVE
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        SERVICES OFF
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Institutional Profile Details */}
@@ -514,6 +599,18 @@ export const SuperAdminPortal: React.FC = () => {
                   >
                     <Edit size={12} />
                     <span>Edit School</span>
+                  </button>
+                  <button
+                    onClick={() => handleToggleServices(s.id, s.name, s.servicesEnabled !== false)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm border ${
+                      s.servicesEnabled !== false
+                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                    }`}
+                    title={s.servicesEnabled !== false ? 'Turn services OFF (Users can still login but cannot use services)' : 'Turn services ON'}
+                  >
+                    <Power size={12} />
+                    <span>{s.servicesEnabled !== false ? 'Turn Services OFF' : 'Turn Services ON'}</span>
                   </button>
                   <button
                     onClick={() => handleDeleteSchool(s.id, s.name)}
@@ -629,7 +726,44 @@ export const SuperAdminPortal: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Educational Board *</label>
+                    <select
+                      value={board}
+                      onChange={(e) => setBoard(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    >
+                      <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
+                      <option value="RBSE">RBSE (Rajasthan Board of Secondary Education)</option>
+                      <option value="ICSE">ICSE / CISCE</option>
+                      <option value="State Board">State Board</option>
+                      <option value="Other">Other Board (Custom)</option>
+                    </select>
+                    {board === 'Other' && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter Board Name (e.g. Cambridge, IB, UP Board)"
+                        value={customBoard}
+                        onChange={(e) => setCustomBoard(e.target.value)}
+                        className="mt-2 w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board Registration No</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CBSE/AFF/2026/019 or RBSE/JAIPUR/88"
+                      value={affiliationNo}
+                      onChange={(e) => setAffiliationNo(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">School Code (Unique) *</label>
                     <input
@@ -639,16 +773,6 @@ export const SuperAdminPortal: React.FC = () => {
                       value={code}
                       onChange={(e) => setCode(e.target.value.toUpperCase())}
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board No</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. CBSE/AFF/2026/019"
-                      value={affiliationNo}
-                      onChange={(e) => setAffiliationNo(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -1035,6 +1159,49 @@ export const SuperAdminPortal: React.FC = () => {
                   />
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Educational Board *</label>
+                    <select
+                      value={
+                        ['CBSE', 'RBSE', 'ICSE', 'State Board'].includes(editingSchool.board || 'CBSE')
+                          ? (editingSchool.board || 'CBSE')
+                          : 'Other'
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditingSchool({ ...editingSchool, board: val });
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    >
+                      <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
+                      <option value="RBSE">RBSE (Rajasthan Board of Secondary Education)</option>
+                      <option value="ICSE">ICSE / CISCE</option>
+                      <option value="State Board">State Board</option>
+                      <option value="Other">Other Board (Custom)</option>
+                    </select>
+                    {(!['CBSE', 'RBSE', 'ICSE', 'State Board'].includes(editingSchool.board || 'CBSE') || editingSchool.board === 'Other') && (
+                      <input
+                        type="text"
+                        placeholder="Enter Board Name (e.g. Cambridge, IB, UP Board)"
+                        value={editingSchool.board === 'Other' ? '' : (editingSchool.board || '')}
+                        onChange={(e) => setEditingSchool({ ...editingSchool, board: e.target.value || 'Other' })}
+                        className="mt-2 w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board No</label>
+                    <input
+                      type="text"
+                      value={editingSchool.affiliationNo || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, affiliationNo: e.target.value })}
+                      placeholder="e.g. CBSE/AFF/2026/019 or RBSE/JAIPUR/88"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">School Code *</label>
@@ -1047,16 +1214,6 @@ export const SuperAdminPortal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Affiliation / Board No</label>
-                    <input
-                      type="text"
-                      value={editingSchool.affiliationNo || ''}
-                      onChange={(e) => setEditingSchool({ ...editingSchool, affiliationNo: e.target.value })}
-                      placeholder="e.g. CBSE/AFF/2026/019"
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
-                    />
-                  </div>
-                  <div>
                     <label className="block font-bold text-slate-700 mb-1">Established Year</label>
                     <input
                       type="text"
@@ -1065,6 +1222,17 @@ export const SuperAdminPortal: React.FC = () => {
                       placeholder="e.g. 2005"
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2"
                     />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">ERP Services Status</label>
+                    <select
+                      value={editingSchool.servicesEnabled !== false ? '1' : '0'}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, servicesEnabled: e.target.value === '1' })}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    >
+                      <option value="1">🟢 Services Active (ON)</option>
+                      <option value="0">🔴 Services Suspended (OFF)</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1354,6 +1522,110 @@ export const SuperAdminPortal: React.FC = () => {
                   className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow transition"
                 >
                   {passLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT SUPER ADMIN PROFILE & SECURITY ================= */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Super Admin Profile & Security</h3>
+                  <p className="text-xs text-slate-500">Update your platform master details</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowProfileModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Super Admin Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Master Official Email (Login ID) *</label>
+                <input
+                  type="email"
+                  required
+                  value={profileEmail}
+                  onChange={(e) => setProfileEmail(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Master Contact Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Security: Change Password (Optional) */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                  Change Password (Optional)
+                </span>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    placeholder="Required only if setting new password"
+                    value={profileCurrentPassword}
+                    onChange={(e) => setProfileCurrentPassword(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter new password (min 6 characters)"
+                    value={profileNewPassword}
+                    onChange={(e) => setProfileNewPassword(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileLoading}
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-1.5"
+                >
+                  {profileLoading ? 'Saving...' : 'Save Profile Changes'}
                 </button>
               </div>
             </form>
