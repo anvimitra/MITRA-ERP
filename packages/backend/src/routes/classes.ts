@@ -274,6 +274,63 @@ classRoutes.put('/class/:id', async (c) => {
   return c.json({ success: true, message: 'Class updated successfully' });
 });
 
+// Delete Class (Principal or SuperAdmin)
+classRoutes.delete('/class/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can delete classes' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const existing = db
+    .select()
+    .from(schema.classes)
+    .where(and(eq(schema.classes.schoolId, user.schoolId), eq(schema.classes.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Class not found' }, 404);
+
+  // Check if students exist in this class
+  const studentsInClass = db
+    .select()
+    .from(schema.students)
+    .where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.classId, id)))
+    .all();
+
+  if (studentsInClass.length > 0) {
+    return c.json({
+      error: `Cannot delete class "${existing.name}": ${studentsInClass.length} student(s) are currently enrolled. Please reassign or remove students first.`,
+    }, 400);
+  }
+
+  // Delete associated sections, subject allocations, class teachers
+  db.delete(schema.sections).where(and(eq(schema.sections.schoolId, user.schoolId), eq(schema.sections.classId, id))).run();
+  db.delete(schema.classTeachers).where(and(eq(schema.classTeachers.schoolId, user.schoolId), eq(schema.classTeachers.classId, id))).run();
+  db.delete(schema.subjectAllocations).where(and(eq(schema.subjectAllocations.schoolId, user.schoolId), eq(schema.subjectAllocations.classId, id))).run();
+  db.delete(schema.classes).where(and(eq(schema.classes.schoolId, user.schoolId), eq(schema.classes.id, id))).run();
+
+  return c.json({ success: true, message: `Class "${existing.name}" deleted successfully` });
+});
+
+// Delete Subject Allocation (Principal or SuperAdmin)
+classRoutes.delete('/subject-allocation/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can remove subject allocations' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.subjectAllocations)
+    .where(and(eq(schema.subjectAllocations.schoolId, user.schoolId), eq(schema.subjectAllocations.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Subject allocation removed successfully' });
+});
+
 
 // Create a new Section (Principal or SuperAdmin)
 classRoutes.post('/section', async (c) => {

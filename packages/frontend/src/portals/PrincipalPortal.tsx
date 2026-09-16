@@ -327,6 +327,11 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   // Exam state
   const [newExamName, setNewExamName] = useState('');
   const [newExamType, setNewExamType] = useState('sa2');
+  const [showEditExamModal, setShowEditExamModal] = useState(false);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
+  const [editExamName, setEditExamName] = useState('');
+  const [editExamType, setEditExamType] = useState('sa2');
+  const [editExamYear, setEditExamYear] = useState('2026-2027');
   const [selectedReportCard, setSelectedReportCard] = useState<any | null>(null);
   const [principalReportTemplate, setPrincipalReportTemplate] = useState<'cbse' | 'modern' | 'minimal' | 'junior'>('cbse');
 
@@ -884,6 +889,65 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       loadData();
     } catch (err: any) {
       alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string, className: string) => {
+    if (!confirm(`Are you sure you want to delete class "${className}"? This will also remove its sections and subject allocations.`)) return;
+    try {
+      const res = await ApiService.deleteClass(classId);
+      alert(res.message || '✅ Class deleted successfully.');
+      loadData();
+    } catch (err: any) {
+      alert('Error deleting class: ' + err.message);
+    }
+  };
+
+  const handleDeleteSubjectAllocation = async (allocId: string) => {
+    if (!confirm('Are you sure you want to remove this teacher subject allocation?')) return;
+    try {
+      await ApiService.deleteSubjectAllocation(allocId);
+      alert('✅ Subject allocation removed.');
+      loadData();
+    } catch (err: any) {
+      alert('Error removing allocation: ' + err.message);
+    }
+  };
+
+  const handleOpenEditExam = (exam: any) => {
+    setEditingExamId(exam.id);
+    setEditExamName(exam.name);
+    setEditExamType(exam.examType || 'sa2');
+    setEditExamYear(exam.academicYear || '2026-2027');
+    setShowEditExamModal(true);
+  };
+
+  const handleSaveEditExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExamId || !editExamName) return;
+    try {
+      await ApiService.updateExam(editingExamId, {
+        name: editExamName,
+        examType: editExamType as any,
+        academicYear: editExamYear,
+      });
+      alert(`✅ Exam "${editExamName}" updated successfully!`);
+      setShowEditExamModal(false);
+      setEditingExamId(null);
+      loadData();
+    } catch (err: any) {
+      alert('Error updating exam: ' + err.message);
+    }
+  };
+
+  const handleDeleteExam = async (examId: string, examName: string) => {
+    if (!confirm(`⚠️ Are you sure you want to delete exam "${examName}"? All marks recorded for this exam will also be removed.`)) return;
+    try {
+      await ApiService.deleteExam(examId);
+      alert(`✅ Exam "${examName}" deleted successfully.`);
+      loadData();
+    } catch (err: any) {
+      alert('Error deleting exam: ' + err.message);
     }
   };
 
@@ -1882,11 +1946,29 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     <div key={c.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
                       <div>
                         <span className="font-bold text-slate-900">{c.name}</span>
-                        <span className="text-[11px] text-slate-400 block">Grade Level: {c.gradeLevel || 'Standard'}</span>
+                        <span className="text-[11px] text-slate-400 block">Grade Level: {c.gradeLevel ?? 'Standard'}</span>
                       </div>
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold text-[10px]">
-                        Section A, B Active
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold text-[10px]">
+                          Section A, B Active
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditClass(c)}
+                          className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                          title="Edit Class"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClass(c.id, c.name)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                          title="Delete Class"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1928,8 +2010,16 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                             </span>
                             <button
                               type="button"
+                              onClick={() => handleOpenEditSubject(sub)}
+                              className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                              title="Edit Subject"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleDeleteSubject(sub.id, sub.name)}
-                              className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50"
+                              className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition"
                               title="Delete Subject"
                             >
                               <Trash2 size={13} />
@@ -1987,6 +2077,153 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   Authorize Class Teacher
                 </button>
               </form>
+            </div>
+
+            {/* Subject Teacher RBAC Allocation Form */}
+            <div className="p-5 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-indigo-950">📚 Assign Subjects to Teachers for Class & Section</h3>
+                <p className="text-xs text-indigo-800/80">Designate which teacher teaches which subject in a class (authorizes marks entry for teachers).</p>
+              </div>
+
+              <form onSubmit={handleAssignSubjectTeacher} className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Select Class</label>
+                  <select
+                    value={subClassId}
+                    onChange={(e) => {
+                      setSubClassId(e.target.value);
+                      const classSecs = (classesData?.sections || []).filter((s: any) => s.classId === e.target.value);
+                      if (classSecs.length > 0) setSubSectionId(classSecs[0].id);
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                  >
+                    {classesData?.classes?.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Select Section</label>
+                  <select
+                    value={subSectionId}
+                    onChange={(e) => setSubSectionId(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                  >
+                    {(classesData?.sections || [])
+                      .filter((s: any) => !subClassId || s.classId === subClassId)
+                      .map((s: any) => (
+                        <option key={s.id} value={s.id}>Section {s.name}</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Select Subject</label>
+                  <select
+                    value={subSubjectId}
+                    onChange={(e) => setSubSubjectId(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                  >
+                    {(classesData?.subjects || [])
+                      .filter((s: any) => !s.classId || s.classId === subClassId)
+                      .map((sub: any) => (
+                        <option key={sub.id} value={sub.id}>{sub.name} ({sub.code || 'CORE'})</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Select Teacher</label>
+                  <select
+                    value={subTeacherId}
+                    onChange={(e) => setSubTeacherId(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
+                  >
+                    {classesData?.teachers?.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"
+                  >
+                    Assign Subject
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* List of Allocated Subjects & Teachers */}
+            <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                  <Users size={14} className="text-indigo-600" />
+                  <span>Teacher Subject Allocations List ({classesData?.subjectAllocations?.length || 0})</span>
+                </h3>
+              </div>
+              {(!classesData?.subjectAllocations || classesData.subjectAllocations.length === 0) ? (
+                <div className="p-6 text-center text-xs text-slate-400 font-medium bg-white rounded-xl border border-dashed border-slate-300">
+                  No teacher subject allocations configured yet. Use the form above to assign subjects to teachers.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
+                      <tr>
+                        <th className="px-4 py-3">Class & Section</th>
+                        <th className="px-4 py-3">Subject</th>
+                        <th className="px-4 py-3">Assigned Teacher</th>
+                        <th className="px-4 py-3">Session</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {classesData.subjectAllocations.map((alloc: any) => {
+                        const cls = classesData?.classes?.find((c: any) => c.id === alloc.classId);
+                        const sec = classesData?.sections?.find((s: any) => s.id === alloc.sectionId);
+                        const sub = classesData?.subjects?.find((s: any) => s.id === alloc.subjectId);
+                        const teacher = classesData?.teachers?.find((t: any) => t.id === alloc.teacherId);
+                        return (
+                          <tr key={alloc.id} className="hover:bg-slate-50/80">
+                            <td className="px-4 py-3 font-bold text-slate-900">
+                              {cls?.name || 'Class'} {sec ? `• Section ${sec.name}` : ''}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-slate-700">
+                              <span className="font-bold text-indigo-700">{sub?.name || 'Subject'}</span>
+                              {sub?.code && <span className="text-[10px] text-slate-400 font-mono ml-1.5">({sub.code})</span>}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-800 flex items-center gap-1.5">
+                              <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">
+                                {teacher?.name?.charAt(0) || 'T'}
+                              </span>
+                              <span>{teacher?.name || 'Teacher'}</span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                              {alloc.academicYear || '2026-2027'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSubjectAllocation(alloc.id)}
+                                className="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition inline-flex items-center gap-1 font-bold text-[11px]"
+                                title="Remove Subject Allocation"
+                              >
+                                <Trash2 size={13} />
+                                <span>Remove</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2243,14 +2480,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   <Award size={14} />
                   <span>Publish Class Results</span>
                 </button>
-                <form onSubmit={handleCreateExam} className="flex items-center gap-2 text-xs">
+                <form onSubmit={handleCreateExam} className="flex flex-wrap items-center gap-2 text-xs">
                   <input
                     type="text"
+                    required
                     placeholder="e.g. Unit Test 2 / SA-2"
                     value={newExamName}
                     onChange={(e) => setNewExamName(e.target.value)}
                     className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                   />
+                  <select
+                    value={newExamType}
+                    onChange={(e) => setNewExamType(e.target.value)}
+                    className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-800"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="unit">Unit Test</option>
+                    <option value="half_yearly">Half Yearly</option>
+                    <option value="sa1">SA-1</option>
+                    <option value="sa2">SA-2</option>
+                    <option value="sa3">SA-3</option>
+                    <option value="yearly">Annual</option>
+                  </select>
                   <button
                     type="submit"
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"
@@ -2263,10 +2514,32 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {exams.map((ex) => (
-                <div key={ex.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <div className="text-[10px] font-mono text-indigo-600 font-bold uppercase">{ex.examType}</div>
-                  <div className="font-extrabold text-slate-900 text-sm mt-0.5">{ex.name}</div>
-                  <div className="text-[11px] text-slate-500 mt-1 font-medium">Session: 2026-2027</div>
+                <div key={ex.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-indigo-600 font-bold uppercase">{ex.examType}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditExam(ex)}
+                          className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                          title="Edit Exam Name / Type"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExam(ex.id, ex.name)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                          title="Delete Exam"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="font-extrabold text-slate-900 text-sm mt-1">{ex.name}</div>
+                    <div className="text-[11px] text-slate-500 mt-1 font-medium">Session: {ex.academicYear || '2026-2027'}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -5461,6 +5734,84 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 Close & Continue
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT EXAM ================= */}
+      {showEditExamModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                <Edit2 size={16} className="text-indigo-600" />
+                <span>Edit Exam Details</span>
+              </h3>
+              <button
+                onClick={() => setShowEditExamModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditExam} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Exam Title / Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editExamName}
+                  onChange={(e) => setEditExamName(e.target.value)}
+                  placeholder="e.g. Summative Assessment 2 (SA-2)"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-900 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Exam Cycle Type</label>
+                <select
+                  value={editExamType}
+                  onChange={(e) => setEditExamType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-900 focus:bg-white"
+                >
+                  <option value="weekly">Weekly Assessment</option>
+                  <option value="unit">Unit Test</option>
+                  <option value="half_yearly">Half Yearly Exam</option>
+                  <option value="sa1">Summative Assessment 1 (SA-1)</option>
+                  <option value="sa2">Summative Assessment 2 (SA-2)</option>
+                  <option value="sa3">Summative Assessment 3 (SA-3)</option>
+                  <option value="yearly">Annual / Board Examination</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Academic Session</label>
+                <input
+                  type="text"
+                  value={editExamYear}
+                  onChange={(e) => setEditExamYear(e.target.value)}
+                  placeholder="2026-2027"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-900 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditExamModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

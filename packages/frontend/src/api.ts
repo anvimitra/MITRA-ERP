@@ -297,6 +297,19 @@ export class ApiService {
     });
   }
 
+  static async updateExam(id: string, examData: Partial<Exam>) {
+    return this.request<{ success: boolean; message: string }>(`/exams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(examData),
+    });
+  }
+
+  static async deleteExam(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/exams/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   static async recordMarks(examId: string, classId: string, sectionId: string, subjectId: string, marksList: any[]) {
     return this.request<any>('/exams/marks', {
       method: 'POST',
@@ -494,6 +507,18 @@ export class ApiService {
     return this.request<{ success: boolean; message: string }>(`/classes/subject/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteClass(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/classes/class/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async deleteSubjectAllocation(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/classes/subject-allocation/${id}`, {
+      method: 'DELETE',
     });
   }
 

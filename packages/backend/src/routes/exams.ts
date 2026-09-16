@@ -54,6 +54,77 @@ examRoutes.post('/', async (c) => {
   return c.json({ success: true, message: 'Exam created successfully', examId: id });
 });
 
+// Update an exam (Principal or Admin)
+examRoutes.put('/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can edit exams' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { name, examType, academicYear, startDate, endDate } = body;
+
+  const existing = db
+    .select()
+    .from(schema.exams)
+    .where(and(eq(schema.exams.schoolId, user.schoolId), eq(schema.exams.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Exam not found' }, 404);
+
+  db.update(schema.exams)
+    .set({
+      name: name !== undefined ? name : existing.name,
+      examType: examType !== undefined ? examType : existing.examType,
+      academicYear: academicYear !== undefined ? academicYear : existing.academicYear,
+      startDate: startDate !== undefined ? startDate : existing.startDate,
+      endDate: endDate !== undefined ? endDate : existing.endDate,
+    })
+    .where(and(eq(schema.exams.schoolId, user.schoolId), eq(schema.exams.id, id)))
+    .run();
+
+  return c.json({ success: true, message: 'Exam updated successfully' });
+});
+
+// Delete an exam (Principal or Admin)
+examRoutes.delete('/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can delete exams' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const existing = db
+    .select()
+    .from(schema.exams)
+    .where(and(eq(schema.exams.schoolId, user.schoolId), eq(schema.exams.id, id)))
+    .get();
+
+  if (!existing) return c.json({ error: 'Exam not found' }, 404);
+
+  // Delete associated marks
+  db.delete(schema.marks)
+    .where(and(eq(schema.marks.schoolId, user.schoolId), eq(schema.marks.examId, id)))
+    .run();
+
+  // Delete associated admit cards
+  db.delete(schema.admitCards)
+    .where(and(eq(schema.admitCards.schoolId, user.schoolId), eq(schema.admitCards.examId, id)))
+    .run();
+
+  // Delete the exam
+  db.delete(schema.exams)
+    .where(and(eq(schema.exams.schoolId, user.schoolId), eq(schema.exams.id, id)))
+    .run();
+
+  return c.json({ success: true, message: `Exam "${existing.name}" removed successfully` });
+});
+
 // Mark entry for a subject & class
 // STRICT RULE: Only the designated Subject Teacher (or Principal/SuperAdmin) can record marks for that subject!
 examRoutes.post('/marks', async (c) => {
