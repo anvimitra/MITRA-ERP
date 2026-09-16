@@ -561,6 +561,29 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
               {showPgInstructions ? 'Hide Render Cloud DB Guide' : 'Add Render Free PostgreSQL'}
             </button>
           </div>
+
+          {/* Daily 10:00 PM Auto-Backup Status Banner */}
+          <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-emerald-400 font-bold">⏰ Daily Auto-Backup Active:</span>
+              <span className="text-slate-300">Har roz raat 10:00 PM (22:00) Google Drive par automatic backup hoga</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {driveStatus?.autoBackup?.lastRunAt ? (
+                <span className="text-xs text-slate-300 bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                  Last Synced: <strong>{new Date(driveStatus.autoBackup.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong> ({driveStatus.autoBackup.lastRunDate})
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+                  Next Scheduled: Tonight at 10:00 PM
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Collapsible Render PostgreSQL Guide */}

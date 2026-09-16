@@ -12,6 +12,10 @@ import {
   listGoogleDriveBackups,
   downloadGoogleDriveBackup,
 } from '../services/google-drive.js';
+import {
+  getAutoBackupStatus,
+  executeAutoBackup,
+} from '../services/backup-scheduler.js';
 
 function normalizeLogoUrl(url?: string | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
@@ -752,8 +756,22 @@ schoolRoutes.get('/google-drive-status', async (c) => {
     folderId,
     folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
     backups,
+    autoBackup: getAutoBackupStatus(),
     error: errorMsg,
   });
+});
+
+// Trigger Google Drive Auto-Backup manually or on-demand (Super Admin only)
+schoolRoutes.post('/google-drive-auto-backup/trigger', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const result = await executeAutoBackup('Super Admin Manual Trigger');
+  return c.json(result);
 });
 
 // Trigger Google Drive Cloud Sync (Super Admin only)

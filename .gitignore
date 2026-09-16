@@ -15,6 +15,7 @@ build/
 .env.*.local
 *service-account*.json
 service-account.json
+*backup-scheduler-state*.json
 
 # Cloudflare Wrangler cache
 .wrangler/

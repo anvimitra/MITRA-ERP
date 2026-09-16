@@ -1040,6 +1040,17 @@ export class ApiService {
       folderId: string;
       folderUrl: string;
       backups: any[];
+      autoBackup?: {
+        enabled: boolean;
+        scheduleDescription: string;
+        targetHour: number;
+        targetMinute: number;
+        lastRunDate: string | null;
+        lastRunAt: string | null;
+        lastRunStatus: string;
+        lastRunMessage: string | null;
+        nextRunAt: string;
+      };
       error: string | null;
     }>('/schools/google-drive-status');
   }
@@ -1050,6 +1061,16 @@ export class ApiService {
       message: string;
       result: any;
     }>('/schools/google-drive-sync', {
+      method: 'POST',
+    });
+  }
+
+  static async triggerGoogleDriveAutoBackup() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      result?: any;
+    }>('/schools/google-drive-auto-backup/trigger', {
       method: 'POST',
     });
   }
