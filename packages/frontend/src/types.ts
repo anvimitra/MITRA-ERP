@@ -24,6 +24,8 @@ export interface School {
   apiSyncKey?: string;
   studentCount?: number;
   teacherCount?: number;
+  principalEmail?: string;
+  principalPassword?: string;
 }
 
 export interface User {

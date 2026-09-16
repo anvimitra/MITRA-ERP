@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db, schema, eq } from '../db/index.js';
+import { db, schema, eq, and } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken, hashPassword } from '../services/auth.js';
 import { isPostgresConnected, getPostgresPool } from '../db/postgres-sync.js';
@@ -343,6 +343,38 @@ schoolRoutes.put('/:id', async (c) => {
       .where(eq(schema.schools.id, schoolId))
       .run();
 
+    // If Super Admin provided a new principal password or updated principal email
+    if (body.principalPassword && body.principalPassword.trim()) {
+      const principal = db
+        .select()
+        .from(schema.users)
+        .where(and(eq(schema.users.schoolId, schoolId), eq(schema.users.role, 'principal')))
+        .get();
+
+      if (principal) {
+        const updateP: any = { passwordHash: hashPassword(body.principalPassword.trim()) };
+        if (body.principalEmail) updateP.email = body.principalEmail.trim().toLowerCase();
+        if (body.principalName) updateP.name = body.principalName.trim();
+        db.update(schema.users).set(updateP).where(eq(schema.users.id, principal.id)).run();
+      } else {
+        const principalUserId = `user-principal-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+        const pEmail = (body.principalEmail && body.principalEmail.trim()) || `principal@${(body.code || existing.code).toLowerCase()}.anvimitra.com`;
+        const pName = (body.principalName && body.principalName.trim()) || `${body.name || existing.name} Principal`;
+        db.insert(schema.users).values({
+          id: principalUserId,
+          schoolId,
+          role: 'principal',
+          name: pName,
+          email: pEmail.toLowerCase(),
+          phone: body.phone || existing.phone || '',
+          passwordHash: hashPassword(body.principalPassword.trim()),
+          appInstalled: 0,
+          isActive: 1,
+          createdAt: new Date().toISOString(),
+        }).run();
+      }
+    }
+
     try {
       saveLocalBackup(getDatabaseInstance());
     } catch {}
@@ -351,6 +383,145 @@ schoolRoutes.put('/:id', async (c) => {
   }
 
   return c.json({ error: 'Forbidden' }, 403);
+});
+
+// Super Admin: View Principal credentials for any school tenant
+schoolRoutes.get('/:id/principal-credentials', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const schoolId = c.req.param('id');
+  const existingSchool = db.select().from(schema.schools).where(eq(schema.schools.id, schoolId)).get();
+  if (!existingSchool) {
+    return c.json({ error: 'School not found' }, 404);
+  }
+
+  const principal = db
+    .select({
+      id: schema.users.id,
+      name: schema.users.name,
+      email: schema.users.email,
+      phone: schema.users.phone,
+      role: schema.users.role,
+      isActive: schema.users.isActive,
+      createdAt: schema.users.createdAt,
+    })
+    .from(schema.users)
+    .where(and(eq(schema.users.schoolId, schoolId), eq(schema.users.role, 'principal')))
+    .get();
+
+  return c.json({
+    schoolId: existingSchool.id,
+    schoolName: existingSchool.name,
+    schoolCode: existingSchool.code,
+    principal: principal || null,
+  });
+});
+
+// Super Admin: Reset or create Principal password & credentials for any school tenant
+schoolRoutes.post('/:id/reset-principal-password', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const schoolId = c.req.param('id');
+  const existingSchool = db.select().from(schema.schools).where(eq(schema.schools.id, schoolId)).get();
+  if (!existingSchool) {
+    return c.json({ error: 'School not found' }, 404);
+  }
+
+  const body = await c.req.json();
+  const { newPassword, email, name, phone } = body;
+
+  if (!newPassword || String(newPassword).trim().length < 4) {
+    return c.json({ error: 'New password must be at least 4 characters' }, 400);
+  }
+
+  const cleanPassword = String(newPassword).trim();
+
+  let principal = db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.schoolId, schoolId), eq(schema.users.role, 'principal')))
+    .get();
+
+  if (principal) {
+    const updateData: any = {
+      passwordHash: hashPassword(cleanPassword),
+    };
+    if (email && String(email).trim()) updateData.email = String(email).trim().toLowerCase();
+    if (name && String(name).trim()) updateData.name = String(name).trim();
+    if (phone !== undefined) updateData.phone = String(phone).trim();
+
+    db.update(schema.users)
+      .set(updateData)
+      .where(eq(schema.users.id, principal.id))
+      .run();
+
+    if (name && String(name).trim()) {
+      db.update(schema.schools)
+        .set({ principalName: String(name).trim() })
+        .where(eq(schema.schools.id, schoolId))
+        .run();
+    }
+  } else {
+    // Principal user account doesn't exist yet, create one now!
+    const principalUserId = `user-principal-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const pEmail = (email && String(email).trim()) || `principal@${existingSchool.code.toLowerCase()}.anvimitra.com`;
+    const pName = (name && String(name).trim()) || existingSchool.principalName || `${existingSchool.name} Principal`;
+
+    db.insert(schema.users).values({
+      id: principalUserId,
+      schoolId,
+      role: 'principal',
+      name: pName,
+      email: pEmail.toLowerCase(),
+      phone: phone || existingSchool.phone || '',
+      passwordHash: hashPassword(cleanPassword),
+      appInstalled: 0,
+      isActive: 1,
+      createdAt: new Date().toISOString(),
+    }).run();
+
+    if (name && String(name).trim()) {
+      db.update(schema.schools)
+        .set({ principalName: String(name).trim() })
+        .where(eq(schema.schools.id, schoolId))
+        .run();
+    }
+  }
+
+  // Fetch updated principal
+  const updatedPrincipal = db
+    .select({
+      id: schema.users.id,
+      name: schema.users.name,
+      email: schema.users.email,
+      phone: schema.users.phone,
+      role: schema.users.role,
+      isActive: schema.users.isActive,
+    })
+    .from(schema.users)
+    .where(and(eq(schema.users.schoolId, schoolId), eq(schema.users.role, 'principal')))
+    .get();
+
+  try {
+    saveLocalBackup(getDatabaseInstance());
+  } catch {}
+
+  return c.json({
+    success: true,
+    message: `Principal credentials updated successfully for ${existingSchool.name} (${existingSchool.code})`,
+    principal: updatedPrincipal,
+    schoolCode: existingSchool.code,
+  });
 });
 
 // Super Admin: Dedicated endpoint to toggle school services ON/OFF

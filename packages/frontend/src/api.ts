@@ -180,6 +180,37 @@ export class ApiService {
     });
   }
 
+  static async getSchoolPrincipalCredentials(schoolId: string) {
+    return this.request<{
+      schoolId: string;
+      schoolName: string;
+      schoolCode: string;
+      principal: {
+        id: string;
+        name: string;
+        email: string;
+        phone: string;
+        role: string;
+        isActive: number;
+      } | null;
+    }>(`/schools/${schoolId}/principal-credentials`);
+  }
+
+  static async resetSchoolPrincipalPassword(
+    schoolId: string,
+    data: { newPassword: string; email?: string; name?: string; phone?: string }
+  ) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      principal: any;
+      schoolCode?: string;
+    }>(`/schools/${schoolId}/reset-principal-password`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   static async getBranding(code: string) {
     return this.request<{ school: School }>(`/schools/branding/${code}`);
   }

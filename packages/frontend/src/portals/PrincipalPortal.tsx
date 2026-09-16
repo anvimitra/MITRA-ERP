@@ -44,6 +44,7 @@ import {
   Bookmark,
   Copy,
   HeartHandshake,
+  Key,
   Upload,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
@@ -1698,16 +1699,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
               </div>
               <span className="text-xs text-slate-400 font-bold self-end sm:self-center">
                 Showing {
-                  parentsList.filter((p) => {
-                    const q = parentSearch.toLowerCase();
+                  (Array.isArray(parentsList) ? parentsList : []).filter((p) => {
+                    const q = (parentSearch || '').toLowerCase().trim();
                     if (!q) return true;
-                    const matchesParent = (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q);
-                    const matchesChild = p.children?.some((c: any) =>
-                      (c.name || '').toLowerCase().includes(q) || (c.admissionNo || '').toLowerCase().includes(q)
+                    const pName = String(p?.name || '').toLowerCase();
+                    const pPhone = String(p?.phone || '').toLowerCase();
+                    const matchesParent = pName.includes(q) || pPhone.includes(q);
+                    const matchesChild = Array.isArray(p?.children) && p.children.some((c: any) =>
+                      String(c?.name || '').toLowerCase().includes(q) || String(c?.admissionNo || '').toLowerCase().includes(q)
                     );
                     return matchesParent || matchesChild;
                   }).length
-                } of {parentsList.length} Parents
+                } of {Array.isArray(parentsList) ? parentsList.length : 0} Parents
               </span>
             </div>
 
@@ -1725,7 +1728,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {parentsList.length === 0 ? (
+                  {(!Array.isArray(parentsList) || parentsList.length === 0) ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
                         No parents found. Parents are automatically registered when admitting students.
@@ -1734,11 +1737,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   ) : (
                     parentsList
                       .filter((p) => {
-                        const q = parentSearch.toLowerCase();
+                        const q = (parentSearch || '').toLowerCase().trim();
                         if (!q) return true;
-                        const matchesParent = (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q);
-                        const matchesChild = p.children?.some((c: any) =>
-                          (c.name || '').toLowerCase().includes(q) || (c.admissionNo || '').toLowerCase().includes(q)
+                        const pName = String(p?.name || '').toLowerCase();
+                        const pPhone = String(p?.phone || '').toLowerCase();
+                        const matchesParent = pName.includes(q) || pPhone.includes(q);
+                        const matchesChild = Array.isArray(p?.children) && p.children.some((c: any) =>
+                          String(c?.name || '').toLowerCase().includes(q) || String(c?.admissionNo || '').toLowerCase().includes(q)
                         );
                         return matchesParent || matchesChild;
                       })

@@ -69,6 +69,15 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [copiedCreds, setCopiedCreds] = useState(false);
 
+  // School credentials management for existing/other schools
+  const [managingCredsSchool, setManagingCredsSchool] = useState<School | null>(null);
+  const [schoolPrincipalData, setSchoolPrincipalData] = useState<any | null>(null);
+  const [schoolCredsLoading, setSchoolCredsLoading] = useState(false);
+  const [resetPrincipalPass, setResetPrincipalPass] = useState('');
+  const [resetPrincipalEmail, setResetPrincipalEmail] = useState('');
+  const [resetPrincipalName, setResetPrincipalName] = useState('');
+  const [copiedSchoolCreds, setCopiedSchoolCreds] = useState(false);
+
   // Master PC Storage & DB Persistence State
   const [dbStatus, setDbStatus] = useState<{
     database: string;
@@ -271,6 +280,56 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
       loadData();
     } catch (err: any) {
       alert('Error updating school: ' + err.message);
+    }
+  };
+
+  const handleOpenCredentialsModal = async (school: School) => {
+    setManagingCredsSchool(school);
+    setSchoolCredsLoading(true);
+    setResetPrincipalPass('');
+    setResetPrincipalEmail('');
+    setResetPrincipalName(school.principalName || '');
+    try {
+      const res = await ApiService.getSchoolPrincipalCredentials(school.id);
+      setSchoolPrincipalData(res.principal);
+      if (res.principal?.email) {
+        setResetPrincipalEmail(res.principal.email);
+      } else {
+        setResetPrincipalEmail(`principal@${school.code.toLowerCase()}.anvimitra.com`);
+      }
+      if (res.principal?.name) {
+        setResetPrincipalName(res.principal.name);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSchoolPrincipalData(null);
+      setResetPrincipalEmail(`principal@${school.code.toLowerCase()}.anvimitra.com`);
+    } finally {
+      setSchoolCredsLoading(false);
+    }
+  };
+
+  const handleSavePrincipalCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!managingCredsSchool) return;
+    if (!resetPrincipalPass || resetPrincipalPass.trim().length < 4) {
+      alert('Please enter a password with at least 4 characters');
+      return;
+    }
+    try {
+      setSchoolCredsLoading(true);
+      const res = await ApiService.resetSchoolPrincipalPassword(managingCredsSchool.id, {
+        newPassword: resetPrincipalPass.trim(),
+        email: resetPrincipalEmail.trim(),
+        name: resetPrincipalName.trim(),
+      });
+      alert(`✅ Principal Credentials updated successfully for ${managingCredsSchool.name}!`);
+      setSchoolPrincipalData(res.principal);
+      loadData();
+    } catch (err: any) {
+      alert('Error updating credentials: ' + err.message);
+    } finally {
+      setSchoolCredsLoading(false);
     }
   };
 
@@ -591,14 +650,22 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
               </div>
 
               {/* Management Controls for Super Admin */}
-              <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="mt-3 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center flex-wrap gap-2">
                   <button
                     onClick={() => setEditingSchool({ ...s })}
                     className="px-2.5 py-1 bg-white border border-slate-300 hover:border-purple-400 rounded-lg text-xs font-bold text-slate-700 hover:text-purple-700 transition flex items-center gap-1 shadow-sm"
                   >
                     <Edit size={12} />
                     <span>Edit School</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenCredentialsModal(s)}
+                    className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 hover:text-purple-900 transition flex items-center gap-1 shadow-sm"
+                    title="View, Copy or Reset Principal Login Credentials for this school"
+                  >
+                    <Key size={12} className="text-purple-600" />
+                    <span>🔑 Credentials</span>
                   </button>
                   <button
                     onClick={() => handleToggleServices(s.id, s.name, s.servicesEnabled !== false)}
@@ -771,9 +838,21 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
                       required
                       placeholder="e.g. DPA01"
                       value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        const newCode = e.target.value.toUpperCase();
+                        setCode(newCode);
+                        if (!principalEmail || (principalEmail.includes('@') && (principalEmail.endsWith('.anvimitra.com') || principalEmail.endsWith('.school.edu')))) {
+                          setPrincipalEmail(newCode ? `principal@${newCode.toLowerCase()}.anvimitra.com` : '');
+                        }
+                        if (!principalPassword || principalPassword.endsWith('@123')) {
+                          setPrincipalPassword(newCode ? `${newCode}@123` : 'School@123');
+                        }
+                      }}
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 uppercase font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     />
+                    <span className="text-[10px] text-purple-700 font-semibold block mt-1">
+                      🔑 Auto-generates Principal Login: {principalEmail || (code ? `principal@${code.toLowerCase()}.anvimitra.com` : 'principal@code.anvimitra.com')}
+                    </span>
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Established Year</label>
@@ -995,18 +1074,23 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
               </div>
 
               {/* Section 4: Principal Login Credentials */}
-              <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200 space-y-3">
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-5 rounded-2xl border-2 border-purple-300 space-y-3 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black text-purple-900 uppercase tracking-wider block">
-                    4. Principal Access Credentials (Admin Sign-In) *
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow">
+                      <Key size={14} />
+                    </div>
+                    <span className="text-xs font-black text-purple-950 uppercase tracking-wider block">
+                      4. Principal Access Credentials (Admin Sign-In) *
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
-                      const randPass = 'Princ@' + Math.floor(1000 + Math.random() * 9000);
+                      const randPass = (code ? code : 'School') + '@' + Math.floor(1000 + Math.random() * 9000);
                       setPrincipalPassword(randPass);
                     }}
-                    className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded-lg transition"
+                    className="text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded-xl transition flex items-center gap-1 shadow-sm"
                   >
                     ⚡ Generate Password
                   </button>
@@ -1018,10 +1102,10 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
                     <input
                       type="email"
                       required
-                      placeholder={code ? `principal@${code.toLowerCase()}.school.edu` : 'principal@school.edu'}
+                      placeholder={code ? `principal@${code.toLowerCase()}.anvimitra.com` : 'principal@school.anvimitra.com'}
                       value={principalEmail}
                       onChange={(e) => setPrincipalEmail(e.target.value)}
-                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none shadow-sm"
                     />
                   </div>
                   <div>
@@ -1029,15 +1113,15 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Princ@2026 or Secret#123"
+                      placeholder={code ? `${code}@123` : 'School@123'}
                       value={principalPassword}
                       onChange={(e) => setPrincipalPassword(e.target.value)}
-                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none shadow-sm"
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-purple-700">
-                  Super Admin explicitly creates this login. Principal uses School Code + this Email & Password to access their ERP.
+                <p className="text-[11px] text-purple-800 font-medium">
+                  💡 Super Admin sets this initial sign-in. Principal uses School Code <strong>({code || '...' })</strong> + this Email & Password to access their ERP portal & mobile app.
                 </p>
               </div>
 
@@ -1440,6 +1524,54 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
                 </div>
               </div>
 
+              {/* Section 4: Principal Login Credentials & Password Reset */}
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-2xl border-2 border-purple-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Key size={14} className="text-purple-600" />
+                    <span className="text-[11px] font-black text-purple-900 uppercase tracking-wider block">
+                      4. Principal Access Credentials & Password Reset
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randPass = (editingSchool.code || 'School') + '@' + Math.floor(1000 + Math.random() * 9000);
+                      setEditingSchool({ ...editingSchool, principalPassword: randPass });
+                    }}
+                    className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded-lg transition"
+                  >
+                    ⚡ Generate Password
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal Official Email (Login ID)</label>
+                    <input
+                      type="email"
+                      placeholder={`principal@${(editingSchool.code || 'school').toLowerCase()}.anvimitra.com`}
+                      value={editingSchool.principalEmail || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, principalEmail: e.target.value })}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="Leave blank to keep unchanged"
+                      value={editingSchool.principalPassword || ''}
+                      onChange={(e) => setEditingSchool({ ...editingSchool, principalPassword: e.target.value })}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-purple-700">
+                  Enter a new password here to reset this Principal's sign-in access. Leave blank to keep existing password.
+                </p>
+              </div>
+
               <div className="pt-3 flex gap-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -1456,6 +1588,147 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: MANAGE SCHOOL CREDENTIALS (SUPER ADMIN) ================= */}
+      {managingCredsSchool && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-purple-200 space-y-5 animate-slide-up relative">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center font-black shadow-lg shadow-purple-500/30">
+                  <Key size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">School Principal Credentials</h3>
+                  <p className="text-xs text-purple-700 font-bold">
+                    {managingCredsSchool.name} ({managingCredsSchool.code})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setManagingCredsSchool(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {schoolCredsLoading && !schoolPrincipalData ? (
+              <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">
+                Loading Principal account details...
+              </div>
+            ) : (
+              <form onSubmit={handleSavePrincipalCredentials} className="space-y-4 text-xs">
+                {/* Current Info Overview */}
+                <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 space-y-2 font-mono">
+                  <div className="flex justify-between items-center pb-1.5 border-b border-slate-200 text-[11px]">
+                    <span className="text-slate-500 font-sans font-bold">School Tenant Code:</span>
+                    <span className="font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded text-xs">
+                      {managingCredsSchool.code}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-1.5 border-b border-slate-200 text-[11px]">
+                    <span className="text-slate-500 font-sans font-bold">Principal Account:</span>
+                    <span className="font-bold text-slate-800 font-sans">
+                      {schoolPrincipalData?.name || managingCredsSchool.principalName || 'Principal'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-500 font-sans font-bold">Current Login Email:</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {schoolPrincipalData?.email || resetPrincipalEmail || 'Not assigned'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Form to Update / Reset */}
+                <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200 space-y-3">
+                  <span className="text-[11px] font-black text-purple-900 uppercase tracking-wider block">
+                    Update / Reset Principal Sign-In Access
+                  </span>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal Name</label>
+                    <input
+                      type="text"
+                      value={resetPrincipalName}
+                      onChange={(e) => setResetPrincipalName(e.target.value)}
+                      placeholder="e.g. Dr. Anand Sharma"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Principal Login Email (User ID) *</label>
+                    <input
+                      type="email"
+                      required
+                      value={resetPrincipalEmail}
+                      onChange={(e) => setResetPrincipalEmail(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700">Set New Password *</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randPass = managingCredsSchool.code + '@' + Math.floor(1000 + Math.random() * 9000);
+                          setResetPrincipalPass(randPass);
+                        }}
+                        className="text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded-lg transition"
+                      >
+                        ⚡ Generate Password
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter new password (min 4 characters)"
+                      value={resetPrincipalPass}
+                      onChange={(e) => setResetPrincipalPass(e.target.value)}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <p className="text-[10px] text-purple-700">
+                    Entering a new password immediately updates this Principal's sign-in credentials in the database.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={schoolCredsLoading}
+                    className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 transition text-xs"
+                  >
+                    <Check size={14} />
+                    <span>{schoolCredsLoading ? 'Updating Credentials...' : 'Save & Update Principal Credentials'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emailToCopy = resetPrincipalEmail || schoolPrincipalData?.email || `principal@${managingCredsSchool.code.toLowerCase()}.anvimitra.com`;
+                      const passToCopy = resetPrincipalPass || 'Existing password on record';
+                      const credsText = `=== ANVIMITRA ERP - PRINCIPAL LOGIN CREDENTIALS ===\nSchool Name: ${managingCredsSchool.name}\nSchool Code: ${managingCredsSchool.code}\nPrincipal Login Email: ${emailToCopy}\nPassword: ${passToCopy}\nPortal URL: ${window.location.origin}`;
+                      navigator.clipboard.writeText(credsText);
+                      setCopiedSchoolCreds(true);
+                      setTimeout(() => setCopiedSchoolCreds(false), 2500);
+                    }}
+                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-1.5 transition text-xs border border-slate-300"
+                  >
+                    {copiedSchoolCreds ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span>{copiedSchoolCreds ? 'Copied to Clipboard!' : 'Copy Principal Login Details'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
