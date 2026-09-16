@@ -13,6 +13,8 @@ build/
 .env
 .env.local
 .env.*.local
+*service-account*.json
+service-account.json
 
 # Cloudflare Wrangler cache
 .wrangler/

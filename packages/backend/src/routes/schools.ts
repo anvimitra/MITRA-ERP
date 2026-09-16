@@ -5,6 +5,13 @@ import { verifyToken, hashPassword } from '../services/auth.js';
 import { isPostgresConnected, getPostgresPool } from '../db/postgres-sync.js';
 import { restoreLocalBackup, saveLocalBackup } from '../db/persistent-backup.js';
 import { getDatabaseInstance } from '../db/init.js';
+import {
+  isGoogleDriveConfigured,
+  getDriveFolderId,
+  uploadBackupToGoogleDrive,
+  listGoogleDriveBackups,
+  downloadGoogleDriveBackup,
+} from '../services/google-drive.js';
 
 function normalizeLogoUrl(url?: string | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
@@ -718,5 +725,189 @@ schoolRoutes.post('/restore-snapshot', async (c) => {
     message: `Restored ${restoredCount} schools successfully from backup snapshot`,
     totalSchools: restoredCount,
   });
+});
+
+// =========================================================================
+// GOOGLE DRIVE CLOUD DATABASE BACKUP & RESTORE
+// =========================================================================
+
+// Check Google Drive configuration status & list recent Drive backups
+schoolRoutes.get('/google-drive-status', async (c) => {
+  const isConfigured = isGoogleDriveConfigured();
+  const folderId = getDriveFolderId();
+
+  let backups: any[] = [];
+  let errorMsg: string | null = null;
+
+  if (isConfigured) {
+    try {
+      backups = await listGoogleDriveBackups();
+    } catch (err: any) {
+      errorMsg = err.message;
+    }
+  }
+
+  return c.json({
+    configured: isConfigured,
+    folderId,
+    folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+    backups,
+    error: errorMsg,
+  });
+});
+
+// Trigger Google Drive Cloud Sync (Super Admin only)
+schoolRoutes.post('/google-drive-sync', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  try {
+    const schools = db.select().from(schema.schools).all();
+    const users = db.select().from(schema.users).all();
+    const classes = db.select().from(schema.classes).all();
+    const sections = db.select().from(schema.sections).all();
+    const students = db.select().from(schema.students).all();
+    const parents = db.select().from(schema.parents).all();
+    const subjects = db.select().from(schema.subjects).all();
+    const marks = db.select().from(schema.marks).all();
+    const attendance = db.select().from(schema.attendance).all();
+    const feeStructures = db.select().from(schema.feeStructures).all();
+    const feePayments = db.select().from(schema.feePayments).all();
+
+    const snapshot = {
+      version: '1.0.0',
+      exportDate: new Date().toISOString(),
+      source: 'ANVIMITRA-ERP Google Drive Cloud Sync Hub',
+      totalSchools: schools.length,
+      dataset: {
+        schools,
+        users,
+        classes,
+        sections,
+        students,
+        parents,
+        subjects,
+        marks,
+        attendance,
+        feeStructures,
+        feePayments,
+      },
+    };
+
+    const fileName = `anvimitra_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    const result = await uploadBackupToGoogleDrive(snapshot, fileName);
+
+    return c.json({
+      success: true,
+      message: `✅ ERP database (${schools.length} schools, ${students.length} students) successfully synced to Google Drive!`,
+      result,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Google Drive sync failed' }, 500);
+  }
+});
+
+// Restore ERP Database from Google Drive (Super Admin only)
+schoolRoutes.post('/google-drive-restore', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Super Admin only' }, 403);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  let targetFileId = body.fileId;
+
+  try {
+    if (!targetFileId) {
+      const backups = await listGoogleDriveBackups();
+      if (!backups || backups.length === 0) {
+        return c.json({ error: 'No backups found in Google Drive folder' }, 404);
+      }
+      targetFileId = backups[0].id;
+    }
+
+    const downloaded = await downloadGoogleDriveBackup(targetFileId);
+    const dataset = downloaded.dataset || downloaded;
+
+    if (!dataset || !Array.isArray(dataset.schools)) {
+      return c.json({ error: 'Downloaded file does not contain valid ERP backup dataset' }, 400);
+    }
+
+    let restoredSchools = 0;
+    for (const s of dataset.schools) {
+      try {
+        db.insert(schema.schools).values(s).run();
+        restoredSchools++;
+      } catch {}
+    }
+
+    if (Array.isArray(dataset.users)) {
+      for (const u of dataset.users) {
+        try {
+          db.insert(schema.users).values(u).run();
+        } catch {}
+      }
+    }
+
+    if (Array.isArray(dataset.classes)) {
+      for (const cl of dataset.classes) {
+        try {
+          db.insert(schema.classes).values(cl).run();
+        } catch {}
+      }
+    }
+
+    if (Array.isArray(dataset.sections)) {
+      for (const sec of dataset.sections) {
+        try {
+          db.insert(schema.sections).values(sec).run();
+        } catch {}
+      }
+    }
+
+    if (Array.isArray(dataset.students)) {
+      for (const st of dataset.students) {
+        try {
+          db.insert(schema.students).values(st).run();
+        } catch {}
+      }
+    }
+
+    if (Array.isArray(dataset.feeStructures)) {
+      for (const fs of dataset.feeStructures) {
+        try {
+          db.insert(schema.feeStructures).values(fs).onConflictDoNothing().run();
+        } catch {}
+      }
+    }
+
+    if (Array.isArray(dataset.feePayments)) {
+      for (const fp of dataset.feePayments) {
+        try {
+          db.insert(schema.feePayments).values(fp).onConflictDoNothing().run();
+        } catch {}
+      }
+    }
+
+    try {
+      const sqlite = getDatabaseInstance();
+      saveLocalBackup(sqlite);
+    } catch {}
+
+    return c.json({
+      success: true,
+      message: `✅ Successfully restored ${restoredSchools} schools and full database records from Google Drive!`,
+      restoredSchools,
+      backupDate: downloaded.exportDate,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Google Drive restore failed' }, 500);
+  }
 });
 

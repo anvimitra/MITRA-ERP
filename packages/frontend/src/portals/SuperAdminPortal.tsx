@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { School, SMSLogItem, User } from '../types';
 import { ApiService } from '../api';
-import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check, HardDrive, Download, Upload, Database, AlertTriangle, UserCheck, Power } from 'lucide-react';
+import { School as SchoolIcon, Plus, Cloud, Server, MessageSquare, ShieldCheck, CheckCircle2, Key, RefreshCw, Trash2, Edit, Lock, X, Copy, Check, HardDrive, Download, Upload, Database, AlertTriangle, UserCheck, Power, ExternalLink } from 'lucide-react';
 
 interface Props {
   user?: User | null;
@@ -89,6 +89,9 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
   } | null>(null);
   const [showPgInstructions, setShowPgInstructions] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveRestoring, setDriveRestoring] = useState(false);
+  const [driveStatus, setDriveStatus] = useState<any>(null);
   const restoreFileRef = useRef<HTMLInputElement | null>(null);
 
   const loadData = async () => {
@@ -100,6 +103,8 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
       setSmsLogs(smsRes.smsLogs || []);
       const statusRes = await ApiService.getDbStatus().catch(() => null);
       setDbStatus(statusRes);
+      const gDrive = await ApiService.getGoogleDriveStatus().catch(() => null);
+      setDriveStatus(gDrive);
     } catch (err) {
       console.error(err);
     } finally {
@@ -149,6 +154,35 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
     } finally {
       setBackupLoading(false);
       e.target.value = '';
+    }
+  };
+
+  const handleGoogleDriveSync = async () => {
+    try {
+      setDriveSyncing(true);
+      const res = await ApiService.syncGoogleDrive();
+      alert(res.message || '✅ ERP Database synced to Google Drive successfully!');
+      await loadData();
+    } catch (err: any) {
+      alert('Google Drive Sync: ' + err.message);
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+
+  const handleGoogleDriveRestore = async () => {
+    if (!confirm('⚠️ Are you sure you want to restore the entire database from your latest Google Drive backup? Existing records will be updated.')) {
+      return;
+    }
+    try {
+      setDriveRestoring(true);
+      const res = await ApiService.restoreGoogleDrive();
+      alert(res.message || '✅ ERP Database successfully restored from Google Drive!');
+      await loadData();
+    } catch (err: any) {
+      alert('Google Drive Restore: ' + err.message);
+    } finally {
+      setDriveRestoring(false);
     }
   };
 
@@ -479,12 +513,30 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
               className="hidden"
             />
             <button
+              onClick={handleGoogleDriveSync}
+              disabled={driveSyncing}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
+              title="Sync complete ERP database snapshot directly to your Google Drive folder"
+            >
+              <Cloud size={14} />
+              <span>{driveSyncing ? 'Syncing to Drive...' : '☁️ Sync to Google Drive'}</span>
+            </button>
+            <button
+              onClick={handleGoogleDriveRestore}
+              disabled={driveRestoring}
+              className="px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-200 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow"
+              title="Restore entire ERP database from latest Google Drive backup"
+            >
+              <Download size={14} />
+              <span>{driveRestoring ? 'Restoring...' : '📥 Restore from Drive'}</span>
+            </button>
+            <button
               onClick={handleDownloadBackup}
               disabled={backupLoading}
               className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow"
             >
               <Download size={14} />
-              <span>{backupLoading ? 'Exporting...' : 'Download Master Backup (JSON)'}</span>
+              <span>{backupLoading ? 'Exporting...' : 'Export JSON (Local)'}</span>
             </button>
             <button
               onClick={() => restoreFileRef.current?.click()}
@@ -492,14 +544,15 @@ export const SuperAdminPortal: React.FC<Props> = ({ user: initialUser, onUpdateU
               className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
             >
               <Upload size={14} />
-              <span>Restore from PC / JSON</span>
+              <span>Restore JSON (Local)</span>
             </button>
             <button
-              onClick={() => window.open('http://localhost:5432', '_blank')}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 flex items-center gap-1.5"
+              onClick={() => window.open(driveStatus?.folderUrl || 'https://drive.google.com/drive/folders/1_227b7nzwSRmhIfWRQP_DhlGwGFFeNvJ', '_blank')}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-semibold transition border border-slate-700 flex items-center gap-1.5"
+              title="Open the Google Drive backup folder"
             >
-              <Server size={14} />
-              <span>Open Local Connector (Port 5432)</span>
+              <ExternalLink size={13} />
+              <span>Open Drive Folder</span>
             </button>
             <button
               onClick={() => setShowPgInstructions(!showPgInstructions)}

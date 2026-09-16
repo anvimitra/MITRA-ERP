@@ -1032,6 +1032,39 @@ export class ApiService {
       body: JSON.stringify({ dataset }),
     });
   }
+
+  // ==================== GOOGLE DRIVE CLOUD STORAGE & BACKUP ====================
+  static async getGoogleDriveStatus() {
+    return this.request<{
+      configured: boolean;
+      folderId: string;
+      folderUrl: string;
+      backups: any[];
+      error: string | null;
+    }>('/schools/google-drive-status');
+  }
+
+  static async syncGoogleDrive() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      result: any;
+    }>('/schools/google-drive-sync', {
+      method: 'POST',
+    });
+  }
+
+  static async restoreGoogleDrive(fileId?: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      restoredSchools: number;
+      backupDate?: string;
+    }>('/schools/google-drive-restore', {
+      method: 'POST',
+      body: JSON.stringify({ fileId }),
+    });
+  }
 }
 
 
