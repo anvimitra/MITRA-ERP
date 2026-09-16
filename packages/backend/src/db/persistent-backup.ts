@@ -94,9 +94,15 @@ export function restoreLocalBackup(sqlite: DatabaseSync): boolean {
     for (const item of TABLE_MAP) {
       const rows = data[item.propName] || data[item.tableName];
       if (Array.isArray(rows) && rows.length > 0) {
+        let validCols: Set<string> = new Set();
+        try {
+          const colInfo = sqlite.prepare(`PRAGMA table_info(${item.tableName})`).all() as any[];
+          validCols = new Set(colInfo.map((c) => c.name));
+        } catch {}
+
         for (const row of rows) {
           try {
-            const keys = Object.keys(row);
+            const keys = Object.keys(row).filter((k) => validCols.has(k));
             if (keys.length === 0) continue;
             const placeholders = keys.map(() => '?').join(', ');
             const values = keys.map((k) => row[k]);
