@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
-import { isDesignatedClassTeacher } from '../services/rbac.js';
+import { isDesignatedClassTeacher, isStudentAccessibleByUser } from '../services/rbac.js';
 import { dispatchStudentNotification } from '../services/notification-sms.js';
 
 export const attendanceRoutes = new Hono();
@@ -192,6 +192,9 @@ attendanceRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student attendance record' }, 403);
+  }
 
   const history = db
     .select()

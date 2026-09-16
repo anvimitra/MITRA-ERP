@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and, desc } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
+import { isStudentAccessibleByUser, resolveLinkedStudentsForParent } from '../services/rbac.js';
 
 export const transportRoutes = new Hono();
 
@@ -347,11 +348,21 @@ transportRoutes.get('/student-allocations', async (c) => {
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
-  const allocations = db
+  let allocations = db
     .select()
     .from(schema.studentTransport)
     .where(eq(schema.studentTransport.schoolId, user.schoolId))
     .all();
+
+  // Strict parent/student isolation
+  if (user.role === 'parent') {
+    const linked = resolveLinkedStudentsForParent(user);
+    const allowedIds = new Set(linked.map((s: any) => s.id));
+    allocations = allocations.filter((a: any) => allowedIds.has(a.studentId));
+  } else if (user.role === 'student') {
+    const student = db.select().from(schema.students).where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.userId, user.userId || (user as any).id))).get();
+    allocations = allocations.filter((a: any) => student && a.studentId === student.id);
+  }
 
   const students = db
     .select({
@@ -482,6 +493,9 @@ transportRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student transport details' }, 403);
+  }
 
   const allocation = db
     .select()

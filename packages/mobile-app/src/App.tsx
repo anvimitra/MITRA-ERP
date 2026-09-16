@@ -152,21 +152,36 @@ export const App: React.FC = () => {
           setActiveTab('home');
         }
 
-        if (res.linkedStudents && res.linkedStudents.length > 0) {
-          setAllLinkedStudents(res.linkedStudents);
-          localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(res.linkedStudents));
-          const currentCachedStu = student || res.linkedStudents[0];
-          const matchedCurrent = res.linkedStudents.find((s: any) => s.id === currentCachedStu?.id) || res.linkedStudents[0];
-          setStudent(matchedCurrent);
-          refreshUserData(res.user, matchedCurrent);
-        } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher') {
+        if (res.user.role === 'parent') {
+          if (res.linkedStudents && res.linkedStudents.length > 0) {
+            setAllLinkedStudents(res.linkedStudents);
+            localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(res.linkedStudents));
+            const currentCachedStu = student || res.linkedStudents[0];
+            const matchedCurrent = res.linkedStudents.find((s: any) => s.id === currentCachedStu?.id) || res.linkedStudents[0];
+            setStudent(matchedCurrent);
+            refreshUserData(res.user, matchedCurrent);
+          } else {
+            setAllLinkedStudents([]);
+            setStudent(null);
+            localStorage.removeItem('anvimitra_cached_linked_students');
+            refreshUserData(res.user);
+          }
+        } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher' || res.user.role === 'super_admin') {
+          setAllLinkedStudents([]);
+          setStudent(null);
           refreshUserData(res.user);
         } else {
-          const liveStus = await fetchLiveStudents();
-          if (liveStus && liveStus.length > 0) {
-            setAllLinkedStudents(liveStus);
-            setStudent(liveStus[0]);
-            refreshUserData(res.user, liveStus[0]);
+          if (res.linkedStudents && res.linkedStudents.length > 0) {
+            setAllLinkedStudents(res.linkedStudents);
+            setStudent(res.linkedStudents[0]);
+            refreshUserData(res.user, res.linkedStudents[0]);
+          } else {
+            const liveStus = await fetchLiveStudents();
+            if (liveStus && liveStus.length > 0) {
+              setAllLinkedStudents(liveStus);
+              setStudent(liveStus[0]);
+              refreshUserData(res.user, liveStus[0]);
+            }
           }
         }
       } else {
@@ -224,22 +239,38 @@ export const App: React.FC = () => {
     localStorage.setItem('anvimitra_cached_user', JSON.stringify(newUser));
     localStorage.setItem('anvimitra_cached_school', JSON.stringify(newSchool));
 
-    if (linkedStudents && linkedStudents.length > 0) {
-      setAllLinkedStudents(linkedStudents);
-      localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(linkedStudents));
-      setStudent(linkedStudents[0]);
-      refreshUserData(newUser, linkedStudents[0]);
-    } else {
-      const liveStudents = await fetchLiveStudents();
-      if (liveStudents && liveStudents.length > 0) {
-        setAllLinkedStudents(liveStudents);
-        localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(liveStudents));
-        setStudent(liveStudents[0]);
-        refreshUserData(newUser, liveStudents[0]);
+    if (newUser.role === 'parent') {
+      if (linkedStudents && linkedStudents.length > 0) {
+        setAllLinkedStudents(linkedStudents);
+        localStorage.setItem('anvimitra_cached_linked_students', JSON.stringify(linkedStudents));
+        setStudent(linkedStudents[0]);
+        refreshUserData(newUser, linkedStudents[0]);
       } else {
         setAllLinkedStudents([]);
         setStudent(null);
+        localStorage.removeItem('anvimitra_cached_linked_students');
         refreshUserData(newUser);
+      }
+    } else if (newUser.role === 'principal' || newUser.role === 'accountant' || newUser.role === 'teacher' || newUser.role === 'super_admin') {
+      setAllLinkedStudents([]);
+      setStudent(null);
+      refreshUserData(newUser);
+    } else {
+      if (linkedStudents && linkedStudents.length > 0) {
+        setAllLinkedStudents(linkedStudents);
+        setStudent(linkedStudents[0]);
+        refreshUserData(newUser, linkedStudents[0]);
+      } else {
+        const liveStudents = await fetchLiveStudents();
+        if (liveStudents && liveStudents.length > 0) {
+          setAllLinkedStudents(liveStudents);
+          setStudent(liveStudents[0]);
+          refreshUserData(newUser, liveStudents[0]);
+        } else {
+          setAllLinkedStudents([]);
+          setStudent(null);
+          refreshUserData(newUser);
+        }
       }
     }
 
@@ -259,11 +290,13 @@ export const App: React.FC = () => {
     localStorage.removeItem('anvimitra_cached_user');
     localStorage.removeItem('anvimitra_cached_school');
     localStorage.removeItem('anvimitra_cached_student');
+    localStorage.removeItem('anvimitra_cached_linked_students');
     localStorage.removeItem('anvimitra_cached_attendance');
     localStorage.removeItem('anvimitra_cached_fees');
     localStorage.removeItem('anvimitra_cached_report');
     setUser(null);
     setStudent(null);
+    setAllLinkedStudents([]);
     setAttendance([]);
     setFees([]);
     setLatestReport(null);

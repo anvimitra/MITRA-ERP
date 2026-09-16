@@ -7,11 +7,26 @@ interface Props {
   user: User;
   onClose: () => void;
   onOpenReportCard: () => void;
+  linkedStudents?: any[];
+  selectedStudentId?: string;
+  onSelectStudent?: (studentId: string) => void;
 }
 
-export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onOpenReportCard }) => {
+export const MobileAppSimulator: React.FC<Props> = ({
+  school,
+  user,
+  onClose,
+  onOpenReportCard,
+  linkedStudents = [],
+  selectedStudentId,
+  onSelectStudent,
+}) => {
   const [activeTab, setActiveTab] = useState<'home' | 'attendance' | 'fees' | 'card'>('home');
   const [schoolCode, setSchoolCode] = useState(school?.code || 'DPS01');
+
+  const activeStudent = (linkedStudents && linkedStudents.find((s: any) => s.id === selectedStudentId))
+    || (linkedStudents && linkedStudents[0])
+    || null;
 
   // Dynamic branding simulation
   const isDPS = schoolCode === 'DPS01';
@@ -93,13 +108,31 @@ export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onO
                     🎓
                   </div>
                   <div>
-                    <span className="font-bold text-white block">Rahul Sharma</span>
-                    <span className="text-[10px] text-white/80">Class 10-A • Roll #1</span>
+                    <span className="font-bold text-white block">
+                      {activeStudent ? `${activeStudent.firstName} ${activeStudent.lastName || ''}`.trim() : user.name}
+                    </span>
+                    <span className="text-[10px] text-white/80">
+                      {activeStudent ? `Class ${activeStudent.className || activeStudent.classId} • Roll #${activeStudent.rollNo || '1'}` : `Role: ${user.role.toUpperCase()}`}
+                    </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-400 text-emerald-950">
-                  Present Today
-                </span>
+                {linkedStudents && linkedStudents.length > 1 ? (
+                  <select
+                    value={activeStudent?.id || ''}
+                    onChange={(e) => onSelectStudent && onSelectStudent(e.target.value)}
+                    className="bg-white/20 text-white text-[10px] font-bold rounded-lg px-2 py-1 border border-white/30 focus:outline-none"
+                  >
+                    {linkedStudents.map((s: any) => (
+                      <option key={s.id} value={s.id} className="text-slate-900">
+                        {s.firstName} ({s.className || s.classId})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-400 text-emerald-950">
+                    Present Today
+                  </span>
+                )}
               </div>
             </div>
 
@@ -113,7 +146,7 @@ export const MobileAppSimulator: React.FC<Props> = ({ school, user, onClose, onO
                 <div className="flex-1">
                   <span className="font-bold text-slate-900 block text-[11px]">Instant Attendance Alert</span>
                   <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                    Rahul has been marked <strong>PRESENT</strong> by Class Teacher Mrs. Sunita Sharma at 08:30 AM.
+                    {activeStudent?.firstName || 'Student'} has been marked <strong>PRESENT</strong> by Class Teacher at 08:30 AM.
                   </p>
                 </div>
               </div>

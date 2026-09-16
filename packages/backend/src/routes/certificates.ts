@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and, desc } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
+import { isStudentAccessibleByUser, resolveLinkedStudentsForParent } from '../services/rbac.js';
 
 export const certificateRoutes = new Hono();
 
@@ -12,11 +13,21 @@ certificateRoutes.get('/', async (c) => {
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
-  const certs = db
+  let certs = db
     .select()
     .from(schema.certificates)
     .where(eq(schema.certificates.schoolId, user.schoolId))
     .all();
+
+  // Strict isolation for Parent
+  if (user.role === 'parent') {
+    const linked = resolveLinkedStudentsForParent(user);
+    const allowedIds = new Set(linked.map((s: any) => s.id));
+    certs = certs.filter((c: any) => allowedIds.has(c.studentId));
+  } else if (user.role === 'student') {
+    const student = db.select().from(schema.students).where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.userId, user.userId || (user as any).id))).get();
+    certs = certs.filter((c: any) => student && c.studentId === student.id);
+  }
 
   const students = db
     .select({
@@ -83,6 +94,9 @@ certificateRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student certificates' }, 403);
+  }
 
   const certs = db
     .select()
@@ -138,6 +152,9 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student admit card' }, 403);
+  }
   const student = db
     .select()
     .from(schema.students)

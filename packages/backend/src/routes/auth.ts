@@ -1,83 +1,10 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import { comparePassword, generateToken, verifyToken, hashPassword } from '../services/auth.js';
+import { resolveLinkedStudentsForParent } from '../services/rbac.js';
 
 export const authRoutes = new Hono();
 
-// Helper to resolve all sibling students for a parent
-function resolveLinkedStudentsForParent(user: any): any[] {
-  if (user.role !== 'parent') return [];
-
-  const schoolStudents = user.schoolId
-    ? db.select().from(schema.students).where(eq(schema.students.schoolId, user.schoolId)).all()
-    : db.select().from(schema.students).all();
-
-  const allParents = user.schoolId
-    ? db.select().from(schema.parents).where(eq(schema.parents.schoolId, user.schoolId)).all()
-    : db.select().from(schema.parents).all();
-
-  const parentMap = new Map(allParents.map((p: any) => [p.id, p]));
-
-  const uPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
-  const uEmail = (user.email || '').toLowerCase().trim();
-  const uName = (user.name || '').toLowerCase().trim();
-
-  // Find all parentIds that belong to this parent account
-  const matchingParentIds = new Set<string>();
-  for (const p of allParents) {
-    const pPhone = (p.primaryPhone || p.primary_phone || '').replace(/\D/g, '').slice(-10);
-    const pAlt = (p.altPhone || p.alt_phone || '').replace(/\D/g, '').slice(-10);
-    const isUserMatch = p.userId === user.id || p.user_id === user.id;
-    const isPhoneMatch = uPhone.length >= 10 && (pPhone === uPhone || pAlt === uPhone);
-    const isEmailMatch = uEmail && (p.email || '').toLowerCase().trim() === uEmail;
-    const isNameMatch = uName.length >= 4 && (
-      (p.fatherName || p.father_name || '').toLowerCase().trim() === uName ||
-      (p.motherName || p.mother_name || '').toLowerCase().trim() === uName
-    );
-    if (isUserMatch || isPhoneMatch || isEmailMatch || isNameMatch) {
-      matchingParentIds.add(p.id);
-    }
-  }
-
-  const matched = schoolStudents.filter((s: any) => {
-    if (s.parentId && matchingParentIds.has(s.parentId)) return true;
-    const p: any = parentMap.get(s.parentId);
-    if (p) {
-      const pPhone = (p.primaryPhone || p.primary_phone || '').replace(/\D/g, '').slice(-10);
-      const pAlt = (p.altPhone || p.alt_phone || '').replace(/\D/g, '').slice(-10);
-      if (uPhone.length >= 10 && (pPhone === uPhone || pAlt === uPhone)) return true;
-    }
-    const sEmerg = (s.emergencyPhone || s.emergency_phone || '').replace(/\D/g, '').slice(-10);
-    if (uPhone.length >= 10 && sEmerg === uPhone) return true;
-    return false;
-  });
-
-  const seenIds = new Set<string>();
-  const rawStudents: any[] = [];
-  for (const s of matched) {
-    if (!seenIds.has(s.id)) {
-      seenIds.add(s.id);
-      rawStudents.push(s);
-    }
-  }
-
-  const allClasses = db.select().from(schema.classes).all();
-  const allSections = db.select().from(schema.sections).all();
-  const classMap = new Map(allClasses.map((c: any) => [c.id, c.name]));
-  const sectionMap = new Map(allSections.map((sc: any) => [sc.id, sc.name]));
-
-  return rawStudents.map((s: any) => {
-    const p: any = parentMap.get(s.parentId);
-    return {
-      ...s,
-      className: classMap.get(s.classId) || 'Class',
-      sectionName: sectionMap.get(s.sectionId) || 'A',
-      fatherName: p?.fatherName || '',
-      motherName: p?.motherName || '',
-      primaryPhone: p?.primaryPhone || '',
-    };
-  });
-}
 
 // Universal login for all roles: Super Admin, Principal, Teacher, Staff/Accountant, Parent
 authRoutes.post('/login', async (c) => {
@@ -168,6 +95,7 @@ authRoutes.post('/login', async (c) => {
     role: user.role,
     name: user.name,
     email: user.email,
+    phone: user.phone,
   });
 
   return c.json({

@@ -9,6 +9,7 @@ export interface TokenPayload {
   role: string;
   name: string;
   email: string;
+  phone?: string | null;
 }
 
 export function generateToken(payload: TokenPayload): string {

@@ -44,6 +44,18 @@ export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
     }, 1200);
   };
 
+  if (!student) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center min-h-[300px] bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
+        <CreditCard className="w-10 h-10 text-slate-300 mb-2" />
+        <h3 className="font-bold text-slate-800 text-sm">No Student Fee Account</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs">
+          Please select or link a student account to view fees ledger and online payments.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 pb-20">
       {/* Due Banner */}

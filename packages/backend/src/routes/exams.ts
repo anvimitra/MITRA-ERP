@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
-import { isDesignatedSubjectTeacher } from '../services/rbac.js';
+import { isDesignatedSubjectTeacher, isStudentAccessibleByUser } from '../services/rbac.js';
 import { calculateGrade, generateStudentReportCard } from '../services/report-card.js';
 
 export const examRoutes = new Hono();
@@ -218,6 +218,10 @@ examRoutes.get('/report-card/:studentId/:examId', async (c) => {
 
   const studentId = c.req.param('studentId');
   const examId = c.req.param('examId');
+
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student academic report card' }, 403);
+  }
 
   const reportCard = await generateStudentReportCard(user.schoolId, studentId, examId);
   if (!reportCard) {

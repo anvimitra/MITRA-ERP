@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import { verifyToken, hashPassword } from '../services/auth.js';
+import { resolveLinkedStudentsForParent } from '../services/rbac.js';
 import { saveLocalBackup } from '../db/persistent-backup.js';
 import { getDatabaseInstance } from '../db/init.js';
 import crypto from 'crypto';
@@ -14,11 +15,47 @@ function getAuthUser(c: any) {
   return verifyToken(authHeader.substring(7));
 }
 
-// GET /api/students - List all students for current school (with optional filters)
+// GET /api/students - List students (Strict parent/student isolation)
 studentRoutes.get('/', async (c) => {
   const user = getAuthUser(c);
   if (!user || !user.schoolId) {
     return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  // Strict isolation: Parent can ONLY ever see their own linked children
+  if (user.role === 'parent') {
+    const linked = resolveLinkedStudentsForParent(user);
+    return c.json({ students: linked });
+  }
+
+  // Strict isolation: Student can ONLY ever see their own student record
+  if (user.role === 'student') {
+    const currentStudent = db
+      .select()
+      .from(schema.students)
+      .where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.userId, user.userId || (user as any).id)))
+      .get();
+    if (!currentStudent) return c.json({ students: [] });
+
+    const cls = db.select().from(schema.classes).where(eq(schema.classes.id, currentStudent.classId)).get();
+    const sec = db.select().from(schema.sections).where(eq(schema.sections.id, currentStudent.sectionId)).get();
+    const p = currentStudent.parentId
+      ? db.select().from(schema.parents).where(eq(schema.parents.id, currentStudent.parentId)).get()
+      : null;
+
+    return c.json({
+      students: [
+        {
+          ...currentStudent,
+          className: cls?.name || currentStudent.classId,
+          sectionName: sec?.name || currentStudent.sectionId,
+          fatherName: p?.fatherName || '',
+          motherName: p?.motherName || '',
+          primaryPhone: p?.primaryPhone || '',
+          email: p?.email || '',
+        },
+      ],
+    });
   }
 
   const { classId, sectionId, search } = c.req.query();
@@ -363,6 +400,10 @@ studentRoutes.get('/parents', async (c) => {
   const user = getAuthUser(c);
   if (!user || !user.schoolId) {
     return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  if (user.role === 'parent' || user.role === 'student') {
+    return c.json({ error: 'Forbidden: Access denied to parents directory' }, 403);
   }
 
   const rawParents = db

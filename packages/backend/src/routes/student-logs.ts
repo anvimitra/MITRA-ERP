@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and, desc } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
+import { isStudentAccessibleByUser } from '../services/rbac.js';
 import { dispatchStudentNotification } from '../services/notification-sms.js';
 
 export const studentLogRoutes = new Hono();
@@ -12,6 +13,10 @@ studentLogRoutes.get('/school', async (c) => {
   if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role === 'parent' || user.role === 'student') {
+    return c.json({ error: 'Forbidden: Access denied to school-wide logs' }, 403);
+  }
 
   const logs = db
     .select()
@@ -63,6 +68,9 @@ studentLogRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student discipline logs' }, 403);
+  }
 
   const logs = db
     .select()

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
+import { isStudentAccessibleByUser } from '../services/rbac.js';
 import { dispatchStudentNotification } from '../services/notification-sms.js';
 
 export const feeRoutes = new Hono();
@@ -279,6 +280,10 @@ feeRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student fee ledger' }, 403);
+  }
+
   const student = db.select().from(schema.students).where(eq(schema.students.id, studentId)).get();
   if (!student) return c.json({ error: 'Student not found' }, 404);
 

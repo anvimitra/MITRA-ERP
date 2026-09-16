@@ -6,7 +6,7 @@ import { X, Sparkles, Lock, Mail, Building2, Globe, CheckCircle2, AlertCircle, R
 interface Props {
   currentSchool?: School | null;
   onClose: () => void;
-  onLoginSuccess: (user: User, school: School) => void;
+  onLoginSuccess: (user: User, school: School, linkedStudents?: any[]) => void;
 }
 
 export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuccess }) => {
@@ -56,7 +56,7 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
 
     try {
       const res = await loginUser(email, password, schoolCode);
-      onLoginSuccess(res.user, res.school);
+      onLoginSuccess(res.user, res.school, res.linkedStudents);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Invalid credentials or school code');

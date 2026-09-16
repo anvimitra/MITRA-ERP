@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema, eq, and, desc } from '../db/index.js';
 import crypto from 'crypto';
 import { verifyToken } from '../services/auth.js';
+import { isStudentAccessibleByUser } from '../services/rbac.js';
 
 export const libraryRoutes = new Hono();
 
@@ -178,6 +179,9 @@ libraryRoutes.get('/student/:studentId', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const studentId = c.req.param('studentId');
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student library details' }, 403);
+  }
 
   const issues = db
     .select()

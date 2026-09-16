@@ -76,6 +76,8 @@ export const App: React.FC = () => {
     ApiService.setToken(null);
     setUser(null);
     setSchool(null);
+    setLinkedStudents([]);
+    setSelectedStudentId('');
   };
 
   const handleOpenQuickReportCard = async () => {
@@ -212,6 +214,9 @@ export const App: React.FC = () => {
           user={user}
           onClose={() => setShowMobileSim(false)}
           onOpenReportCard={handleOpenQuickReportCard}
+          linkedStudents={linkedStudents}
+          selectedStudentId={selectedStudentId}
+          onSelectStudent={setSelectedStudentId}
         />
       )}
 

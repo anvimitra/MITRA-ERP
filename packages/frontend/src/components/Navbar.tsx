@@ -88,7 +88,7 @@ export const Navbar: React.FC<Props> = ({
               >
                 {linkedStudents.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName || ''} (Class {s.classId}-{s.sectionId})
+                    {s.firstName} {s.lastName || ''} (Class {s.className || s.classId} - {s.sectionName || s.sectionId})
                   </option>
                 ))}
               </select>
