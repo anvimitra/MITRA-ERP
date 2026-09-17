@@ -159,6 +159,17 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       dob TEXT,
       blood_group TEXT,
       photo_url TEXT,
+      nic_no TEXT,
+      address TEXT,
+      city TEXT,
+      state TEXT,
+      pincode TEXT,
+      admission_date TEXT,
+      father_occupation TEXT,
+      mother_occupation TEXT,
+      previous_school TEXT,
+      religion TEXT,
+      mother_tongue TEXT,
       is_active INTEGER DEFAULT 1
     );
 
@@ -528,13 +539,24 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     sqlite.exec(`ALTER TABLE schools ADD COLUMN services_enabled INTEGER DEFAULT 1;`);
   } catch {}
 
-  // Auto-migrate student profile columns (medical, emergency, caste category, user_id)
+  // Auto-migrate student profile columns (medical, emergency, caste category, user_id, NIC, address, etc.)
   const studentProfileCols = [
     'emergency_phone',
     'medical_conditions',
     'allergies',
     'category',
     'user_id',
+    'nic_no',
+    'address',
+    'city',
+    'state',
+    'pincode',
+    'admission_date',
+    'father_occupation',
+    'mother_occupation',
+    'previous_school',
+    'religion',
+    'mother_tongue',
   ];
   for (const col of studentProfileCols) {
     try {

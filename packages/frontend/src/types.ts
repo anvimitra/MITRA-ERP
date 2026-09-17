@@ -96,6 +96,22 @@ export interface Student {
   allergies?: string;
   category?: string;
   userId?: string;
+  // Extended fields
+  nicNo?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  admissionDate?: string;
+  fatherOccupation?: string;
+  motherOccupation?: string;
+  previousSchool?: string;
+  religion?: string;
+  motherTongue?: string;
+  fatherName?: string;
+  motherName?: string;
+  primaryPhone?: string;
+  email?: string;
 }
 
 export interface AttendanceRecord {

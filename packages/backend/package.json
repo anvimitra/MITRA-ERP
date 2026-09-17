@@ -8,7 +8,8 @@
     "build": "tsc",
     "deploy:cf": "wrangler deploy",
     "seed": "tsx src/db/seed.ts",
-    "db:test-pg": "tsx src/scripts/test-postgres.ts"
+    "db:test-pg": "tsx src/scripts/test-postgres.ts",
+    "db:verify-sync": "tsx src/scripts/verify-sync.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

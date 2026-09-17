@@ -176,6 +176,17 @@ const POSTGRES_TABLES_SQL = `
     allergies TEXT,
     category TEXT,
     user_id TEXT,
+    nic_no TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    pincode TEXT,
+    admission_date TEXT,
+    father_occupation TEXT,
+    mother_occupation TEXT,
+    previous_school TEXT,
+    religion TEXT,
+    mother_tongue TEXT,
     is_active INTEGER DEFAULT 1
   );
 
@@ -538,6 +549,17 @@ const POSTGRES_TABLES_SQL = `
   ALTER TABLE students ADD COLUMN IF NOT EXISTS allergies TEXT;
   ALTER TABLE students ADD COLUMN IF NOT EXISTS category TEXT;
   ALTER TABLE students ADD COLUMN IF NOT EXISTS user_id TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS nic_no TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS address TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS city TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS state TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS pincode TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS admission_date TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS father_occupation TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS mother_occupation TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS previous_school TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS religion TEXT;
+  ALTER TABLE students ADD COLUMN IF NOT EXISTS mother_tongue TEXT;
 
   ALTER TABLE subjects ADD COLUMN IF NOT EXISTS class_id TEXT;
 

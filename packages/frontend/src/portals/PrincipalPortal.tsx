@@ -283,6 +283,17 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     email: '',
     address: '',
     photoUrl: '',
+    // Extended profile fields
+    nicNo: '',
+    city: '',
+    state: '',
+    pincode: '',
+    admissionDate: new Date().toISOString().split('T')[0],
+    fatherOccupation: '',
+    motherOccupation: '',
+    previousSchool: '',
+    religion: '',
+    motherTongue: '',
   });
 
   // Staff Form
@@ -601,6 +612,17 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       email: '',
       address: '',
       photoUrl: '',
+      // Extended profile fields
+      nicNo: '',
+      city: '',
+      state: '',
+      pincode: '',
+      admissionDate: new Date().toISOString().split('T')[0],
+      fatherOccupation: '',
+      motherOccupation: '',
+      previousSchool: '',
+      religion: '',
+      motherTongue: '',
     });
     setShowStudentModal(true);
   };
@@ -627,6 +649,17 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       email: s.email || '',
       address: s.address || '',
       photoUrl: s.photoUrl || '',
+      // Extended profile fields
+      nicNo: s.nicNo || '',
+      city: s.city || '',
+      state: s.state || '',
+      pincode: s.pincode || '',
+      admissionDate: s.admissionDate || new Date().toISOString().split('T')[0],
+      fatherOccupation: s.fatherOccupation || '',
+      motherOccupation: s.motherOccupation || '',
+      previousSchool: s.previousSchool || '',
+      religion: s.religion || '',
+      motherTongue: s.motherTongue || '',
     });
     setShowStudentModal(true);
   };
@@ -4628,6 +4661,38 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Date of Birth (DOB) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={studentForm.dob}
+                    onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Admission Date</label>
+                  <input
+                    type="date"
+                    value={studentForm.admissionDate}
+                    onChange={(e) => setStudentForm({ ...studentForm, admissionDate: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">NIC / Aadhaar Card No</label>
+                  <input
+                    type="text"
+                    placeholder="12-digit UID / NIC"
+                    value={studentForm.nicNo}
+                    onChange={(e) => setStudentForm({ ...studentForm, nicNo: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+              </div>
+
               <div className="pt-2 border-t border-slate-200">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
                   Parent / Guardian Details
@@ -4648,6 +4713,28 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                       type="text"
                       value={studentForm.motherName}
                       onChange={(e) => setStudentForm({ ...studentForm, motherName: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Father's Occupation</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Business, Engineer, Farmer"
+                      value={studentForm.fatherOccupation}
+                      onChange={(e) => setStudentForm({ ...studentForm, fatherOccupation: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Mother's Occupation</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Homemaker, Teacher, Doctor"
+                      value={studentForm.motherOccupation}
+                      onChange={(e) => setStudentForm({ ...studentForm, motherOccupation: e.target.value })}
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
                     />
                   </div>
@@ -4679,6 +4766,54 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
               <div className="pt-2 border-t border-slate-200">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
+                  Address & Residential Details
+                </span>
+                <div className="mb-3">
+                  <label className="block font-bold text-slate-700 mb-1">Permanent / Residential Address</label>
+                  <input
+                    type="text"
+                    placeholder="Flat/House No, Building, Street, Landmark"
+                    value={studentForm.address}
+                    onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">City / Town</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Mumbai, Jaipur"
+                      value={studentForm.city}
+                      onChange={(e) => setStudentForm({ ...studentForm, city: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">State / Province</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Maharashtra, Rajasthan"
+                      value={studentForm.state}
+                      onChange={(e) => setStudentForm({ ...studentForm, state: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">PIN / Postal Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 302001"
+                      value={studentForm.pincode}
+                      onChange={(e) => setStudentForm({ ...studentForm, pincode: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
                   Health, Emergency & Social Demographics
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4705,6 +4840,36 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                       <option value="ST">ST (Scheduled Tribe)</option>
                       <option value="EWS">EWS (Economically Weaker Section)</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Religion</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Hindu, Muslim, Sikh, Christian"
+                      value={studentForm.religion}
+                      onChange={(e) => setStudentForm({ ...studentForm, religion: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Mother Tongue</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Hindi, English, Gujarati"
+                      value={studentForm.motherTongue}
+                      onChange={(e) => setStudentForm({ ...studentForm, motherTongue: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-slate-700 mb-1">Previous School Attended (if transfer)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. St. Xavier's High School"
+                      value={studentForm.previousSchool}
+                      onChange={(e) => setStudentForm({ ...studentForm, previousSchool: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                    />
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Medical Conditions / Notes</label>
