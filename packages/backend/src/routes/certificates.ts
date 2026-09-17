@@ -19,14 +19,10 @@ certificateRoutes.get('/', async (c) => {
     .where(eq(schema.certificates.schoolId, user.schoolId))
     .all();
 
-  // Strict isolation for Parent
-  if (user.role === 'parent') {
-    const linked = resolveLinkedStudentsForParent(user);
-    const allowedIds = new Set(linked.map((s: any) => s.id));
-    certs = certs.filter((c: any) => allowedIds.has(c.studentId));
-  } else if (user.role === 'student') {
-    const student = db.select().from(schema.students).where(and(eq(schema.students.schoolId, user.schoolId), eq(schema.students.userId, user.userId || (user as any).id))).get();
-    certs = certs.filter((c: any) => student && c.studentId === student.id);
+  // STRICT PRIVACY RULE: Certificates are visible ONLY in Principal Desk!
+  // Parents and students must NOT see certificates on app or portal.
+  if (user.role === 'parent' || user.role === 'student') {
+    return c.json({ certificates: [] });
   }
 
   const students = db
@@ -86,12 +82,17 @@ certificateRoutes.get('/', async (c) => {
   return c.json({ certificates: enriched });
 });
 
-// List certificates for a specific student (Student/Parent access)
+// List certificates for a specific student (Principal Desk only)
 certificateRoutes.get('/student/:studentId', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  // STRICT PRIVACY RULE: Certificates are visible ONLY in Principal Desk!
+  if (user.role === 'parent' || user.role === 'student') {
+    return c.json({ certificates: [] });
+  }
 
   const studentId = c.req.param('studentId');
   if (!isStudentAccessibleByUser(user, studentId)) {
@@ -348,6 +349,12 @@ certificateRoutes.get('/:id', async (c) => {
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
   const certId = c.req.param('id');
+
+  // STRICT PRIVACY RULE: Certificates are visible ONLY in Principal Desk!
+  if (user.role === 'parent' || user.role === 'student') {
+    return c.json({ error: 'Forbidden: Certificates can only be accessed from the Principal Desk' }, 403);
+  }
+
   const cert = db
     .select()
     .from(schema.certificates)
@@ -467,6 +474,10 @@ certificateRoutes.post('/', async (c) => {
     CHARACTER_CERTIFICATE: 'CC',
     ADMIT_CARD: 'ADM',
     APPRECIATION_AWARD: 'AWD',
+    MERIT_AWARD: 'MRT',
+    SPORTS_AWARD: 'SPT',
+    COMPLETION_CERTIFICATE: 'CMP',
+    EXCELLENCE_AWARD: 'EXC',
   };
   const prefix = prefixMap[certificateType] || 'CERT';
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);

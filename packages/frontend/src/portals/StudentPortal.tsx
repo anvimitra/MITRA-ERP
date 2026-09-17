@@ -49,10 +49,8 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
 
   // New modules state
   const [studentTransport, setStudentTransport] = useState<StudentTransportItem | null>(null);
-  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [myBooks, setMyBooks] = useState<LibraryIssueItem[]>([]);
   const [libraryCatalog, setLibraryCatalog] = useState<LibraryBookItem[]>([]);
-  const [viewCertModal, setViewCertModal] = useState<CertificateItem | null>(null);
   const [viewAdmitCardModal, setViewAdmitCardModal] = useState<any | null>(null);
   const [loadingAdmitCard, setLoadingAdmitCard] = useState(false);
 
@@ -749,52 +747,6 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
               <span>{loadingAdmitCard ? 'Generating...' : 'View & Print Admit Card'}</span>
             </button>
           </div>
-
-          {/* Academic Certificates Registry */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="text-indigo-600" size={20} />
-                <span>Issued Academic Certificates</span>
-              </h3>
-              <p className="text-xs text-slate-500">Official certificates authenticated by Principal office</p>
-            </div>
-
-            {certificates.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-xs font-medium">
-                No official certificates issued currently. Request one at the Front Desk / Reception.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                {certificates.map((cert) => (
-                  <div key={cert.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800">
-                          {cert.certificateType}
-                        </span>
-                        <span className="text-[11px] font-bold text-slate-400">{cert.issueDate}</span>
-                      </div>
-                      <h4 className="text-sm font-black text-slate-900 pt-1">
-                        Certificate No: {cert.certificateNo}
-                      </h4>
-                      <p className="text-xs text-slate-500">Academic Year: {cert.academicYear || '2026-2027'}</p>
-                      {cert.reason && (
-                        <p className="text-xs text-slate-600 italic">Purpose: {cert.reason}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setViewCertModal(cert)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 self-start"
-                    >
-                      <Printer size={14} />
-                      <span>View Official Certificate</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -1187,85 +1139,6 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
                 <div className="text-center">
                   <div className="border-b border-slate-800 w-40 mb-1"></div>
                   <span className="text-[10px] uppercase text-slate-900 font-black">Principal Signature</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: VIEW CERTIFICATE */}
-      {viewCertModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-300 relative my-6">
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <Award size={16} className="text-amber-400" />
-                <span>Official School Certificate</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow"
-                >
-                  <Printer size={14} />
-                  <span>Print Certificate</span>
-                </button>
-                <button
-                  onClick={() => setViewCertModal(null)}
-                  className="text-slate-400 hover:text-white p-1"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-8 sm:p-12 space-y-8 text-slate-900 font-serif border-8 border-double border-slate-200 m-4 rounded-2xl bg-gradient-to-b from-amber-50/20 to-white">
-              <div className="text-center space-y-1 border-b-2 border-slate-800 pb-4">
-                <h2 className="text-2xl font-black tracking-wider uppercase font-sans text-slate-900">
-                  {student?.schoolName || 'DELHI PUBLIC GLOBAL ACADEMY'}
-                </h2>
-                <p className="text-xs font-sans text-slate-600">CBSE Affiliation No: 1032890 • School Code: 8402</p>
-                <div className="pt-4">
-                  <h3 className="text-lg font-black uppercase tracking-widest font-sans text-indigo-900 underline decoration-2 underline-offset-8">
-                    {viewCertModal.certificateType}
-                  </h3>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center text-xs font-sans text-slate-500">
-                <span>Ref No: <strong className="font-mono text-slate-800">{viewCertModal.certificateNo}</strong></span>
-                <span>Date: <strong className="text-slate-800">{viewCertModal.issueDate}</strong></span>
-              </div>
-
-              <div className="text-sm leading-relaxed space-y-4 text-justify text-slate-800">
-                <p>
-                  This is to officially certify that <strong className="uppercase font-sans font-black">{student?.firstName} {student?.lastName || ''}</strong>, 
-                  son/daughter of <strong className="font-sans font-bold">{student?.fatherName || 'Guardian'}</strong>, 
-                  bearing Admission Number <strong className="font-mono font-bold">{student?.admissionNo}</strong> and Roll Number <strong className="font-bold">#{student?.rollNo || '01'}</strong>, 
-                  is a bona fide student of Class <strong className="font-sans font-bold">{student?.className || '10'} - Section {student?.sectionName || 'A'}</strong> in this institution for the Academic Session <strong className="font-sans font-bold">{viewCertModal.academicYear || '2026-2027'}</strong>.
-                </p>
-                <p>
-                  According to institutional records, his/her general conduct and moral character have been found to be <strong className="font-sans font-bold uppercase">{viewCertModal.conduct || 'Good'}</strong>.
-                </p>
-                {viewCertModal.reason && (
-                  <p className="italic text-xs text-slate-600">
-                    This certificate is granted for the purpose of: {viewCertModal.reason}.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-end justify-between pt-12 text-xs font-sans font-bold">
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-400 flex items-center justify-center text-[9px] text-slate-400 mx-auto mb-1">
-                    SEAL
-                  </div>
-                  <span className="text-[10px] text-slate-500 uppercase">Institutional Seal</span>
-                </div>
-
-                <div className="text-center">
-                  <div className="border-b border-slate-800 w-44 mb-1"></div>
-                  <span className="text-xs uppercase text-slate-900 font-black">Principal Signature</span>
                 </div>
               </div>
             </div>

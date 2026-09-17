@@ -67,16 +67,12 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
         setSelectedAllocationId(alloc.subjectsAssigned[0].id);
       }
 
-      // Collect all assigned classes (Class Teacher + Subject Allocations)
+      // Collect assigned classes for daily attendance (ONLY designated Class Teacher)
       const assignedList: Array<{ classId: string; sectionId: string }> = [];
       const seenKeys = new Set<string>();
       (alloc.classTeacherOf || []).forEach((ct: any) => {
         const key = `${ct.classId}_${ct.sectionId}`;
         if (!seenKeys.has(key)) { seenKeys.add(key); assignedList.push({ classId: ct.classId, sectionId: ct.sectionId }); }
-      });
-      (alloc.subjectsAssigned || []).forEach((sa: any) => {
-        const key = `${sa.classId}_${sa.sectionId}`;
-        if (!seenKeys.has(key)) { seenKeys.add(key); assignedList.push({ classId: sa.classId, sectionId: sa.sectionId }); }
       });
 
       if (assignedList.length > 0) {
@@ -307,7 +303,7 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
     }
   };
 
-    // Collect all assigned classes (Class Teacher + Subject Allocations)
+    // Collect all assigned classes for attendance (STRICTLY designated Class Teacher only)
   const assignedClassesList = React.useMemo(() => {
     if (!allocations) return [];
     const list: Array<{
@@ -333,23 +329,6 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
           className: cls?.name || `Class ${ct.classId}`,
           sectionName: sec?.name || 'A',
           isClassTeacher: true,
-        });
-      }
-    });
-
-    (allocations.subjectsAssigned || []).forEach((sa: any) => {
-      const key = `${sa.classId}_${sa.sectionId}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        const cls = allocations.allClasses?.find((c: any) => c.id === sa.classId);
-        const sec = allocations.allSections?.find((s: any) => s.id === sa.sectionId);
-        list.push({
-          key,
-          classId: sa.classId,
-          sectionId: sa.sectionId,
-          className: cls?.name || `Class ${sa.classId}`,
-          sectionName: sec?.name || 'A',
-          isClassTeacher: false,
         });
       }
     });
@@ -458,9 +437,9 @@ export const TeacherPortal: React.FC<{ user: any }> = ({ user }) => {
               <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700 mx-auto mb-3">
                 <ShieldAlert size={28} />
               </div>
-              <h2 className="text-lg font-bold text-amber-950">No Assigned Classes: Attendance Restricted</h2>
+              <h2 className="text-lg font-bold text-amber-950">Class Teacher Authorization Required: Attendance Restricted</h2>
               <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
-                Per school policy, teachers can only view and mark daily attendance for the classes officially assigned to them (as Class Teacher or Subject Faculty). Please ask the Principal to allocate your classes.
+                Per school policy, only the officially designated Class Teacher can take and submit daily attendance for a class. You are not currently assigned as Class Teacher for any class. Please contact the Principal to assign you in the Academic Master.
               </p>
             </div>
           ) : (

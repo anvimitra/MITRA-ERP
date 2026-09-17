@@ -7,6 +7,7 @@ export async function isDesignatedClassTeacher(
   classId: string,
   sectionId: string
 ): Promise<boolean> {
+  // STRICT RULE: Only the designated Class Teacher for this class & section can mark attendance
   const match = db
     .select()
     .from(schema.classTeachers)
@@ -20,23 +21,7 @@ export async function isDesignatedClassTeacher(
     )
     .get();
 
-  if (match) return true;
-
-  // Also allow teacher if they are assigned subjects in this class & section
-  const subMatch = db
-    .select()
-    .from(schema.subjectAllocations)
-    .where(
-      and(
-        eq(schema.subjectAllocations.schoolId, schoolId),
-        eq(schema.subjectAllocations.teacherId, teacherId),
-        eq(schema.subjectAllocations.classId, classId),
-        eq(schema.subjectAllocations.sectionId, sectionId)
-      )
-    )
-    .get();
-
-  return !!subMatch;
+  return !!match;
 }
 
 export async function isDesignatedSubjectTeacher(

@@ -81,12 +81,27 @@ classRoutes.get('/', async (c) => {
     .where(eq(schema.subjectAllocations.schoolId, user.schoolId))
     .all();
 
+  const classMap = new Map(schoolClasses.map((c: any) => [c.id, c.name]));
+  const sectionMap = new Map(schoolSections.map((s: any) => [s.id, s.name]));
+  const teacherMap = new Map(schoolTeachers.map((t: any) => [t.id, t]));
+
+  const enrichedClassTeachers = classTeacherAssignments.map((ct: any) => {
+    const t: any = teacherMap.get(ct.teacherId);
+    return {
+      ...ct,
+      teacherName: t?.name || 'Assigned Teacher',
+      teacherEmail: t?.email || '',
+      className: classMap.get(ct.classId) || 'Class',
+      sectionName: sectionMap.get(ct.sectionId) || 'A',
+    };
+  });
+
   return c.json({
     classes: schoolClasses,
     sections: schoolSections,
     subjects: schoolSubjects,
     teachers: schoolTeachers,
-    classTeacherAssignments,
+    classTeacherAssignments: enrichedClassTeachers,
     subjectAllocations,
   });
 });
@@ -167,6 +182,28 @@ classRoutes.post('/class-teacher', async (c) => {
   }).run();
 
   return c.json({ success: true, message: 'Class Teacher assigned successfully' });
+});
+
+// Unassign Class Teacher (Principal only)
+classRoutes.delete('/class-teacher/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
+    return c.json({ error: 'Only Principal or Admin can unassign class teachers' }, 403);
+  }
+
+  const id = c.req.param('id');
+  db.delete(schema.classTeachers)
+    .where(
+      and(
+        eq(schema.classTeachers.schoolId, user.schoolId),
+        eq(schema.classTeachers.id, id)
+      )
+    )
+    .run();
+
+  return c.json({ success: true, message: 'Class Teacher unassigned successfully' });
 });
 
 // Assign Subject Teacher (Principal only)

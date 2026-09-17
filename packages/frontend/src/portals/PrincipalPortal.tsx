@@ -864,6 +864,17 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     }
   };
 
+  const handleUnassignClassTeacher = async (assignmentId: string, className: string, teacherName: string) => {
+    if (!confirm(`Are you sure you want to unassign ${teacherName} as Class Teacher for ${className}?`)) return;
+    try {
+      await ApiService.unassignClassTeacher(assignmentId);
+      alert('✅ Class Teacher unassigned successfully!');
+      loadData();
+    } catch (err: any) {
+      alert('Error unassigning class teacher: ' + err.message);
+    }
+  };
+
   const handleAssignSubjectTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -2082,6 +2093,81 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   Authorize Class Teacher
                 </button>
               </form>
+
+              {/* Assigned Class Teachers Roster Table */}
+              <div className="pt-2">
+                <h4 className="text-xs font-black uppercase text-blue-900 tracking-wider mb-2 flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-blue-600" />
+                  <span>Current Class Teacher Allotments ({classesData?.classTeacherAssignments?.length || 0})</span>
+                </h4>
+                
+                {(!classesData?.classTeacherAssignments || classesData.classTeacherAssignments.length === 0) ? (
+                  <div className="p-4 bg-white border border-blue-100 rounded-xl text-xs text-slate-400 text-center font-medium">
+                    No Class Teachers have been assigned yet. Use the selector above to allocate teachers to classes for attendance authorization.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto bg-white border border-blue-100 rounded-xl shadow-sm">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-blue-50/70 border-b border-blue-100 text-blue-900 text-[10px] font-black uppercase">
+                        <tr>
+                          <th className="px-3 py-2.5">Class & Section</th>
+                          <th className="px-3 py-2.5">Designated Class Teacher</th>
+                          <th className="px-3 py-2.5">Email / Contact</th>
+                          <th className="px-3 py-2.5">Academic Session</th>
+                          <th className="px-3 py-2.5">Attendance Rights</th>
+                          <th className="px-3 py-2.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {classesData.classTeacherAssignments.map((cta: any) => {
+                          const clsName = cta.className || classesData?.classes?.find((c: any) => c.id === cta.classId)?.name || 'Class';
+                          const secName = cta.sectionName || classesData?.sections?.find((s: any) => s.id === cta.sectionId)?.name || 'A';
+                          const teacher = classesData?.teachers?.find((t: any) => t.id === cta.teacherId);
+                          const tName = cta.teacherName || teacher?.name || 'Teacher';
+                          const tEmail = cta.teacherEmail || teacher?.email || 'N/A';
+                          
+                          return (
+                            <tr key={cta.id} className="hover:bg-blue-50/30 transition">
+                              <td className="px-3 py-2.5 font-bold text-slate-900">
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[11px]">
+                                  {clsName} - {secName}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                                  <span>⭐</span>
+                                  <span>{tName}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">
+                                {tEmail}
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-600 font-medium text-[11px]">
+                                {cta.academicYear || '2026-2027'}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                  <CheckCircle2 size={10} /> Authorized
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnassignClassTeacher(cta.id, `${clsName} (${secName})`, tName)}
+                                  className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200 transition inline-flex items-center gap-1"
+                                >
+                                  <Trash2 size={11} />
+                                  <span>Unassign</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Subject Teacher RBAC Allocation Form */}

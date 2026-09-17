@@ -231,6 +231,12 @@ export class ApiService {
     });
   }
 
+  static async unassignClassTeacher(assignmentId: string) {
+    return this.request<any>(`/classes/class-teacher/${assignmentId}`, {
+      method: 'DELETE',
+    });
+  }
+
   static async assignSubjectTeacher(teacherId: string, classId: string, sectionId: string, subjectId: string, academicYear?: string) {
     return this.request<any>('/classes/subject-allocation', {
       method: 'POST',

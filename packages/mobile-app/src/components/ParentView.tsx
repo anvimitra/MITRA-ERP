@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Student, AttendanceRecord, FeeItem, ExamReport, CertificateItem, StudentTransportItem, LibraryIssueItem, School } from '../types';
-import { fetchStudentTransport, fetchCertificates, fetchLibraryIssues, fetchAdmitCard } from '../api';
+import { Student, AttendanceRecord, FeeItem, ExamReport, StudentTransportItem, LibraryIssueItem, School } from '../types';
+import { fetchStudentTransport, fetchLibraryIssues, fetchAdmitCard } from '../api';
 import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download, Navigation } from 'lucide-react';
 import { TabType } from './BottomNavBar';
 import { LiveBusMapModal } from './LiveBusMapModal';
@@ -36,17 +36,14 @@ export const ParentView: React.FC<Props> = ({
   const attendanceRate = attendance && attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 100;
 
   const [transport, setTransport] = useState<StudentTransportItem | null>(null);
-  const [certs, setCerts] = useState<CertificateItem[]>([]);
   const [books, setBooks] = useState<LibraryIssueItem[]>([]);
   const [admitCard, setAdmitCard] = useState<any | null>(null);
   const [showAdmitCardModal, setShowAdmitCardModal] = useState(false);
-  const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
   const [showLiveTrackingModal, setShowLiveTrackingModal] = useState(false);
 
   useEffect(() => {
     if (student?.id) {
       fetchStudentTransport(student.id).then(setTransport).catch(() => {});
-      fetchCertificates(student.id).then(setCerts).catch(() => {});
       fetchLibraryIssues(student.id).then(setBooks).catch(() => {});
       fetchAdmitCard(student.id).then(setAdmitCard).catch(() => {});
     }
@@ -482,33 +479,7 @@ export const ParentView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Academic Certificates Card */}
-      {certs.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2.5">
-          <div className="flex items-center space-x-2">
-            <div className="p-2 rounded-xl bg-purple-100 text-purple-800">
-              <FileText className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-slate-900 text-sm">Issued Certificates ({certs.length})</h3>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            {certs.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCert(c)}
-                className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-left active:scale-95 transition space-y-1"
-              >
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">
-                  {c.certificateType}
-                </span>
-                <p className="text-xs font-black text-slate-800 line-clamp-1">{c.certificateNo}</p>
-                <span className="text-[10px] text-purple-600 font-bold block">Tap to View →</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* MODAL: ADMIT CARD VIEW */}
       {showAdmitCardModal && admitCard && (
@@ -573,36 +544,7 @@ export const ParentView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* MODAL: CERTIFICATE VIEW */}
-      {selectedCert && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-sm w-full bg-white rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-300">
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-xs font-black uppercase text-purple-900">{selectedCert.certificateType} Certificate</span>
-              <button onClick={() => setSelectedCert(null)} className="text-slate-400 p-1">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="text-center space-y-1">
-              <h3 className="font-black text-sm uppercase">{school?.name || 'School ERP'}</h3>
-              <p className="text-[10px] text-slate-500">Ref: {selectedCert.certificateNo}</p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200 text-xs leading-relaxed text-slate-800">
-              This certifies that <strong>{selectedCert.studentName || `${student.firstName} ${student.lastName}`}</strong> (Adm #{selectedCert.admissionNo || student.admissionNo}) is a bona fide student for Academic Year {selectedCert.academicYear}. Character & Conduct: <strong>{selectedCert.conduct || 'Good'}</strong>.
-            </div>
-
-            <button
-              onClick={() => window.print()}
-              className="w-full py-2.5 bg-purple-600 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center space-x-1.5"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print Official Certificate</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* LIVE BUS TRACKING MAP MODAL */}
       {showLiveTrackingModal && student && (
