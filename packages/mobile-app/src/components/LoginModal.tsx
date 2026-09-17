@@ -73,7 +73,7 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div>
             <h3 className="font-extrabold text-base text-slate-900">MITRA-ERP Institutional Sign In</h3>
-            <p className="text-xs text-slate-500">Sign in with your registered school credentials</p>
+            <p className="text-xs text-slate-500">Parent, Teacher, Principal & Bus Driver Portal</p>
           </div>
           <button
             onClick={onClose}

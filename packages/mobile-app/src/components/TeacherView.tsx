@@ -28,7 +28,9 @@ import {
   Layers,
   Save,
   Search,
+  Bus,
 } from 'lucide-react';
+import { LiveBusMapModal } from './LiveBusMapModal';
 
 interface Props {
   teacher: User;
@@ -57,6 +59,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [feedback, setFeedback] = useState<string | null>(null);
   const [attSearch, setAttSearch] = useState('');
   const [marksSearch, setMarksSearch] = useState('');
+  const [showFleetTracking, setShowFleetTracking] = useState(false);
 
   // Marks Entry state
   const [exams, setExams] = useState<ExamItem[]>([]);
@@ -329,6 +332,25 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           </button>
         </div>
       </div>
+
+      {/* Live School Bus Tracking Shortcut for Faculty */}
+      <button
+        onClick={() => setShowFleetTracking(true)}
+        className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-950 flex items-center justify-between transition shadow-sm"
+      >
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold">
+            <Bus className="w-4 h-4" />
+          </div>
+          <div className="text-left">
+            <h4 className="text-xs font-black text-amber-950">Live School Bus Fleet Tracking</h4>
+            <p className="text-[10px] text-amber-700">Check live positions of school buses & arrival status</p>
+          </div>
+        </div>
+        <span className="px-2 py-0.5 rounded-lg bg-amber-200 text-amber-900 text-[10px] font-black uppercase">
+          Live GPS
+        </span>
+      </button>
 
       {feedback && (
         <div className="p-3 rounded-xl text-xs font-semibold flex items-start space-x-2 bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-sm">
@@ -810,6 +832,14 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             </form>
           </div>
         </div>
+      )}
+
+      {/* Faculty Live Bus Tracking Modal */}
+      {showFleetTracking && (
+        <LiveBusMapModal
+          isFleetView={true}
+          onClose={() => setShowFleetTracking(false)}
+        />
       )}
     </div>
   );

@@ -14,6 +14,7 @@ import {
   Server,
   BookOpen,
   Layers,
+  Bus,
 } from 'lucide-react';
 import { Role } from '../types';
 
@@ -34,7 +35,8 @@ export type TabType =
   | 'notices'
   | 'schools'
   | 'add_school'
-  | 'system';
+  | 'system'
+  | 'trip';
 
 interface Props {
   activeTab: TabType;
@@ -234,6 +236,19 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
               <span className="text-[10px] mt-0.5">Fees</span>
             </button>
           </>
+        )}
+
+        {/* 5. DRIVER NAVIGATION */}
+        {role === 'driver' && (
+          <button
+            onClick={() => onChangeTab('trip')}
+            className={`flex flex-col items-center py-1 px-6 rounded-2xl transition ${
+              activeTab === 'trip' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Bus className={`w-6 h-6 ${activeTab === 'trip' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className="text-[10px] mt-0.5">Live Bus Trip</span>
+          </button>
         )}
       </div>
     </nav>

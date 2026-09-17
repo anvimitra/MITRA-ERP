@@ -19,6 +19,7 @@ import { ParentView } from './components/ParentView';
 import { TeacherView } from './components/TeacherView';
 import { PrincipalView } from './components/PrincipalView';
 import { SuperAdminView } from './components/SuperAdminView';
+import { DriverView } from './components/DriverView';
 import { AttendanceView } from './components/AttendanceView';
 import { ReportCardView } from './components/ReportCardView';
 import { FeesView } from './components/FeesView';
@@ -148,6 +149,8 @@ export const App: React.FC = () => {
           setActiveTab('overview');
         } else if (res.user.role === 'teacher') {
           setActiveTab('attendance');
+        } else if (res.user.role === 'driver') {
+          setActiveTab('trip');
         } else {
           setActiveTab('home');
         }
@@ -166,7 +169,7 @@ export const App: React.FC = () => {
             localStorage.removeItem('anvimitra_cached_linked_students');
             refreshUserData(res.user);
           }
-        } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher' || res.user.role === 'super_admin') {
+        } else if (res.user.role === 'principal' || res.user.role === 'accountant' || res.user.role === 'teacher' || res.user.role === 'super_admin' || res.user.role === 'driver') {
           setAllLinkedStudents([]);
           setStudent(null);
           refreshUserData(res.user);
@@ -251,7 +254,7 @@ export const App: React.FC = () => {
         localStorage.removeItem('anvimitra_cached_linked_students');
         refreshUserData(newUser);
       }
-    } else if (newUser.role === 'principal' || newUser.role === 'accountant' || newUser.role === 'teacher' || newUser.role === 'super_admin') {
+    } else if (newUser.role === 'principal' || newUser.role === 'accountant' || newUser.role === 'teacher' || newUser.role === 'super_admin' || newUser.role === 'driver') {
       setAllLinkedStudents([]);
       setStudent(null);
       refreshUserData(newUser);
@@ -280,6 +283,8 @@ export const App: React.FC = () => {
       setActiveTab('overview');
     } else if (newUser.role === 'teacher') {
       setActiveTab('attendance');
+    } else if (newUser.role === 'driver') {
+      setActiveTab('trip');
     } else {
       setActiveTab('home');
     }
@@ -381,7 +386,9 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
-                {user.role === 'super_admin' ? (
+                {user.role === 'driver' ? (
+                  <DriverView driver={user} school={school} />
+                ) : user.role === 'super_admin' ? (
                   <SuperAdminView
                     user={user}
                     onUpdateUser={setUser}

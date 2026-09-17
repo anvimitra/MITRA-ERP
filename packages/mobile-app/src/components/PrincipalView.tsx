@@ -40,7 +40,9 @@ import {
   GraduationCap,
   Layers,
   UserCheck,
+  Bus,
 } from 'lucide-react';
+import { LiveBusMapModal } from './LiveBusMapModal';
 
 interface Props {
   principal: User;
@@ -81,6 +83,7 @@ export const PrincipalView: React.FC<Props> = ({
   const [studentSearch, setStudentSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showFleetTracking, setShowFleetTracking] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [newStudent, setNewStudent] = useState({
     admissionNo: '',
@@ -579,6 +582,14 @@ export const PrincipalView: React.FC<Props> = ({
               >
                 <Radio className="w-4 h-4 text-amber-700" />
                 <span>Circulars ({notices.length})</span>
+              </button>
+
+              <button
+                onClick={() => setShowFleetTracking(true)}
+                className="p-2.5 rounded-xl bg-yellow-50 hover:bg-yellow-100 text-yellow-900 border border-yellow-300 font-bold text-xs flex items-center space-x-2 transition col-span-2 shadow-sm"
+              >
+                <Bus className="w-4 h-4 text-amber-600" />
+                <span>Live Bus Fleet Tracking (बस लाइव ट्रैकिंग)</span>
               </button>
             </div>
           </div>
@@ -1543,6 +1554,14 @@ export const PrincipalView: React.FC<Props> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Institutional Fleet Live Map Modal */}
+      {showFleetTracking && (
+        <LiveBusMapModal
+          isFleetView={true}
+          onClose={() => setShowFleetTracking(false)}
+        />
       )}
     </div>
   );

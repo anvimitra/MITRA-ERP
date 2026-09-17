@@ -438,7 +438,14 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       driver_name TEXT NOT NULL,
       driver_phone TEXT NOT NULL,
       driver_license TEXT,
-      status TEXT DEFAULT 'ACTIVE'
+      status TEXT DEFAULT 'ACTIVE',
+      current_lat REAL,
+      current_lng REAL,
+      current_speed REAL DEFAULT 0,
+      current_heading REAL DEFAULT 0,
+      last_location_update TEXT,
+      is_trip_active INTEGER DEFAULT 0,
+      driver_user_id TEXT
     );
 
     CREATE TABLE IF NOT EXISTS transport_routes (
@@ -559,6 +566,16 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
   try {
     sqlite.exec('ALTER TABLE admit_cards ADD COLUMN schedule_json TEXT;');
   } catch {}
+
+  // Auto-migrate GPS telemetry columns for transport_vehicles
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN current_lat REAL;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN current_lng REAL;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN current_speed REAL DEFAULT 0;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN current_heading REAL DEFAULT 0;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN last_location_update TEXT;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN is_trip_active INTEGER DEFAULT 0;'); } catch {}
+  try { sqlite.exec('ALTER TABLE transport_vehicles ADD COLUMN driver_user_id TEXT;'); } catch {}
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN vehicle_id TEXT;'); } catch {}
 
   // If schools count is 0, auto-restore from persistent backup snapshot first
   try {

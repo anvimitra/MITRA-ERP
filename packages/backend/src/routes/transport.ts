@@ -1,10 +1,57 @@
 import { Hono } from 'hono';
 import { db, schema, eq, and, desc } from '../db/index.js';
 import crypto from 'crypto';
-import { verifyToken } from '../services/auth.js';
+import { verifyToken, hashPassword } from '../services/auth.js';
 import { isStudentAccessibleByUser, resolveLinkedStudentsForParent } from '../services/rbac.js';
 
 export const transportRoutes = new Hono();
+
+// Helper: Ensure driver has a login user account in the ERP
+export function ensureDriverUserAccount(schoolId: string, driverName: string, driverPhone: string, vehicleId?: string): string | null {
+  const cleanPhone = (driverPhone || '').trim();
+  const digitsOnly = cleanPhone.replace(/\D/g, '');
+  if (!digitsOnly || digitsOnly.length < 10) return null;
+
+  // Search existing user by phone in this school
+  const allUsers = db.select().from(schema.users).where(eq(schema.users.schoolId, schoolId)).all();
+  const existingUser = allUsers.find((u: any) => {
+    const uPhone = (u.phone || '').replace(/\D/g, '');
+    return uPhone === digitsOnly || (uPhone.length >= 10 && uPhone.endsWith(digitsOnly.slice(-10)));
+  });
+
+  const defaultPassHash = hashPassword('Driver@123');
+  const now = new Date().toISOString();
+
+  if (existingUser) {
+    db.update(schema.users)
+      .set({
+        role: 'driver',
+        name: driverName || existingUser.name,
+        vehicleId: vehicleId || existingUser.vehicleId,
+        isActive: 1,
+      })
+      .where(eq(schema.users.id, existingUser.id))
+      .run();
+    return existingUser.id;
+  } else {
+    const driverUserId = crypto.randomUUID();
+    const driverEmail = `driver.${digitsOnly.slice(-10)}@transport.school`;
+    db.insert(schema.users).values({
+      id: driverUserId,
+      schoolId: schoolId,
+      role: 'driver',
+      name: driverName || 'School Bus Driver',
+      email: driverEmail,
+      phone: cleanPhone,
+      passwordHash: defaultPassHash,
+      appInstalled: 0,
+      isActive: 1,
+      createdAt: now,
+      vehicleId: vehicleId || null,
+    }).run();
+    return driverUserId;
+  }
+}
 
 // ==================== VEHICLES ====================
 
@@ -43,6 +90,7 @@ transportRoutes.post('/vehicles', async (c) => {
   }
 
   const vehicleId = crypto.randomUUID();
+  const driverUserId = ensureDriverUserAccount(user.schoolId, driverName, driverPhone, vehicleId);
 
   db.insert(schema.transportVehicles).values({
     id: vehicleId,
@@ -54,9 +102,10 @@ transportRoutes.post('/vehicles', async (c) => {
     driverPhone,
     driverLicense: driverLicense || '',
     status: 'ACTIVE',
+    driverUserId: driverUserId || null,
   }).run();
 
-  return c.json({ success: true, message: 'Vehicle added successfully', vehicleId }, 201);
+  return c.json({ success: true, message: 'Vehicle added successfully', vehicleId, driverUserId }, 201);
 });
 
 // Update vehicle (Principal or SuperAdmin only)
@@ -82,6 +131,16 @@ transportRoutes.put('/vehicles/:id', async (c) => {
 
   if (!existing) return c.json({ error: 'Vehicle not found' }, 404);
 
+  let driverUserId = existing.driverUserId;
+  if (driverPhone || driverName) {
+    driverUserId = ensureDriverUserAccount(
+      user.schoolId,
+      driverName ?? existing.driverName,
+      driverPhone ?? existing.driverPhone,
+      id
+    );
+  }
+
   db.update(schema.transportVehicles)
     .set({
       vehicleNo: vehicleNo ?? existing.vehicleNo,
@@ -91,6 +150,7 @@ transportRoutes.put('/vehicles/:id', async (c) => {
       driverPhone: driverPhone ?? existing.driverPhone,
       driverLicense: driverLicense ?? existing.driverLicense,
       status: status ?? existing.status,
+      driverUserId: driverUserId ?? existing.driverUserId,
     })
     .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
     .run();
@@ -532,6 +592,378 @@ transportRoutes.get('/student/:studentId', async (c) => {
       vehicleModel: vehicle?.vehicleModel || '',
       driverName: vehicle?.driverName || '',
       driverPhone: vehicle?.driverPhone || '',
+      currentLat: vehicle?.currentLat || null,
+      currentLng: vehicle?.currentLng || null,
+      currentSpeed: vehicle?.currentSpeed || 0,
+      currentHeading: vehicle?.currentHeading || 0,
+      lastLocationUpdate: vehicle?.lastLocationUpdate || null,
+      isTripActive: vehicle?.isTripActive === 1,
     },
   });
 });
+
+// ==================== DRIVER & LIVE GPS TELEMETRY ====================
+
+// Driver: Get assigned bus, route, and stop information
+transportRoutes.get('/driver/my-bus', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const schoolVehicles = db
+    .select()
+    .from(schema.transportVehicles)
+    .where(eq(schema.transportVehicles.schoolId, user.schoolId))
+    .all();
+
+  const userPhoneDigits = (user.phone || '').replace(/\D/g, '');
+
+  // Match vehicle by driverUserId, vehicleId, or driver phone number
+  let vehicle = schoolVehicles.find((v: any) => v.driverUserId === user.userId || (v.id && (user as any).vehicleId === v.id));
+
+  if (!vehicle && userPhoneDigits.length >= 10) {
+    const last10 = userPhoneDigits.slice(-10);
+    vehicle = schoolVehicles.find((v: any) => {
+      const vPhoneDigits = (v.driverPhone || '').replace(/\D/g, '');
+      return vPhoneDigits.endsWith(last10);
+    });
+  }
+
+  // Fallback: if driver role and only one vehicle exists in the school
+  if (!vehicle && user.role === 'driver' && schoolVehicles.length === 1) {
+    vehicle = schoolVehicles[0];
+  }
+
+  if (!vehicle) {
+    return c.json({
+      assigned: false,
+      message: 'No school vehicle assigned to this driver account yet. Please contact the Principal.',
+    });
+  }
+
+  // Find assigned route
+  const route = db
+    .select()
+    .from(schema.transportRoutes)
+    .where(and(eq(schema.transportRoutes.schoolId, user.schoolId), eq(schema.transportRoutes.vehicleId, vehicle.id)))
+    .get();
+
+  let stops: any[] = [];
+  if (route) {
+    stops = db
+      .select()
+      .from(schema.transportStops)
+      .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.routeId, route.id)))
+      .all()
+      .sort((a: any, b: any) => (a.sequenceOrder || 1) - (b.sequenceOrder || 1));
+  }
+
+  return c.json({
+    assigned: true,
+    vehicle: {
+      id: vehicle.id,
+      vehicleNo: vehicle.vehicleNo,
+      vehicleModel: vehicle.vehicleModel,
+      driverName: vehicle.driverName,
+      driverPhone: vehicle.driverPhone,
+      driverLicense: vehicle.driverLicense,
+      status: vehicle.status,
+      currentLat: vehicle.currentLat || null,
+      currentLng: vehicle.currentLng || null,
+      currentSpeed: vehicle.currentSpeed || 0,
+      currentHeading: vehicle.currentHeading || 0,
+      lastLocationUpdate: vehicle.lastLocationUpdate || null,
+      isTripActive: vehicle.isTripActive === 1,
+    },
+    route: route
+      ? {
+          id: route.id,
+          routeName: route.routeName,
+          startLocation: route.startLocation,
+          endLocation: route.endLocation,
+          monthlyFare: route.monthlyFare,
+        }
+      : null,
+    stops,
+  });
+});
+
+// Driver: Push live GPS telemetry updates from mobile phone (watchPosition)
+transportRoutes.post('/driver/live-location', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const body = await c.req.json();
+  const { vehicleId, lat, lng, speed, heading, isTripActive } = body;
+
+  let targetVehicleId = vehicleId;
+
+  // If vehicleId not provided, look up by driver user
+  if (!targetVehicleId) {
+    const schoolVehicles = db
+      .select()
+      .from(schema.transportVehicles)
+      .where(eq(schema.transportVehicles.schoolId, user.schoolId))
+      .all();
+    const userPhoneDigits = (user.phone || '').replace(/\D/g, '');
+    const found = schoolVehicles.find((v: any) => {
+      if (v.driverUserId === user.userId || (v.id && (user as any).vehicleId === v.id)) return true;
+      if (userPhoneDigits.length >= 10) {
+        return (v.driverPhone || '').replace(/\D/g, '').endsWith(userPhoneDigits.slice(-10));
+      }
+      return false;
+    }) || (user.role === 'driver' && schoolVehicles.length === 1 ? schoolVehicles[0] : null);
+
+    if (found) targetVehicleId = found.id;
+  }
+
+  if (!targetVehicleId) {
+    return c.json({ error: 'Vehicle ID could not be identified for this driver' }, 400);
+  }
+
+  const existing = db
+    .select()
+    .from(schema.transportVehicles)
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, targetVehicleId)))
+    .get();
+
+  if (!existing) {
+    return c.json({ error: 'Vehicle not found' }, 404);
+  }
+
+  const now = new Date().toISOString();
+  const updateData: any = {
+    lastLocationUpdate: now,
+  };
+
+  if (lat !== undefined && lng !== undefined) {
+    updateData.currentLat = Number(lat);
+    updateData.currentLng = Number(lng);
+  }
+  if (speed !== undefined) updateData.currentSpeed = Number(speed);
+  if (heading !== undefined) updateData.currentHeading = Number(heading);
+  if (isTripActive !== undefined) updateData.isTripActive = isTripActive ? 1 : 0;
+
+  db.update(schema.transportVehicles)
+    .set(updateData)
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, targetVehicleId)))
+    .run();
+
+  return c.json({
+    success: true,
+    timestamp: now,
+    vehicleId: targetVehicleId,
+    isTripActive: updateData.isTripActive !== undefined ? updateData.isTripActive === 1 : existing.isTripActive === 1,
+  });
+});
+
+// Driver: Toggle trip state (Start / End Trip)
+transportRoutes.post('/driver/toggle-trip', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const body = await c.req.json();
+  const { vehicleId, isTripActive } = body;
+
+  let targetVehicleId = vehicleId;
+  if (!targetVehicleId) {
+    const schoolVehicles = db
+      .select()
+      .from(schema.transportVehicles)
+      .where(eq(schema.transportVehicles.schoolId, user.schoolId))
+      .all();
+    const userPhoneDigits = (user.phone || '').replace(/\D/g, '');
+    const found = schoolVehicles.find((v: any) => {
+      if (v.driverUserId === user.userId) return true;
+      if (userPhoneDigits.length >= 10) {
+        return (v.driverPhone || '').replace(/\D/g, '').endsWith(userPhoneDigits.slice(-10));
+      }
+      return false;
+    }) || (user.role === 'driver' && schoolVehicles.length === 1 ? schoolVehicles[0] : null);
+
+    if (found) targetVehicleId = found.id;
+  }
+
+  if (!targetVehicleId) {
+    return c.json({ error: 'Vehicle ID not found' }, 400);
+  }
+
+  const now = new Date().toISOString();
+  db.update(schema.transportVehicles)
+    .set({
+      isTripActive: isTripActive ? 1 : 0,
+      lastLocationUpdate: now,
+    })
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, targetVehicleId)))
+    .run();
+
+  return c.json({
+    success: true,
+    vehicleId: targetVehicleId,
+    isTripActive: Boolean(isTripActive),
+    timestamp: now,
+  });
+});
+
+// Parent: Strict Live Bus Tracking (ONLY for students with assigned transport)
+transportRoutes.get('/parent/live-tracking/:studentId', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const studentId = c.req.param('studentId');
+
+  // Strict RBAC: Parent can ONLY access their own children
+  if (!isStudentAccessibleByUser(user, studentId)) {
+    return c.json({ error: 'Forbidden: Access denied to student transport tracking' }, 403);
+  }
+
+  // Check if student has transport allocated
+  const allocation = db
+    .select()
+    .from(schema.studentTransport)
+    .where(
+      and(
+        eq(schema.studentTransport.schoolId, user.schoolId),
+        eq(schema.studentTransport.studentId, studentId)
+      )
+    )
+    .get();
+
+  if (!allocation) {
+    return c.json({
+      hasTransport: false,
+      message: 'No school bus is assigned to this student in the ERP.',
+    });
+  }
+
+  const route = db.select().from(schema.transportRoutes).where(eq(schema.transportRoutes.id, allocation.routeId)).get();
+  if (!route) {
+    return c.json({
+      hasTransport: false,
+      message: 'Assigned transport route was not found in the ERP system.',
+    });
+  }
+
+  const stop = db.select().from(schema.transportStops).where(eq(schema.transportStops.id, allocation.stopId)).get();
+  const vehicle = route.vehicleId
+    ? db.select().from(schema.transportVehicles).where(eq(schema.transportVehicles.id, route.vehicleId)).get()
+    : null;
+
+  const allStops = db
+    .select()
+    .from(schema.transportStops)
+    .where(and(eq(schema.transportStops.schoolId, user.schoolId), eq(schema.transportStops.routeId, route.id)))
+    .all()
+    .sort((a: any, b: any) => (a.sequenceOrder || 1) - (b.sequenceOrder || 1));
+
+  return c.json({
+    hasTransport: true,
+    studentId,
+    vehicle: vehicle
+      ? {
+          id: vehicle.id,
+          vehicleNo: vehicle.vehicleNo,
+          vehicleModel: vehicle.vehicleModel,
+          driverName: vehicle.driverName,
+          driverPhone: vehicle.driverPhone,
+          driverLicense: vehicle.driverLicense,
+          status: vehicle.status,
+          currentLat: vehicle.currentLat || null,
+          currentLng: vehicle.currentLng || null,
+          currentSpeed: vehicle.currentSpeed || 0,
+          currentHeading: vehicle.currentHeading || 0,
+          lastLocationUpdate: vehicle.lastLocationUpdate || null,
+          isTripActive: vehicle.isTripActive === 1,
+        }
+      : null,
+    route: {
+      id: route.id,
+      routeName: route.routeName,
+      startLocation: route.startLocation,
+      endLocation: route.endLocation,
+      monthlyFare: route.monthlyFare,
+    },
+    studentStop: stop
+      ? {
+          id: stop.id,
+          stopName: stop.stopName,
+          pickupTime: stop.pickupTime,
+          dropTime: stop.dropTime,
+          sequenceOrder: stop.sequenceOrder,
+        }
+      : null,
+    allStops,
+  });
+});
+
+// Fleet Live Tracking: For Principal, Teachers & SuperAdmin to view all active buses
+transportRoutes.get('/fleet-live', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'teacher' && user.role !== 'super_admin' && user.role !== 'accountant') {
+    return c.json({ error: 'Forbidden: School staff only' }, 403);
+  }
+
+  const vehicles = db
+    .select()
+    .from(schema.transportVehicles)
+    .where(eq(schema.transportVehicles.schoolId, user.schoolId))
+    .all();
+
+  const routes = db
+    .select()
+    .from(schema.transportRoutes)
+    .where(eq(schema.transportRoutes.schoolId, user.schoolId))
+    .all();
+
+  const stops = db
+    .select()
+    .from(schema.transportStops)
+    .where(eq(schema.transportStops.schoolId, user.schoolId))
+    .all();
+
+  const fleet = vehicles.map((v: any) => {
+    const route = routes.find((r: any) => r.vehicleId === v.id);
+    const routeStops = route
+      ? stops.filter((s: any) => s.routeId === route.id).sort((a: any, b: any) => (a.sequenceOrder || 1) - (b.sequenceOrder || 1))
+      : [];
+
+    return {
+      id: v.id,
+      vehicleNo: v.vehicleNo,
+      vehicleModel: v.vehicleModel,
+      driverName: v.driverName,
+      driverPhone: v.driverPhone,
+      driverLicense: v.driverLicense,
+      status: v.status,
+      currentLat: v.currentLat || null,
+      currentLng: v.currentLng || null,
+      currentSpeed: v.currentSpeed || 0,
+      currentHeading: v.currentHeading || 0,
+      lastLocationUpdate: v.lastLocationUpdate || null,
+      isTripActive: v.isTripActive === 1,
+      routeName: route?.routeName || 'Unassigned Route',
+      routeId: route?.id || null,
+      stopsCount: routeStops.length,
+      stops: routeStops,
+    };
+  });
+
+  return c.json({
+    schoolId: user.schoolId,
+    totalVehicles: vehicles.length,
+    activeTrips: fleet.filter((f: any) => f.isTripActive).length,
+    vehicles: fleet,
+  });
+});
+

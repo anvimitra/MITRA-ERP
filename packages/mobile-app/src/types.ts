@@ -1,4 +1,4 @@
-export type Role = 'parent' | 'teacher' | 'principal' | 'accountant' | 'student' | 'super_admin';
+export type Role = 'parent' | 'teacher' | 'principal' | 'accountant' | 'student' | 'super_admin' | 'driver';
 
 export interface School {
   id: string;
@@ -166,15 +166,94 @@ export interface CertificateItem {
 }
 
 export interface StudentTransportItem {
-  id: string;
-  studentId: string;
+  id?: string;
+  allocationId?: string;
+  studentId?: string;
   studentName?: string;
   admissionNo?: string;
   routeName: string;
+  startLocation?: string;
+  endLocation?: string;
+  monthlyFare?: number;
   stopName: string;
   pickupTime: string;
   dropTime: string;
   vehicleNo: string;
+  vehicleModel?: string;
+  driverName?: string;
+  driverPhone?: string;
+  currentLat?: number | null;
+  currentLng?: number | null;
+  currentSpeed?: number;
+  currentHeading?: number;
+  lastLocationUpdate?: string | null;
+  isTripActive?: boolean;
+}
+
+export interface LiveVehicleTelemetry {
+  id: string;
+  vehicleNo: string;
+  vehicleModel?: string;
+  driverName: string;
+  driverPhone: string;
+  driverLicense?: string;
+  status: string;
+  currentLat?: number | null;
+  currentLng?: number | null;
+  currentSpeed?: number;
+  currentHeading?: number;
+  lastLocationUpdate?: string | null;
+  isTripActive?: boolean;
+}
+
+export interface TransportStopItem {
+  id: string;
+  stopName: string;
+  pickupTime: string;
+  dropTime: string;
+  sequenceOrder: number;
+}
+
+export interface DriverBusInfo {
+  assigned: boolean;
+  message?: string;
+  vehicle?: LiveVehicleTelemetry;
+  route?: {
+    id: string;
+    routeName: string;
+    startLocation: string;
+    endLocation: string;
+    monthlyFare: number;
+  } | null;
+  stops?: TransportStopItem[];
+}
+
+export interface ParentLiveBusTracking {
+  hasTransport: boolean;
+  message?: string;
+  studentId?: string;
+  vehicle?: LiveVehicleTelemetry | null;
+  route?: {
+    id: string;
+    routeName: string;
+    startLocation: string;
+    endLocation: string;
+    monthlyFare: number;
+  } | null;
+  studentStop?: TransportStopItem | null;
+  allStops?: TransportStopItem[];
+}
+
+export interface FleetLiveInfo {
+  schoolId: string;
+  totalVehicles: number;
+  activeTrips: number;
+  vehicles: Array<LiveVehicleTelemetry & {
+    routeName?: string;
+    routeId?: string;
+    stopsCount?: number;
+    stops?: TransportStopItem[];
+  }>;
 }
 
 export interface LibraryBookItem {

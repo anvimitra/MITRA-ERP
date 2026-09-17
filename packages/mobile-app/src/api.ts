@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo, DriverBusInfo, ParentLiveBusTracking, FleetLiveInfo } from './types';
 
 // Canonical Live Production Render API Endpoint
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -509,12 +509,96 @@ export async function fetchStudentTransport(studentId: string): Promise<StudentT
     const res = await authFetch(`/transport/student/${studentId}`);
     if (res.ok) {
       const data = await res.json();
+      if (data.transport) return data.transport;
       if (data.allocation) return data.allocation;
     }
   } catch (err) {
     console.warn('Transport offline:', err);
   }
   return null;
+}
+
+// 18b. Fetch Parent Live Bus Tracking (Strict RBAC: returns hasTransport: false if no bus assigned)
+export async function fetchParentBusLiveTracking(studentId: string): Promise<ParentLiveBusTracking> {
+  try {
+    const res = await authFetch(`/transport/parent/live-tracking/${studentId}`);
+    if (res.ok) {
+      return await res.json();
+    }
+    const errData = await res.json().catch(() => ({}));
+    return {
+      hasTransport: false,
+      message: errData.message || errData.error || 'Failed to fetch tracking data',
+    };
+  } catch (err: any) {
+    return {
+      hasTransport: false,
+      message: err?.message || 'Offline or network error',
+    };
+  }
+}
+
+// 18c. Driver: Fetch Assigned Vehicle, Route, and Stops
+export async function fetchDriverMyBus(): Promise<DriverBusInfo> {
+  try {
+    const res = await authFetch('/transport/driver/my-bus');
+    if (res.ok) {
+      return await res.json();
+    }
+    const errData = await res.json().catch(() => ({}));
+    return {
+      assigned: false,
+      message: errData.message || errData.error || 'Unable to retrieve assigned vehicle.',
+    };
+  } catch (err: any) {
+    return {
+      assigned: false,
+      message: err?.message || 'Driver bus sync offline',
+    };
+  }
+}
+
+// 18d. Driver: Push GPS Coordinates to ERP Server (watchPosition)
+export async function updateDriverLiveLocation(telemetry: {
+  vehicleId?: string;
+  lat: number;
+  lng: number;
+  speed?: number;
+  heading?: number;
+  isTripActive?: boolean;
+}): Promise<any> {
+  const res = await authFetch('/transport/driver/live-location', {
+    method: 'POST',
+    body: JSON.stringify(telemetry),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to sync GPS location');
+  }
+  return data;
+}
+
+// 18e. Driver: Start or End Trip
+export async function toggleDriverTrip(isTripActive: boolean, vehicleId?: string): Promise<any> {
+  const res = await authFetch('/transport/driver/toggle-trip', {
+    method: 'POST',
+    body: JSON.stringify({ isTripActive, vehicleId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to toggle trip status');
+  }
+  return data;
+}
+
+// 18f. Principal & Teachers: Fetch all active school buses with live telemetry
+export async function fetchFleetLiveTracking(): Promise<FleetLiveInfo> {
+  const res = await authFetch('/transport/fleet-live');
+  if (res.ok) {
+    return await res.json();
+  }
+  const data = await res.json().catch(() => ({}));
+  throw new Error(data.error || 'Failed to fetch fleet tracking data');
 }
 
 // 19. Fetch Library Issues

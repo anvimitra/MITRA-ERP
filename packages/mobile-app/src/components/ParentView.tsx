@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Student, AttendanceRecord, FeeItem, ExamReport, CertificateItem, StudentTransportItem, LibraryIssueItem, School } from '../types';
 import { fetchStudentTransport, fetchCertificates, fetchLibraryIssues, fetchAdmitCard } from '../api';
-import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download, Navigation } from 'lucide-react';
 import { TabType } from './BottomNavBar';
+import { LiveBusMapModal } from './LiveBusMapModal';
 
 interface Props {
   student?: Student | null;
@@ -40,6 +41,7 @@ export const ParentView: React.FC<Props> = ({
   const [admitCard, setAdmitCard] = useState<any | null>(null);
   const [showAdmitCardModal, setShowAdmitCardModal] = useState(false);
   const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
+  const [showLiveTrackingModal, setShowLiveTrackingModal] = useState(false);
 
   useEffect(() => {
     if (student?.id) {
@@ -334,50 +336,80 @@ export const ParentView: React.FC<Props> = ({
         )}
       </div>
 
-      {/* School Bus Tracker Card */}
-      {transport && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+      {/* School Bus Tracker Card - ONLY visible if child has assigned bus in ERP */}
+      {transport && transport.routeName && (
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 rounded-xl bg-amber-100 text-amber-800">
-                <Bus className="w-4 h-4" />
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-500 text-slate-950 flex items-center justify-center shadow-md shadow-amber-500/20 font-black">
+                <Bus className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">School Bus Tracking</h3>
-                <p className="text-[11px] text-slate-500">{transport.routeName}</p>
+                <h3 className="font-black text-slate-900 text-sm">School Bus Live Tracking</h3>
+                <p className="text-[11px] text-slate-500 font-medium">{transport.routeName}</p>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800">
-              Active
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 ${
+                transport.isTripActive
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  transport.isTripActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                }`}
+              />
+              <span>{transport.isTripActive ? 'Trip Active' : 'At Stand'}</span>
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+          <div className="grid grid-cols-2 gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
             <div>
-              <span className="text-[10px] text-slate-400 block font-medium">Bus Number</span>
-              <strong className="font-mono text-slate-800">{transport.vehicleNo}</strong>
+              <span className="text-[10px] text-slate-400 block font-bold">Bus Number</span>
+              <strong className="font-mono text-slate-900 text-sm">{transport.vehicleNo}</strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block font-medium">Boarding Stop</span>
-              <strong className="text-slate-800 truncate block">{transport.stopName}</strong>
+              <span className="text-[10px] text-slate-400 block font-bold">Boarding Stop</span>
+              <strong className="text-slate-900 truncate block">{transport.stopName}</strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block font-medium">Morning Pickup</span>
+              <span className="text-[10px] text-slate-400 block font-bold">Morning Pickup</span>
               <strong className="text-emerald-700 font-black">{transport.pickupTime}</strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block font-medium">Afternoon Drop</span>
+              <span className="text-[10px] text-slate-400 block font-bold">Afternoon Drop</span>
               <strong className="text-blue-700 font-black">{transport.dropTime}</strong>
             </div>
           </div>
 
-          <a
-            href="tel:+919876543210"
-            className="w-full py-2 bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition"
-          >
-            <Phone className="w-3.5 h-3.5" />
-            <span>Call Driver (Rajesh Kumar)</span>
-          </a>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={() => setShowLiveTrackingModal(true)}
+              className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 active:scale-98 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5"
+            >
+              <Navigation className="w-4 h-4" />
+              <span>Track Live Map</span>
+            </button>
+
+            {transport.driverPhone ? (
+              <a
+                href={`tel:${transport.driverPhone}`}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition truncate px-2"
+              >
+                <Phone className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Call Driver</span>
+              </a>
+            ) : (
+              <button
+                disabled
+                className="w-full py-2.5 bg-slate-100 text-slate-400 text-xs rounded-xl font-bold"
+              >
+                No Phone
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -570,6 +602,15 @@ export const ParentView: React.FC<Props> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* LIVE BUS TRACKING MAP MODAL */}
+      {showLiveTrackingModal && student && (
+        <LiveBusMapModal
+          studentId={student.id}
+          studentName={`${student.firstName} ${student.lastName || ''}`.trim()}
+          onClose={() => setShowLiveTrackingModal(false)}
+        />
       )}
     </div>
   );
