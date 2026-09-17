@@ -1,5 +1,6 @@
 import React from 'react';
 import { ReportCardData } from '../types';
+import { User } from 'lucide-react';
 
 export const CbseOfficialTemplate: React.FC<{ data: ReportCardData }> = ({ data }) => {
   const { school, student, exam, subjects, summary } = data;
@@ -8,26 +9,37 @@ export const CbseOfficialTemplate: React.FC<{ data: ReportCardData }> = ({ data 
     <div className="report-card-container bg-white text-slate-900 border-4 border-double border-slate-800 p-8 max-w-4xl mx-auto my-6 font-serif shadow-xl">
       {/* Header */}
       <div className="text-center border-b-2 border-slate-800 pb-4 relative">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           {school.logoUrl && (
-            <img src={school.logoUrl} alt="Logo" className="w-16 h-16 object-contain grayscale" />
+            <img src={school.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
           )}
-          <div className="flex-1 px-4">
+          <div className="flex-1 px-2">
             <span className="text-[11px] font-sans uppercase tracking-widest text-slate-600 block">
-              CENTRAL BOARD OF SECONDARY EDUCATION, NEW DELHI
+              {school.board ? `${school.board} BOARD ACCREDITED INSTITUTION` : 'CENTRAL BOARD OF SECONDARY EDUCATION, NEW DELHI'}
             </span>
             <h1 className="text-2xl font-bold uppercase tracking-wider text-slate-950 font-serif">
               {school.name}
             </h1>
-            <p className="text-xs text-slate-600 font-sans mt-0.5">{school.address}</p>
+            <p className="text-xs text-slate-600 font-sans mt-0.5">
+              {school.address}{school.city ? `, ${school.city}` : ''}{school.state ? `, ${school.state}` : ''}{school.pincode ? ` - ${school.pincode}` : ''}
+              {school.phone ? ` • Tel: ${school.phone}` : ''}
+              {school.email ? ` • Email: ${school.email}` : ''}
+            </p>
             <div className="flex justify-center gap-6 text-[10px] text-slate-500 font-sans mt-1">
-              <span>Affiliation No: 2130099</span>
+              <span>Affiliation No: {school.affiliationNo || school.code}</span>
               <span>School Code: {school.code}</span>
               <span>Session: {exam.academicYear}</span>
             </div>
           </div>
-          <div className="w-16 h-16 border border-dashed border-slate-400 flex items-center justify-center text-[9px] text-slate-400 font-sans">
-            Student Photo
+          <div className="w-20 h-24 border-2 border-slate-700 bg-slate-50 flex items-center justify-center overflow-hidden rounded shadow-sm shrink-0">
+            {student.photoUrl ? (
+              <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-slate-400 p-1 font-sans text-center">
+                <User size={26} className="text-slate-400" />
+                <span className="text-[8px] uppercase tracking-wider font-bold mt-1">Photo</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -62,38 +74,37 @@ export const CbseOfficialTemplate: React.FC<{ data: ReportCardData }> = ({ data 
             <tr className="bg-slate-100 text-slate-800 text-center font-bold">
               <th className="border border-slate-400 py-2 px-3 text-left">Subject Code & Name</th>
               <th className="border border-slate-400 py-2 px-2">Max Marks</th>
-              <th className="border border-slate-400 py-2 px-2">Periodic Test (WT)</th>
-              <th className="border border-slate-400 py-2 px-2">Exam Marks</th>
-              <th className="border border-slate-400 py-2 px-2">Total Marks</th>
+              <th className="border border-slate-400 py-2 px-2">Marks Obtained</th>
+              <th className="border border-slate-400 py-2 px-2">Percentage (%)</th>
               <th className="border border-slate-400 py-2 px-2">Grade</th>
               <th className="border border-slate-400 py-2 px-2">Grade Point</th>
+              <th className="border border-slate-400 py-2 px-3 text-left">Teacher Remarks</th>
             </tr>
           </thead>
           <tbody>
-            {subjects.map((s, idx) => {
-              const periodic = Math.round(s.marksObtained * 0.2);
-              const mainExam = Math.round(s.marksObtained * 0.8);
-              return (
-                <tr key={idx} className="text-center">
-                  <td className="border border-slate-400 py-2 px-3 text-left font-semibold">
-                    {s.subjectCode || `SUB0${idx + 1}`} - {s.subjectName}
-                  </td>
-                  <td className="border border-slate-400 py-2 px-2">{s.maxMarks}</td>
-                  <td className="border border-slate-400 py-2 px-2 text-slate-600">{periodic}</td>
-                  <td className="border border-slate-400 py-2 px-2 text-slate-600">{mainExam}</td>
-                  <td className="border border-slate-400 py-2 px-2 font-bold">{s.marksObtained}</td>
-                  <td className="border border-slate-400 py-2 px-2 font-black">{s.grade}</td>
-                  <td className="border border-slate-400 py-2 px-2">{s.gradePoint.toFixed(1)}</td>
-                </tr>
-              );
-            })}
+            {subjects.map((s, idx) => (
+              <tr key={idx} className="text-center hover:bg-slate-50">
+                <td className="border border-slate-400 py-2 px-3 text-left font-semibold">
+                  {s.subjectCode || `SUB0${idx + 1}`} - {s.subjectName}
+                </td>
+                <td className="border border-slate-400 py-2 px-2">{s.maxMarks}</td>
+                <td className="border border-slate-400 py-2 px-2 font-bold text-slate-900">{s.marksObtained}</td>
+                <td className="border border-slate-400 py-2 px-2 font-bold text-blue-900">{s.percentage}%</td>
+                <td className="border border-slate-400 py-2 px-2 font-black">{s.grade}</td>
+                <td className="border border-slate-400 py-2 px-2">{s.gradePoint.toFixed(1)}</td>
+                <td className="border border-slate-400 py-2 px-3 text-left text-slate-600 italic text-[11px]">
+                  {s.remarks || 'Satisfactory'}
+                </td>
+              </tr>
+            ))}
             <tr className="bg-slate-100 font-bold text-center">
               <td className="border border-slate-400 py-2 px-3 text-left uppercase">Grand Aggregate</td>
-              <td className="border border-slate-400 py-2 px-2">{summary.totalMaxMarks}</td>
-              <td className="border border-slate-400 py-2 px-2" colSpan={2}>Percentage: {summary.overallPercentage}%</td>
+              <td className="border border-slate-400 py-2 px-2 font-bold">{summary.totalMaxMarks}</td>
               <td className="border border-slate-400 py-2 px-2 text-blue-900 font-black">{summary.totalMarksObtained}</td>
+              <td className="border border-slate-400 py-2 px-2 text-blue-900 font-black">{summary.overallPercentage}%</td>
               <td className="border border-slate-400 py-2 px-2 font-black">{summary.overallGrade}</td>
               <td className="border border-slate-400 py-2 px-2">{summary.overallGradePoint.toFixed(1)}</td>
+              <td className="border border-slate-400 py-2 px-3 text-left font-bold text-emerald-800 uppercase">{summary.division}</td>
             </tr>
           </tbody>
         </table>
@@ -168,16 +179,24 @@ export const CbseOfficialTemplate: React.FC<{ data: ReportCardData }> = ({ data 
       {/* Signature Row */}
       <div className="mt-8 pt-8 grid grid-cols-3 gap-4 text-center font-sans text-xs border-t border-slate-400">
         <div>
-          <div className="h-8"></div>
+          <div className="h-8 flex items-end justify-center font-serif italic text-slate-700 font-bold text-xs">
+            {student.classTeacherName || ''}
+          </div>
           <strong className="block border-t border-slate-400 pt-1">Class Teacher</strong>
+          {student.classTeacherName && <span className="text-[10px] text-slate-500 font-sans">{student.classTeacherName}</span>}
         </div>
         <div>
-          <div className="h-8"></div>
+          <div className="h-8 flex items-end justify-center font-mono text-[10px] text-slate-400">
+            [INSTITUTIONAL SEAL]
+          </div>
           <strong className="block border-t border-slate-400 pt-1">Exam Coordinator</strong>
         </div>
         <div>
-          <div className="h-8"></div>
+          <div className="h-8 flex items-end justify-center font-serif italic text-blue-900 font-bold text-sm">
+            {school.principalName || ''}
+          </div>
           <strong className="block border-t border-slate-400 pt-1">Principal / Head of Institution</strong>
+          {school.principalName && <span className="text-[10px] text-slate-500 font-sans">{school.principalName}</span>}
         </div>
       </div>
     </div>

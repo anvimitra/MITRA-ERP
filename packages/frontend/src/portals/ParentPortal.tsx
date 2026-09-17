@@ -910,10 +910,10 @@ export const ParentPortal: React.FC<Props> = ({ user, studentId }) => {
               {/* Board Header */}
               <div className="text-center border-b-2 border-slate-900 pb-4">
                 <h2 className="text-xl font-black uppercase tracking-wide">
-                  {viewAdmitCardModal.schoolName || 'DELHI PUBLIC GLOBAL ACADEMY'}
+                  {viewAdmitCardModal.schoolName || school?.name || schoolNameDisplay}
                 </h2>
                 <p className="text-xs font-bold text-slate-700">
-                  Affiliation No: {viewAdmitCardModal.schoolAffiliation || 'CBSE/AFF/1032890'} • Center Code: {viewAdmitCardModal.centerNumber || '8402'}
+                  {(viewAdmitCardModal.schoolAffiliation || school?.affiliationNo) ? `Affiliation No: ${viewAdmitCardModal.schoolAffiliation || school?.affiliationNo} • ` : ''}Center Code: {viewAdmitCardModal.centerNumber || '8402'}
                 </p>
                 <div className="inline-block mt-2 px-4 py-1 bg-slate-100 border border-slate-400 rounded-lg text-xs font-black uppercase tracking-wider">
                   {viewAdmitCardModal.examTitle || 'SECONDARY SCHOOL EXAMINATION 2026 • ADMIT CARD'}

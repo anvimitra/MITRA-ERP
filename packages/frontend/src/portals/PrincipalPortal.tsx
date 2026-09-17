@@ -1204,7 +1204,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 {currentSchool?.name || 'ANVIMITRA ERP'}
               </h2>
               <span className="text-[10px] text-slate-400 font-mono block">
-                Code: {currentSchool?.code || 'LSK1'} • 2026-2027
+                {currentSchool?.code ? `Code: ${currentSchool.code} • ` : ''}Academic Session
               </span>
             </div>
           </div>
@@ -4141,7 +4141,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
         {activeTab === 'certificates' && (
           <CertificatesDesk
             students={students}
-            schoolInfo={classesData?.school}
+            schoolInfo={currentSchool || classesData?.school}
             onStudentsUpdated={async () => {
               const [sRes, pRes] = await Promise.all([
                 ApiService.getStudents(),
@@ -4195,13 +4195,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   )}
                   <div>
                     <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
-                      {currentSchool?.name || classesData?.school?.name || 'LSK ACADEMY SECONDARY SCHOOL'}
+                      {currentSchool?.name || classesData?.school?.name || 'School Name'}
                     </h1>
                     <p className="text-xs font-semibold text-slate-600">
-                      Affiliation No: {currentSchool?.affiliationNo || 'CBSE-REG-8402'} | School Code: {currentSchool?.code || 'LSK1'}
+                      {(currentSchool?.affiliationNo || classesData?.school?.affiliationNo) ? `Affiliation No: ${currentSchool?.affiliationNo || classesData?.school?.affiliationNo} | ` : ''}School Code: {currentSchool?.code || classesData?.school?.code || ''}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {currentSchool?.address || 'Institutional Campus, Main Road'} • Phone: {currentSchool?.phone || '+91 9680897658'}
+                      {currentSchool?.address || classesData?.school?.address || ''}{currentSchool?.phone || classesData?.school?.phone ? ` • Phone: ${currentSchool?.phone || classesData?.school?.phone}` : ''}
                     </p>
                   </div>
                 </div>
@@ -4236,7 +4236,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">Roll Number & Code</span>
                     <span className="font-mono font-bold text-slate-900">
-                      {selectedAdmitCardStudent.rollNo ? `Roll: ${selectedAdmitCardStudent.rollNo}` : ''} • {selectedAdmitCardDetails?.rollCode || `CBSE-LSK1-2026-${String(selectedAdmitCardStudent.rollNo || 1).padStart(4, '0')}`}
+                      {selectedAdmitCardStudent.rollNo ? `Roll: ${selectedAdmitCardStudent.rollNo}` : ''} • {selectedAdmitCardDetails?.rollCode || `${currentSchool?.code || 'SCH'}-2026-${String(selectedAdmitCardStudent.rollNo || 1).padStart(4, '0')}`}
                     </span>
                   </div>
 
@@ -4435,7 +4435,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     <div key={st.id} className="border-2 border-slate-900 p-6 rounded-2xl relative space-y-4 print:page-break-after-always">
                       <div className="text-center border-b-2 border-slate-900 pb-4">
                         <h2 className="text-xl font-black uppercase text-slate-900">
-                          {currentSchool?.name || 'LSK ACADEMY SECONDARY SCHOOL'}
+                          {currentSchool?.name || classesData?.school?.name || 'School Name'}
                         </h2>
                         <p className="text-xs font-semibold text-slate-600">
                           {card?.examTitle || admitCardExamTitle || 'Annual Examination Hall Ticket 2026-27'}
@@ -4454,7 +4454,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 uppercase font-bold block">Roll No & Code</span>
-                            <span className="font-mono font-bold">{st.rollNo || 1} • {card?.rollCode || `CBSE-LSK1-2026-${String(st.rollNo || 1).padStart(4, '0')}`}</span>
+                            <span className="font-mono font-bold">{st.rollNo || 1} • {card?.rollCode || `${currentSchool?.code || 'SCH'}-2026-${String(st.rollNo || 1).padStart(4, '0')}`}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 uppercase font-bold block">Examination Center</span>

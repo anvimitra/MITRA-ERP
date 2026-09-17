@@ -179,6 +179,13 @@ export interface ReportCardData {
     address?: string | null;
     phone?: string | null;
     email?: string | null;
+    affiliationNo?: string | null;
+    principalName?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    website?: string | null;
+    board?: string | null;
     primaryColor: string;
   };
   student: {
@@ -193,6 +200,7 @@ export interface ReportCardData {
     dob?: string | null;
     bloodGroup?: string | null;
     photoUrl?: string | null;
+    classTeacherName?: string | null;
   };
   exam: {
     id: string;
@@ -281,6 +289,9 @@ export interface CertificateItem {
   reason?: string;
   conduct?: string;
   status: string;
+  photoUrl?: string;
+  student?: any;
+  school?: any;
   extra?: any;
 }
 

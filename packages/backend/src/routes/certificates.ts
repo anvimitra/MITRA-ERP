@@ -36,6 +36,7 @@ certificateRoutes.get('/', async (c) => {
       sectionId: schema.students.sectionId,
       gender: schema.students.gender,
       dob: schema.students.dob,
+      photoUrl: schema.students.photoUrl,
     })
     .from(schema.students)
     .where(eq(schema.students.schoolId, user.schoolId))
@@ -52,6 +53,28 @@ certificateRoutes.get('/', async (c) => {
     .from(schema.sections)
     .where(eq(schema.sections.schoolId, user.schoolId))
     .all();
+
+  const school = db
+    .select()
+    .from(schema.schools)
+    .where(eq(schema.schools.id, user.schoolId))
+    .get();
+
+  const schoolData = {
+    name: school?.name || '',
+    code: school?.code || '',
+    affiliationNo: school?.affiliationNo || '',
+    principalName: school?.principalName || '',
+    address: school?.address || '',
+    city: school?.city || '',
+    state: school?.state || '',
+    pincode: school?.pincode || '',
+    phone: school?.phone || '',
+    email: school?.email || '',
+    logoUrl: school?.logoUrl || '',
+    website: school?.website || '',
+    board: (school as any)?.board || 'CBSE',
+  };
 
   const enriched = certs.map((cert: any) => {
     const student = students.find((s: any) => s.id === cert.studentId);
@@ -75,6 +98,17 @@ certificateRoutes.get('/', async (c) => {
       className: cls?.name || '',
       sectionName: sec?.name || '',
       dob: student?.dob || '',
+      photoUrl: student?.photoUrl || '',
+      student: student
+        ? {
+            ...student,
+            fullName: `${student.firstName} ${student.lastName || ''}`.trim(),
+            className: cls?.name || '',
+            sectionName: sec?.name || '',
+            photoUrl: student.photoUrl || '',
+          }
+        : null,
+      school: schoolData,
       extra: parsedExtra,
     };
   });
@@ -135,9 +169,32 @@ certificateRoutes.get('/student/:studentId', async (c) => {
       ...cert,
       studentName: student ? `${student.firstName} ${student.lastName || ''}`.trim() : '',
       admissionNo: student?.admissionNo || '',
+      photoUrl: student?.photoUrl || '',
+      student: student
+        ? {
+            ...student,
+            fullName: `${student.firstName} ${student.lastName || ''}`.trim(),
+            photoUrl: student?.photoUrl || '',
+          }
+        : null,
       schoolName: school?.name || '',
       schoolLogo: school?.logoUrl || '',
       schoolAffiliation: school?.affiliationNo || '',
+      school: {
+        name: school?.name || '',
+        code: school?.code || '',
+        affiliationNo: school?.affiliationNo || '',
+        principalName: school?.principalName || '',
+        address: school?.address || '',
+        city: school?.city || '',
+        state: school?.state || '',
+        pincode: school?.pincode || '',
+        phone: school?.phone || '',
+        email: school?.email || '',
+        logoUrl: school?.logoUrl || '',
+        website: school?.website || '',
+        board: (school as any)?.board || 'CBSE',
+      },
       extra: parsedExtra,
     };
   });
@@ -244,9 +301,9 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
       dob: student.dob || '2010-05-15',
       photoUrl: student.photoUrl,
       centerNumber: cardRecord?.centerNumber || '8402',
-      centerName: cardRecord?.centerName || `${school?.name || 'National School'} Examination Center, Campus Block-A`,
+      centerName: cardRecord?.centerName || `${school?.name || 'School'} Examination Center, Campus Block-A`,
       schoolName: school?.name || '',
-      schoolAffiliation: school?.affiliationNo || 'CBSE/AFF/1032890',
+      schoolAffiliation: school?.affiliationNo || '',
       examTitle: cardRecord?.examTitle || 'Secondary School Examination 2026 (Annual Term)',
       isAssigned: !!cardRecord,
       instructions: [
@@ -292,7 +349,7 @@ certificateRoutes.post('/generate-class-admit-cards', async (c) => {
 
   for (const s of students) {
     const cardId = `adm-${Date.now()}-${s.id.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const rollCode = `CBSE-${school?.code || 'SCH'}-2026-${String(s.rollNo || 1).padStart(4, '0')}`;
+    const rollCode = `${school?.code || 'SCH'}-2026-${String(s.rollNo || 1).padStart(4, '0')}`;
 
     db.delete(schema.admitCards)
       .where(and(eq(schema.admitCards.schoolId, user.schoolId), eq(schema.admitCards.studentId, s.id)))
@@ -308,7 +365,7 @@ certificateRoutes.post('/generate-class-admit-cards', async (c) => {
       rollCode,
       examTitle: examTitle || 'Official Annual Examination Admit Card 2026',
       centerNumber: centerNumber || '8402',
-      centerName: centerName || `${school?.name || 'Institutional Campus'} Center A`,
+      centerName: centerName || `${school?.name || 'School'} Center A`,
       scheduleJson,
       isPublished: 1,
       createdAt: now,
@@ -412,6 +469,7 @@ certificateRoutes.get('/:id', async (c) => {
       student: {
         ...student,
         fullName: student ? `${student.firstName} ${student.lastName || ''}`.trim() : '',
+        photoUrl: student?.photoUrl || '',
         className: cls?.name || '',
         sectionName: sec?.name || '',
         fatherName: parent?.fatherName || '',
@@ -431,6 +489,8 @@ certificateRoutes.get('/:id', async (c) => {
         phone: school?.phone || '',
         email: school?.email || '',
         logoUrl: school?.logoUrl || '',
+        website: school?.website || '',
+        board: (school as any)?.board || 'CBSE',
       },
     },
   });

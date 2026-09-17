@@ -122,14 +122,9 @@ authRoutes.post('/login', async (c) => {
     },
     school: school
       ? {
-          id: school.id,
-          name: school.name,
-          code: school.code,
-          board: school.board || 'CBSE',
-          servicesEnabled: school.servicesEnabled !== 0,
-          logoUrl: school.logoUrl,
-          primaryColor: school.primaryColor,
-          secondaryColor: school.secondaryColor,
+          ...school,
+          board: (school as any).board || 'CBSE',
+          servicesEnabled: (school as any).servicesEnabled !== 0,
         }
       : null,
     linkedStudents,

@@ -518,8 +518,8 @@ export const StaffPayrollDesk: React.FC<StaffPayrollDeskProps> = ({ staffList })
             <div className="p-8 font-sans text-xs border border-slate-300 m-4 rounded-xl bg-white space-y-6">
               {/* Header */}
               <div className="text-center pb-4 border-b border-slate-300">
-                <h2 className="text-lg font-black uppercase text-slate-900">{printSlip.school?.name || 'DELHI PUBLIC SCHOOL'}</h2>
-                <p className="text-slate-500 text-[11px]">{printSlip.school?.address || 'Sector 12, RK Puram, New Delhi'}</p>
+                <h2 className="text-lg font-black uppercase text-slate-900">{printSlip.school?.name || 'Institutional Campus'}</h2>
+                <p className="text-slate-500 text-[11px]">{printSlip.school?.address || ''}</p>
                 <h3 className="font-bold text-slate-800 text-xs mt-2 bg-slate-100 py-1 rounded">
                   SALARY PAY SLIP FOR THE MONTH OF {printSlip.monthYear}
                 </h3>
@@ -585,7 +585,7 @@ export const StaffPayrollDesk: React.FC<StaffPayrollDeskProps> = ({ staffList })
                 </div>
                 <div>
                   <div className="h-8 border-b border-slate-400 mx-8 mb-1 flex items-end justify-center">
-                    <span className="font-serif italic text-blue-900">Dr. Rajesh Khanna</span>
+                    <span className="font-serif italic text-blue-900">{printSlip.school?.principalName || 'Authorized Signatory'}</span>
                   </div>
                   <span>Authorized Signatory / Principal</span>
                 </div>

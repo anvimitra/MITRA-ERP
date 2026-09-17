@@ -19,6 +19,13 @@ export interface StudentReportCardData {
     address?: string | null;
     phone?: string | null;
     email?: string | null;
+    affiliationNo?: string | null;
+    principalName?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    website?: string | null;
+    board?: string | null;
     primaryColor: string;
   };
   student: {
@@ -33,6 +40,7 @@ export interface StudentReportCardData {
     dob?: string | null;
     bloodGroup?: string | null;
     photoUrl?: string | null;
+    classTeacherName?: string | null;
   };
   exam: {
     id: string;
@@ -79,6 +87,29 @@ export async function generateStudentReportCard(
   const studentClass = db.select().from(schema.classes).where(eq(schema.classes.id, student.classId)).get();
   const studentSection = db.select().from(schema.sections).where(eq(schema.sections.id, student.sectionId)).get();
   const parent = student.parentId ? db.select().from(schema.parents).where(eq(schema.parents.id, student.parentId)).get() : null;
+
+  let classTeacherName = '';
+  if (student.classId && student.sectionId) {
+    try {
+      const ctAssignment = db
+        .select()
+        .from(schema.classTeachers)
+        .where(
+          and(
+            eq(schema.classTeachers.schoolId, schoolId),
+            eq(schema.classTeachers.classId, student.classId),
+            eq(schema.classTeachers.sectionId, student.sectionId)
+          )
+        )
+        .get();
+      if (ctAssignment) {
+        const teacherUser = db.select().from(schema.users).where(eq(schema.users.id, ctAssignment.teacherId)).get();
+        if (teacherUser) classTeacherName = teacherUser.name;
+      }
+    } catch {
+      classTeacherName = '';
+    }
+  }
 
   const exam = db.select().from(schema.exams).where(eq(schema.exams.id, examId)).get();
   if (!exam) return null;
@@ -150,6 +181,13 @@ export async function generateStudentReportCard(
       address: school.address,
       phone: school.phone,
       email: school.email,
+      affiliationNo: school.affiliationNo || '',
+      principalName: school.principalName || '',
+      city: school.city || '',
+      state: school.state || '',
+      pincode: school.pincode || '',
+      website: school.website || '',
+      board: school.board || 'CBSE',
       primaryColor: school.primaryColor || '#2563eb',
     },
     student: {
@@ -164,6 +202,7 @@ export async function generateStudentReportCard(
       dob: student.dob,
       bloodGroup: student.bloodGroup,
       photoUrl: student.photoUrl,
+      classTeacherName: classTeacherName || null,
     },
     exam: {
       id: exam.id,

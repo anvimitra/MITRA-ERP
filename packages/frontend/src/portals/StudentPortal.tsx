@@ -922,9 +922,11 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
           <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
             <div className="bg-gradient-to-r from-blue-900 to-indigo-900 p-6 text-white text-center relative">
               <h3 className="text-base font-black tracking-wide uppercase">
-                {student?.schoolName || 'Delhi Public Global Academy'}
+                {student?.schoolName || user?.schoolName || 'School Name'}
               </h3>
-              <p className="text-[11px] text-blue-200">Affiliation No: CBSE/AFF/1030948 • Official Student ID</p>
+              <p className="text-[11px] text-blue-200">
+                {(student?.schoolAffiliation || user?.schoolAffiliation) ? `Affiliation No: ${student?.schoolAffiliation || user?.schoolAffiliation} • ` : ''}Official Student ID
+              </p>
               <div className="w-20 h-20 rounded-2xl mx-auto mt-4 overflow-hidden border-2 border-white/50 shadow-lg bg-slate-100">
                 {student?.photoUrl ? (
                   <img src={student.photoUrl} alt="Student" className="w-full h-full object-cover" />
@@ -1029,10 +1031,10 @@ export const StudentPortal: React.FC<Props> = ({ user }) => {
               {/* Board Header */}
               <div className="text-center border-b-2 border-slate-900 pb-4">
                 <h2 className="text-xl font-black uppercase tracking-wide">
-                  {viewAdmitCardModal.schoolName || 'DELHI PUBLIC GLOBAL ACADEMY'}
+                  {viewAdmitCardModal.schoolName || student?.schoolName || 'School Name'}
                 </h2>
                 <p className="text-xs font-bold text-slate-700">
-                  Affiliation No: {viewAdmitCardModal.schoolAffiliation || 'CBSE/AFF/1032890'} • Center Code: {viewAdmitCardModal.centerNumber || '8402'}
+                  {viewAdmitCardModal.schoolAffiliation ? `Affiliation No: ${viewAdmitCardModal.schoolAffiliation} • ` : ''}Center Code: {viewAdmitCardModal.centerNumber || '8402'}
                 </p>
                 <div className="inline-block mt-2 px-4 py-1 bg-slate-100 border border-slate-400 rounded-lg text-xs font-black uppercase tracking-wider">
                   {viewAdmitCardModal.examTitle || 'SECONDARY SCHOOL EXAMINATION 2026 • ADMIT CARD'}

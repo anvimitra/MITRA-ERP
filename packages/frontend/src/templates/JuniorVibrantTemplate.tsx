@@ -18,7 +18,9 @@ export const JuniorVibrantTemplate: React.FC<{ data: ReportCardData }> = ({ data
         </div>
 
         <h1 className="text-3xl font-black text-indigo-900 tracking-tight">{school.name}</h1>
-        <p className="text-xs text-indigo-600 font-medium mt-1">{school.address} • School Code: {school.code}</p>
+        <p className="text-xs text-indigo-600 font-medium mt-1">
+          {school.address} • School Code: {school.code} {school.affiliationNo ? `• Affil: ${school.affiliationNo}` : ''}
+        </p>
 
         <div className="inline-block mt-3 px-5 py-1.5 rounded-2xl bg-indigo-50 text-indigo-700 font-bold text-sm border border-indigo-200">
           🌟 {exam.name} • Academic Year {exam.academicYear} 🌟
@@ -28,8 +30,12 @@ export const JuniorVibrantTemplate: React.FC<{ data: ReportCardData }> = ({ data
       {/* Student Badge Card */}
       <div className="my-6 bg-white rounded-2xl p-5 border-2 border-sky-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-400 flex items-center justify-center text-3xl shadow-md border-2 border-white">
-            🎓
+          <div className="w-16 h-20 rounded-2xl overflow-hidden shadow-md border-2 border-white bg-gradient-to-tr from-amber-400 to-orange-400 flex items-center justify-center text-3xl shrink-0">
+            {student.photoUrl ? (
+              <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
+            ) : (
+              <span>🎓</span>
+            )}
           </div>
           <div>
             <span className="text-xs text-slate-400 font-bold uppercase">Star Student</span>
@@ -71,7 +77,9 @@ export const JuniorVibrantTemplate: React.FC<{ data: ReportCardData }> = ({ data
             <thead className="bg-indigo-50 text-indigo-900 font-black">
               <tr>
                 <th className="py-3 px-4">Subject</th>
-                <th className="py-3 px-3 text-center">Marks</th>
+                <th className="py-3 px-3 text-center">Max Marks</th>
+                <th className="py-3 px-3 text-center">Marks Obtained</th>
+                <th className="py-3 px-3 text-center">Percentage (%)</th>
                 <th className="py-3 px-3 text-center">Rating</th>
                 <th className="py-3 px-3 text-center">Grade</th>
                 <th className="py-3 px-4">Teacher Smiles & Comments</th>
@@ -84,9 +92,9 @@ export const JuniorVibrantTemplate: React.FC<{ data: ReportCardData }> = ({ data
                     <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
                     {sub.subjectName}
                   </td>
-                  <td className="py-3 px-3 text-center font-bold text-slate-700">
-                    {sub.marksObtained} <span className="text-[10px] text-slate-400 font-normal">/ {sub.maxMarks}</span>
-                  </td>
+                  <td className="py-3 px-3 text-center text-slate-600">{sub.maxMarks}</td>
+                  <td className="py-3 px-3 text-center font-bold text-slate-800">{sub.marksObtained}</td>
+                  <td className="py-3 px-3 text-center font-black text-indigo-700">{sub.percentage}%</td>
                   <td className="py-3 px-3 text-center text-amber-400">
                     {'★'.repeat(sub.percentage >= 80 ? 5 : sub.percentage >= 60 ? 4 : 3)}
                   </td>
@@ -131,14 +139,14 @@ export const JuniorVibrantTemplate: React.FC<{ data: ReportCardData }> = ({ data
       {/* Signatures */}
       <div className="mt-8 pt-6 border-t-2 border-amber-200 grid grid-cols-2 gap-8 text-center text-xs">
         <div>
-          <div className="h-6"></div>
+          <div className="h-6 font-bold text-slate-700">{student.classTeacherName || ''}</div>
           <span className="font-bold text-slate-800 block border-t-2 border-amber-300 pt-1">Class Teacher Signature</span>
-          <span className="text-[10px] text-slate-400">Mrs. Sunita Sharma</span>
+          <span className="text-[10px] text-slate-500">{student.classTeacherName || 'Class Teacher'}</span>
         </div>
         <div>
-          <div className="h-6"></div>
+          <div className="h-6 font-bold text-indigo-900">{school.principalName || ''}</div>
           <span className="font-bold text-slate-800 block border-t-2 border-amber-300 pt-1">Principal Signature & School Seal</span>
-          <span className="text-[10px] text-slate-400">Dr. Rajesh Khanna</span>
+          <span className="text-[10px] text-slate-500">{school.principalName || 'Principal'}</span>
         </div>
       </div>
     </div>

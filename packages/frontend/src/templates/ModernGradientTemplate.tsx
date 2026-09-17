@@ -29,7 +29,7 @@ export const ModernGradientTemplate: React.FC<{ data: ReportCardData }> = ({ dat
             )}
             <div>
               <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-white/15 text-white/90 backdrop-blur mb-1">
-                AFFILIATED SENIOR SECONDARY SCHOOL • CODE: {school.code}
+                {school.affiliationNo ? `AFFILIATION NO: ${school.affiliationNo} • ` : ''}SCHOOL CODE: {school.code}
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{school.name}</h1>
               <p className="text-xs text-white/80 mt-1">{school.address} • Phone: {school.phone}</p>
@@ -46,22 +46,34 @@ export const ModernGradientTemplate: React.FC<{ data: ReportCardData }> = ({ dat
 
       {/* Student Profile Ribbon */}
       <div className="bg-slate-50 border-b border-slate-200 px-8 py-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-          <div>
-            <span className="text-slate-400 block font-semibold text-[10px] uppercase">Student Name</span>
-            <span className="font-bold text-slate-800 text-sm">{student.name}</span>
+        <div className="flex flex-col sm:flex-row items-center gap-5">
+          <div className="w-16 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-md bg-white flex items-center justify-center shrink-0">
+            {student.photoUrl ? (
+              <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-slate-400">
+                <User size={24} />
+                <span className="text-[8px] font-bold uppercase mt-1">Photo</span>
+              </div>
+            )}
           </div>
-          <div>
-            <span className="text-slate-400 block font-semibold text-[10px] uppercase">Class & Section</span>
-            <span className="font-bold text-slate-800 text-sm">{student.className} - {student.sectionName}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block font-semibold text-[10px] uppercase">Admission No / Roll</span>
-            <span className="font-bold text-slate-800 text-sm">{student.admissionNo} (Roll #{student.rollNo || '1'})</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block font-semibold text-[10px] uppercase">Father's Name</span>
-            <span className="font-bold text-slate-800 text-sm">{student.fatherName || 'Guardian'}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs flex-1 w-full">
+            <div>
+              <span className="text-slate-400 block font-semibold text-[10px] uppercase">Student Name</span>
+              <span className="font-bold text-slate-800 text-sm">{student.name}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-semibold text-[10px] uppercase">Class & Section</span>
+              <span className="font-bold text-slate-800 text-sm">{student.className} - {student.sectionName}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-semibold text-[10px] uppercase">Admission No / Roll</span>
+              <span className="font-bold text-slate-800 text-sm">{student.admissionNo} (Roll #{student.rollNo || '1'})</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-semibold text-[10px] uppercase">Father's Name</span>
+              <span className="font-bold text-slate-800 text-sm">{student.fatherName || 'Guardian'}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -79,6 +91,7 @@ export const ModernGradientTemplate: React.FC<{ data: ReportCardData }> = ({ dat
                   <th className="py-3 px-4">Subject</th>
                   <th className="py-3 px-4 text-center">Max Marks</th>
                   <th className="py-3 px-4 text-center">Marks Obtained</th>
+                  <th className="py-3 px-4 text-center">Percentage (%)</th>
                   <th className="py-3 px-4">Performance Bar</th>
                   <th className="py-3 px-4 text-center">Grade</th>
                   <th className="py-3 px-4">Teacher Remark</th>
@@ -93,14 +106,14 @@ export const ModernGradientTemplate: React.FC<{ data: ReportCardData }> = ({ dat
                     </td>
                     <td className="py-3 px-4 text-center text-slate-600">{sub.maxMarks}</td>
                     <td className="py-3 px-4 text-center font-bold text-slate-900">{sub.marksObtained}</td>
-                    <td className="py-3 px-4 w-40">
+                    <td className="py-3 px-4 text-center font-black text-blue-700">{sub.percentage}%</td>
+                    <td className="py-3 px-4 w-36">
                       <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                         <div 
                           className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500" 
                           style={{ width: `${Math.min(100, sub.percentage)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">{sub.percentage}%</span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-black bg-blue-50 text-blue-700 border border-blue-200">
@@ -158,15 +171,15 @@ export const ModernGradientTemplate: React.FC<{ data: ReportCardData }> = ({ dat
         <div className="pt-8 grid grid-cols-3 gap-4 text-center text-xs text-slate-600">
           <div className="border-t border-slate-300 pt-2">
             <span className="font-semibold block">Class Teacher</span>
-            <span className="text-[10px] text-slate-400">Verified</span>
+            <span className="text-[10px] text-slate-500 font-medium">{student.classTeacherName || 'Verified'}</span>
           </div>
           <div className="border-t border-slate-300 pt-2">
             <span className="font-semibold block">Examination Incharge</span>
-            <span className="text-[10px] text-slate-400">Approved</span>
+            <span className="text-[10px] text-slate-500 font-medium">Approved & Sealed</span>
           </div>
           <div className="border-t border-slate-300 pt-2">
             <span className="font-semibold block">Principal</span>
-            <span className="text-[10px] text-slate-400">Delhi Public Global Academy</span>
+            <span className="text-[10px] text-slate-500 font-medium">{school.principalName || school.name}</span>
           </div>
         </div>
       </div>

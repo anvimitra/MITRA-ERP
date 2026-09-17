@@ -347,11 +347,14 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
       const admNo = cert.student?.admissionNo || cert.admissionNo || 'N/A';
       const className = cert.student?.className || cert.className || 'Class 10';
       const sectionName = cert.student?.sectionName || cert.sectionName || 'A';
-      const schoolName = cert.school?.name || schoolInfo?.name || 'LSK ACADEMY SECONDARY SCHOOL';
-      const schoolAddr = cert.school?.address || schoolInfo?.address || 'Institutional Campus, Main Road';
-      const schoolPhone = cert.school?.phone || schoolInfo?.phone || '+91 98765 43210';
-      const affilNo = cert.school?.affiliationNo || schoolInfo?.affiliationNo || 'CBSE/AFF/2026/8892';
-      const principalName = cert.school?.principalName || schoolInfo?.principalName || 'Dr. Rajesh Khanna';
+      const schoolName = cert.school?.name || schoolInfo?.name || 'Educational Institution';
+      const schoolAddr = cert.school?.address || schoolInfo?.address || '';
+      const schoolPhone = cert.school?.phone || schoolInfo?.phone || '';
+      const schoolEmail = cert.school?.email || schoolInfo?.email || '';
+      const affilNo = cert.school?.affiliationNo || schoolInfo?.affiliationNo || cert.school?.code || schoolInfo?.code || '';
+      const principalName = cert.school?.principalName || schoolInfo?.principalName || 'Principal / Head of Institution';
+      const logoUrl = cert.school?.logoUrl || schoolInfo?.logoUrl || '';
+      const studentPhoto = cert.student?.photoUrl || cert.photoUrl || (propStudents ? propStudents.find((s) => s.id === cert.studentId)?.photoUrl : null) || '';
       const extra = cert.extra || {};
       const subTitleText = extra.subTitle || '';
       const dobWordsText = extra.dobWords || (cert.student?.dob ? dateToWords(cert.student.dob) : '');
@@ -484,15 +487,61 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
     }
     ${templateStyles}
     .cert-header {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       border-bottom: 2px solid #334155;
       padding-bottom: 14px;
+      gap: 12px;
+    }
+    .cert-logo-box {
+      width: 85px;
+      text-align: left;
+      flex-shrink: 0;
     }
     .cert-logo {
-      max-height: 70px;
-      margin: 0 auto 6px auto;
-      display: block;
+      max-height: 75px;
+      max-width: 85px;
       object-fit: contain;
+      display: block;
+    }
+    .cert-header-center {
+      flex: 1;
+      text-align: center;
+    }
+    .cert-photo-box {
+      width: 85px;
+      text-align: right;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .student-passport-photo {
+      width: 76px;
+      height: 94px;
+      object-fit: cover;
+      border: 2px solid #0f172a;
+      padding: 1px;
+      background: #ffffff;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      display: block;
+    }
+    .student-photo-placeholder {
+      width: 76px;
+      height: 94px;
+      border: 1px dashed #64748b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      font-size: 8px;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: bold;
+      border-radius: 4px;
+      background: #f8fafc;
     }
     .school-info {
       font-family: Arial, sans-serif;
@@ -574,10 +623,24 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
 
     <div>
       <div class="cert-header">
-        ${cert.school?.logoUrl ? `<img src="${cert.school.logoUrl}" class="cert-logo" alt="Logo" />` : ''}
-        <h1 class="school-name">${schoolName}</h1>
-        <div class="school-info">${schoolAddr} • Phone: ${schoolPhone}</div>
-        <div class="affil-badge">Affiliation No: ${affilNo} • Accredited Institutional Registry</div>
+        <div class="cert-logo-box">
+          ${logoUrl ? `<img src="${logoUrl}" class="cert-logo" alt="Logo" />` : ''}
+        </div>
+        <div class="cert-header-center">
+          <h1 class="school-name">${schoolName}</h1>
+          <div class="school-info">${schoolAddr ? `${schoolAddr}` : ''}${schoolPhone ? ` • Phone: ${schoolPhone}` : ''}${schoolEmail ? ` • Email: ${schoolEmail}` : ''}</div>
+          ${affilNo ? `<div class="affil-badge">Affiliation No: ${affilNo} • Accredited Institutional Registry</div>` : ''}
+        </div>
+        <div class="cert-photo-box">
+          ${studentPhoto ? `
+            <img src="${studentPhoto}" class="student-passport-photo" alt="Student Photo" />
+          ` : `
+            <div class="student-photo-placeholder">
+              <span>Student</span>
+              <span>Photo</span>
+            </div>
+          `}
+        </div>
       </div>
 
       <div class="badge-wrap">
@@ -784,9 +847,24 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
                       {cert.certificateNo}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="font-bold text-slate-800">{cert.studentName}</div>
-                      <div className="text-[11px] text-slate-400">
-                        Adm: {cert.admissionNo} • {cert.className ? `${cert.className}-${cert.sectionName}` : 'Student'}
+                      <div className="flex items-center gap-3">
+                        {cert.photoUrl || cert.student?.photoUrl || propStudents?.find((s) => s.id === cert.studentId)?.photoUrl ? (
+                          <img
+                            src={cert.photoUrl || cert.student?.photoUrl || propStudents?.find((s) => s.id === cert.studentId)?.photoUrl}
+                            alt=""
+                            className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">
+                            {cert.studentName?.charAt(0) || 'S'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-bold text-slate-800">{cert.studentName}</div>
+                          <div className="text-[11px] text-slate-400">
+                            Adm: {cert.admissionNo} • {cert.className ? `${cert.className}-${cert.sectionName}` : 'Student'}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">
@@ -1162,19 +1240,53 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
                 </div>
 
                 {/* School Header */}
-                <div className="text-center pb-5 border-b-2 border-slate-800/80 space-y-1">
-                  {printCert.school?.logoUrl && (
-                    <img src={printCert.school.logoUrl} alt="Logo" className="w-14 h-14 mx-auto object-contain mb-1" />
-                  )}
-                  <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
-                    {printCert.school?.name || schoolInfo?.name || 'LSK ACADEMY SECONDARY SCHOOL'}
-                  </h1>
-                  <p className="text-xs text-slate-600 font-sans">
-                    {printCert.school?.address || schoolInfo?.address || 'Institutional Campus, Main Road'} • Phone: {printCert.school?.phone || schoolInfo?.phone || '+91 98765 43210'}
-                  </p>
-                  <p className="text-[11px] text-blue-800 font-sans font-bold">
-                    Affiliation No: {printCert.school?.affiliationNo || schoolInfo?.affiliationNo || 'CBSE/AFF/2026/8892'} • Institutional Accreditation
-                  </p>
+                <div className="flex items-center justify-between pb-5 border-b-2 border-slate-800/80 gap-4">
+                  <div className="w-20 shrink-0">
+                    {(printCert.school?.logoUrl || schoolInfo?.logoUrl) ? (
+                      <img
+                        src={printCert.school?.logoUrl || schoolInfo?.logoUrl}
+                        alt="Logo"
+                        className="w-16 h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+                        <SchoolIcon size={24} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 text-center space-y-1">
+                    <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+                      {printCert.school?.name || schoolInfo?.name || 'Educational Institution'}
+                    </h1>
+                    <p className="text-xs text-slate-600 font-sans">
+                      {printCert.school?.address || schoolInfo?.address || ''}
+                      {(printCert.school?.phone || schoolInfo?.phone) ? ` • Phone: ${printCert.school?.phone || schoolInfo?.phone}` : ''}
+                      {(printCert.school?.email || schoolInfo?.email) ? ` • Email: ${printCert.school?.email || schoolInfo?.email}` : ''}
+                    </p>
+                    {(printCert.school?.affiliationNo || schoolInfo?.affiliationNo || printCert.school?.code || schoolInfo?.code) && (
+                      <p className="text-[11px] text-blue-800 font-sans font-bold">
+                        Affiliation No: {printCert.school?.affiliationNo || schoolInfo?.affiliationNo || printCert.school?.code || schoolInfo?.code} • Accredited Registry
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="w-20 shrink-0 flex justify-end">
+                    {(printCert.student?.photoUrl || printCert.photoUrl || propStudents?.find((s) => s.id === printCert.studentId)?.photoUrl) ? (
+                      <div className="w-18 h-22 border-2 border-slate-800 p-0.5 rounded shadow-sm bg-white overflow-hidden">
+                        <img
+                          src={printCert.student?.photoUrl || printCert.photoUrl || propStudents?.find((s) => s.id === printCert.studentId)?.photoUrl}
+                          alt="Student"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-18 h-22 border border-dashed border-slate-400 rounded flex flex-col items-center justify-center text-slate-400 text-[8px] font-sans">
+                        <User size={22} className="text-slate-300 mb-0.5" />
+                        <span>Student Photo</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Certificate Title Badge */}
@@ -1280,7 +1392,7 @@ export const CertificatesDesk: React.FC<CertificatesDeskProps> = ({ students: pr
                   <div>
                     <div className="h-8 border-b border-slate-400 mx-6 mb-1 flex items-end justify-center">
                       <span className="font-serif italic font-bold text-blue-900 text-sm">
-                        {printCert.school?.principalName || schoolInfo?.principalName || 'Dr. Rajesh Khanna'}
+                        {printCert.school?.principalName || schoolInfo?.principalName || 'Authorized Signatory'}
                       </span>
                     </div>
                     <span>{printCert.extra?.signatoryTitle || 'Principal'}</span>

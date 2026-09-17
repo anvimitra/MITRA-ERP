@@ -96,7 +96,10 @@ classRoutes.get('/', async (c) => {
     };
   });
 
+  const currentSchool = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
+
   return c.json({
+    school: currentSchool,
     classes: schoolClasses,
     sections: schoolSections,
     subjects: schoolSubjects,

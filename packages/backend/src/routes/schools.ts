@@ -86,6 +86,25 @@ schoolRoutes.get('/branding/:codeOrDomain', async (c) => {
   });
 });
 
+// Authenticated: Get my school details (Principal, Teacher, Accountant, etc.)
+schoolRoutes.get('/my-school', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized or no school associated' }, 401);
+
+  const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
+  if (!school) return c.json({ error: 'School not found' }, 404);
+
+  return c.json({
+    school: {
+      ...school,
+      board: (school as any).board || 'CBSE',
+      servicesEnabled: (school as any).servicesEnabled !== 0,
+    },
+  });
+});
+
 // Super Admin: List all schools
 schoolRoutes.get('/', async (c) => {
   const authHeader = c.req.header('Authorization');

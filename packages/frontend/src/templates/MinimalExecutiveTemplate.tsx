@@ -10,7 +10,9 @@ export const MinimalExecutiveTemplate: React.FC<{ data: ReportCardData }> = ({ d
       <div className="flex justify-between items-start border-b-2 border-black pb-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight uppercase font-sans text-black">{school.name}</h1>
-          <p className="text-[11px] text-gray-700 font-sans">{school.address} | Tel: {school.phone}</p>
+          <p className="text-[11px] text-gray-700 font-sans">
+            {school.address}{school.phone ? ` | Tel: ${school.phone}` : ''}{school.affiliationNo ? ` | Affil No: ${school.affiliationNo}` : ''}
+          </p>
           <p className="text-[10px] text-gray-500 mt-0.5">INSTITUTION ID: {school.code} • SESSION: {exam.academicYear}</p>
         </div>
         <div className="text-right border-l border-black pl-4">
@@ -20,11 +22,20 @@ export const MinimalExecutiveTemplate: React.FC<{ data: ReportCardData }> = ({ d
       </div>
 
       {/* Student Meta */}
-      <div className="grid grid-cols-4 gap-2 py-4 border-b border-black text-[11px]">
-        <div><span className="text-gray-500 block text-[9px] uppercase">CANDIDATE</span><strong>{student.name}</strong></div>
-        <div><span className="text-gray-500 block text-[9px] uppercase">CLASS/SEC</span><strong>{student.className} - {student.sectionName}</strong></div>
-        <div><span className="text-gray-500 block text-[9px] uppercase">ADM NO</span><strong>{student.admissionNo}</strong></div>
-        <div><span className="text-gray-500 block text-[9px] uppercase">ROLL NO</span><strong>{student.rollNo || '1'}</strong></div>
+      <div className="flex items-center gap-4 py-3 border-b border-black text-[11px]">
+        <div className="w-14 h-16 border border-black flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+          {student.photoUrl ? (
+            <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-center text-gray-400 text-[8px] font-sans">PHOTO</div>
+          )}
+        </div>
+        <div className="grid grid-cols-4 gap-2 flex-1">
+          <div><span className="text-gray-500 block text-[9px] uppercase">CANDIDATE</span><strong>{student.name}</strong></div>
+          <div><span className="text-gray-500 block text-[9px] uppercase">CLASS/SEC</span><strong>{student.className} - {student.sectionName}</strong></div>
+          <div><span className="text-gray-500 block text-[9px] uppercase">ADM NO</span><strong>{student.admissionNo}</strong></div>
+          <div><span className="text-gray-500 block text-[9px] uppercase">ROLL NO</span><strong>{student.rollNo || '1'}</strong></div>
+        </div>
       </div>
 
       {/* Marks Table */}
@@ -86,8 +97,14 @@ export const MinimalExecutiveTemplate: React.FC<{ data: ReportCardData }> = ({ d
 
       {/* Signatures */}
       <div className="pt-12 grid grid-cols-2 gap-8 text-center text-[10px] font-sans">
-        <div className="border-t border-black pt-1 uppercase">Authorised Evaluator Signature</div>
-        <div className="border-t border-black pt-1 uppercase">Head of Institution / Stamp</div>
+        <div>
+          <div className="font-bold uppercase text-gray-800 h-5">{student.classTeacherName || ''}</div>
+          <div className="border-t border-black pt-1 uppercase">Class Teacher / Authorised Evaluator</div>
+        </div>
+        <div>
+          <div className="font-bold uppercase text-gray-800 h-5">{school.principalName || ''}</div>
+          <div className="border-t border-black pt-1 uppercase">Head of Institution / Stamp</div>
+        </div>
       </div>
     </div>
   );
