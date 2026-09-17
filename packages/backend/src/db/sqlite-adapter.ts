@@ -58,6 +58,32 @@ function buildWhereClause(condition: any): { sql: string; params: any[] } {
   return { sql: '', params: [] };
 }
 
+const SNAPSHOT_BACKUP_TABLES = [
+  'schools',
+  'users',
+  'classes',
+  'sections',
+  'class_teachers',
+  'subjects',
+  'subject_allocations',
+  'parents',
+  'students',
+  'attendance',
+  'exams',
+  'marks',
+  'fee_structures',
+  'fee_payments',
+  'certificates',
+  'admit_cards',
+  'student_logs',
+  'transport_vehicles',
+  'transport_routes',
+  'transport_stops',
+  'student_transport',
+  'inventory_items',
+  'inventory_transactions',
+];
+
 export class SQLiteAdapter {
   private db: DatabaseSync;
 
@@ -134,7 +160,7 @@ export class SQLiteAdapter {
               stmt.run(...values);
             }
             queuePostgresWrite(tableName, 'insert', rows);
-            if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+            if (SNAPSHOT_BACKUP_TABLES.includes(tableName)) {
               saveLocalBackup(this.db);
             }
           },
@@ -161,7 +187,7 @@ export class SQLiteAdapter {
                 const stmt = this.db.prepare(query);
                 stmt.run(...setParams, ...whereParams);
                 queuePostgresWrite(tableName, 'update', values, condition);
-                if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+                if (SNAPSHOT_BACKUP_TABLES.includes(tableName)) {
                   saveLocalBackup(this.db);
                 }
               },
@@ -183,7 +209,7 @@ export class SQLiteAdapter {
             const stmt = this.db.prepare(query);
             stmt.run(...params);
             queuePostgresWrite(tableName, 'delete', null, condition);
-            if (['schools', 'users', 'classes', 'sections'].includes(tableName)) {
+            if (SNAPSHOT_BACKUP_TABLES.includes(tableName)) {
               saveLocalBackup(this.db);
             }
           },

@@ -27,6 +27,9 @@ function tryLoadEnv() {
   }
 }
 
+const DEFAULT_NEON_DATABASE_URL =
+  'postgresql://neondb_owner:npg_Vel1NQjCX6Wy@ep-dry-thunder-a7kbb3o6-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require';
+
 export function isPostgresConnected(): boolean {
   return isConnected && pool !== null;
 }
@@ -35,7 +38,7 @@ export function getPostgresPool(): pg.Pool | null {
   if (pool) return pool;
 
   tryLoadEnv();
-  const dbUrl = process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL || DEFAULT_NEON_DATABASE_URL;
   if (!dbUrl) {
     return null;
   }
@@ -713,6 +716,13 @@ export async function initializePostgresSync(sqlite: DatabaseSync): Promise<bool
   }
 }
 
+const pendingWrites = new Set<Promise<any>>();
+
+export async function flushPostgresWrites(): Promise<void> {
+  if (pendingWrites.size === 0) return;
+  await Promise.allSettled(Array.from(pendingWrites));
+}
+
 // Write-through hook: Async sync to PostgreSQL when an insert/update/delete occurs
 export function queuePostgresWrite(
   table: string,
@@ -722,8 +732,8 @@ export function queuePostgresWrite(
 ) {
   if (!isConnected || !pool) return;
 
-  // Run in background without blocking synchronous SQLite operations
-  setImmediate(async () => {
+  // Run in background without blocking synchronous SQLite operations, tracking execution promise
+  const writePromise = (async () => {
     try {
       if (action === 'insert') {
         const rows = Array.isArray(data) ? data : [data];
@@ -807,7 +817,10 @@ export function queuePostgresWrite(
         await pool!.query(query, values);
       }
     } catch (err: any) {
-      console.warn(`⚠️ PostgreSQL async sync warning on ${table} [${action}]:`, err.message);
+      console.warn(`⚠️ PostgreSQL write-through warning on ${table} [${action}]:`, err.message);
     }
-  });
+  })();
+
+  pendingWrites.add(writePromise);
+  writePromise.finally(() => pendingWrites.delete(writePromise));
 }
