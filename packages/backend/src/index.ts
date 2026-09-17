@@ -1,8 +1,20 @@
 import { serve } from '@hono/node-server';
+import fs from 'fs';
+import path from 'path';
 import { app } from './app.js';
 import { initializeDatabase } from './db/init.js';
 import { initializePostgresSync } from './db/postgres-sync.js';
 import { startAutoBackupScheduler } from './services/backup-scheduler.js';
+
+// Auto-load .env file if available
+for (const envFile of ['.env', 'packages/backend/.env', '../backend/.env']) {
+  try {
+    if (fs.existsSync(envFile)) {
+      process.loadEnvFile(envFile);
+      break;
+    }
+  } catch {}
+}
 
 // Initialize SQLite schema & persistent backup restore
 const sqlite = initializeDatabase();

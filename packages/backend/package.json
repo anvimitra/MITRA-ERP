@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "deploy:cf": "wrangler deploy",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "db:test-pg": "tsx src/scripts/test-postgres.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
