@@ -1099,13 +1099,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     if (!confirm('📢 Broadcast fee due notifications to all parents with pending dues?')) return;
     try {
       const res = await ApiService.broadcastDueFeeReminders();
-      alert(`✅ Fee Reminder Broadcast Complete! ${res.notifiedCount} parent(s) notified in their Mobile App.`);
+      const count = res.notifiedCount ?? res.count ?? 0;
+      alert(`✅ Fee Reminder Broadcast Complete! ${count} parent(s) with pending dues notified in their Mobile App.`);
     } catch (err: any) {
       alert('Error broadcasting fee reminders: ' + err.message);
     }
   };
 
   const handleSendReminder = async (studentId: string, name: string, dueAmount: number) => {
+    if (dueAmount <= 0) {
+      alert(`ℹ️ Notice: ${name} has no pending fee dues (balance is ₹0). Fee reminder cannot be sent.`);
+      return;
+    }
     try {
       const res = await ApiService.sendFeeReminder(studentId, dueAmount, '2026-10-15');
       setReminderStatus(
@@ -2855,13 +2860,19 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                             <td className="px-4 py-3 font-bold text-emerald-600">₹{s.totalPaid.toLocaleString('en-IN')}</td>
                             <td className="px-4 py-3 font-black text-rose-600">₹{s.dueAmount.toLocaleString('en-IN')}</td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={() => handleSendReminder(s.id, s.firstName, s.dueAmount)}
-                                className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ml-auto"
-                              >
-                                <Bell size={12} />
-                                <span>Send Alert</span>
-                              </button>
+                              {s.dueAmount > 0 ? (
+                                <button
+                                  onClick={() => handleSendReminder(s.id, s.firstName, s.dueAmount)}
+                                  className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ml-auto"
+                                >
+                                  <Bell size={12} />
+                                  <span>Send Alert</span>
+                                </button>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-[10px] inline-flex items-center gap-1 ml-auto">
+                                  ✅ Fully Paid
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ));

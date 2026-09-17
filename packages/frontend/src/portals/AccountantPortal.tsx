@@ -184,6 +184,10 @@ export const AccountantPortal: React.FC<{ school?: any }> = ({ school: initialSc
   };
 
   const handleSendReminder = async (studentId: string, name: string, dueAmount: number) => {
+    if (dueAmount <= 0) {
+      alert(`ℹ️ Notice: ${name} has no pending fee dues (balance is ₹0). Fee reminder cannot be sent.`);
+      return;
+    }
     try {
       const res = await ApiService.sendFeeReminder(studentId, dueAmount, '2026-10-15');
       setReminderStatus(

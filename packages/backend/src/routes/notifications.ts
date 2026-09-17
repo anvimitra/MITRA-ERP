@@ -3,6 +3,7 @@ import { db, schema, eq, and, desc } from '../db/index.js';
 import { verifyToken } from '../services/auth.js';
 import { saveLocalBackup } from '../db/persistent-backup.js';
 import { getDatabaseInstance } from '../db/init.js';
+import { resolveLinkedStudentsForParent } from '../services/rbac.js';
 import crypto from 'crypto';
 
 export const notificationRoutes = new Hono();
@@ -26,9 +27,84 @@ const getMyNotifications = async (c: any) => {
     .all();
 
   // Filter to notifications addressed to this user OR broadcast to 'ALL' within THIS school
-  const myNotifs = allSchoolNotifs.filter(
+  let myNotifs = allSchoolNotifs.filter(
     (n: any) => n.userId === currentUid || n.userId === 'ALL'
   );
+
+  // STRICT RULE: If current user is a parent, ensure fee reminder notifications
+  // are ONLY visible if their linked student actually has pending fee balance (due > 0)!
+  // Parents whose children have zero pending fees or fully paid will NEVER receive/see fee reminders.
+  if (user.role === 'parent') {
+    const linkedStudents = resolveLinkedStudentsForParent(user);
+    if (linkedStudents.length > 0) {
+      const feeStructs = db
+        .select()
+        .from(schema.feeStructures)
+        .where(eq(schema.feeStructures.schoolId, user.schoolId))
+        .all();
+      const allPayments = db
+        .select()
+        .from(schema.feePayments)
+        .where(eq(schema.feePayments.schoolId, user.schoolId))
+        .all();
+
+      const studentsWithDues = new Set<string>();
+      let hasAnyDue = false;
+
+      for (const s of linkedStudents) {
+        const applicableFees = feeStructs.filter(
+          (f: any) => f.classId === s.classId || f.classId === 'ALL' || f.classId === 'all' || !f.classId
+        );
+        const totalExpected = applicableFees.reduce((sum: number, f: any) => sum + (Number(f.amount) || 0), 0);
+        const totalPaid = allPayments
+          .filter((p: any) => p.studentId === s.id)
+          .reduce((sum: number, p: any) => sum + (Number(p.amountPaid) || 0), 0);
+        const balance = totalExpected - totalPaid;
+        if (balance > 0) {
+          hasAnyDue = true;
+          studentsWithDues.add(s.id);
+          const fullName = `${s.firstName} ${s.lastName || ''}`.trim().toLowerCase();
+          studentsWithDues.add(fullName);
+        }
+      }
+
+      myNotifs = myNotifs.filter((n: any) => {
+        const isFeeReminder =
+          n.type === 'fee' &&
+          (n.title?.toLowerCase().includes('reminder') ||
+            n.title?.toLowerCase().includes('pending') ||
+            n.title?.toLowerCase().includes('alert') ||
+            n.title?.toLowerCase().includes('due'));
+
+        if (!isFeeReminder) return true;
+
+        // If parent has no student with dues at all, do NOT show any fee reminder
+        if (!hasAnyDue) return false;
+
+        // If reminder specifically mentions a child's name, verify that child has dues
+        const msg = (n.message || '').toLowerCase();
+        for (const s of linkedStudents) {
+          const fullName = `${s.firstName} ${s.lastName || ''}`.trim().toLowerCase();
+          if (msg.includes(fullName) && !studentsWithDues.has(fullName)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    } else {
+      // Parent has no linked student, do not show fee reminders
+      myNotifs = myNotifs.filter((n: any) => {
+        const isFeeReminder =
+          n.type === 'fee' &&
+          (n.title?.toLowerCase().includes('reminder') ||
+            n.title?.toLowerCase().includes('pending') ||
+            n.title?.toLowerCase().includes('alert') ||
+            n.title?.toLowerCase().includes('due'));
+        return !isFeeReminder;
+      });
+    }
+  }
 
   // Deduplicate by title + message + date timestamp (ignoring second fractions)
   const seen = new Set<string>();

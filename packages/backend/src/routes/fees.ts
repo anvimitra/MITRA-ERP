@@ -158,7 +158,9 @@ feeRoutes.post('/broadcast-due-reminders', async (c) => {
 
   let sentCount = 0;
   for (const s of students) {
-    const applicableFees = feeStructs.filter((f: any) => f.classId === s.classId);
+    const applicableFees = feeStructs.filter(
+      (f: any) => f.classId === s.classId || f.classId === 'ALL' || f.classId === 'all' || !f.classId
+    );
     const totalExpected = applicableFees.reduce((sum: number, f: any) => sum + (Number(f.amount) || 0), 0);
     const totalPaid = payments
       .filter((p: any) => p.studentId === s.id)
@@ -183,6 +185,7 @@ feeRoutes.post('/broadcast-due-reminders', async (c) => {
     success: true,
     message: `Fee due notices successfully broadcasted to ${sentCount} parents.`,
     count: sentCount,
+    notifiedCount: sentCount,
   });
 });
 
@@ -340,12 +343,48 @@ feeRoutes.post('/send-reminder', async (c) => {
   const student = db.select().from(schema.students).where(eq(schema.students.id, studentId)).get();
   if (!student) return c.json({ error: 'Student not found' }, 404);
 
+  // Strictly compute student's actual outstanding balance in DB
+  const allSchoolFees = db
+    .select()
+    .from(schema.feeStructures)
+    .where(eq(schema.feeStructures.schoolId, user.schoolId))
+    .all();
+
+  const classFees = allSchoolFees.filter(
+    (f: any) => f.classId === student.classId || f.classId === 'ALL' || f.classId === 'all' || !f.classId
+  );
+
+  const payments = db
+    .select()
+    .from(schema.feePayments)
+    .where(
+      and(
+        eq(schema.feePayments.schoolId, user.schoolId),
+        eq(schema.feePayments.studentId, studentId)
+      )
+    )
+    .all();
+
+  const totalFeeAmount = classFees.reduce((acc: number, f: any) => acc + (Number(f.amount) || 0), 0);
+  const totalPaidAmount = payments.reduce((acc: number, p: any) => acc + (Number(p.amountPaid) || 0), 0);
+  const actualDue = Math.max(0, totalFeeAmount - totalPaidAmount);
+
+  // STRICT RULE: Only parents with pending balance can receive reminders!
+  if (actualDue <= 0 || (dueAmount !== undefined && dueAmount !== null && Number(dueAmount) <= 0)) {
+    return c.json({
+      error: 'Cannot send fee reminder: This student has no pending fee balance (Fee is fully paid).'
+    }, 400);
+  }
+
   const studentName = `${student.firstName} ${student.lastName || ''}`.trim();
+  const displayDue = dueAmount && Number(dueAmount) > 0 ? Number(dueAmount) : actualDue;
+  const displayDate = dueDate || 'Immediate';
+
   const dispatchResult = await dispatchStudentNotification({
     schoolId: user.schoolId,
     studentId,
     title: 'Fee Reminder Notice',
-    message: `Dear Parent, fee balance of Rs. ${dueAmount} is due for ${studentName} on/before ${dueDate}. Please pay timely.`,
+    message: `Dear Parent, fee balance of Rs. ${displayDue.toLocaleString('en-IN')} is due for ${studentName} on/before ${displayDate}. Please pay timely.`,
     type: 'fee',
   });
 
