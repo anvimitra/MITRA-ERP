@@ -6,11 +6,30 @@ import { isStudentAccessibleByUser, resolveLinkedStudentsForParent } from '../se
 
 export const transportRoutes = new Hono();
 
-// Helper: Ensure driver has a login user account in the ERP
-export function ensureDriverUserAccount(schoolId: string, driverName: string, driverPhone: string, vehicleId?: string): string | null {
+// Helper: Ensure driver has a login user account in the ERP and auto-generate credentials
+export interface DriverAccountResult {
+  driverUserId: string;
+  loginId: string;
+  autoPassword: string;
+  driverName: string;
+}
+
+export function ensureDriverUserAccount(
+  schoolId: string,
+  driverName: string,
+  driverPhone: string,
+  vehicleId?: string
+): DriverAccountResult | null {
   const cleanPhone = (driverPhone || '').trim();
   const digitsOnly = cleanPhone.replace(/\D/g, '');
   if (!digitsOnly || digitsOnly.length < 10) return null;
+
+  // Auto-generate Driver Password Formula: First 4 uppercase letters of Driver Name + Last 4 digits of Mobile
+  const dName = (driverName || 'DRIVER').trim();
+  const lettersOnly = dName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  const namePrefix = (lettersOnly.length >= 4 ? lettersOnly.slice(0, 4) : lettersOnly.padEnd(4, 'D')).toUpperCase();
+  const phoneSuffix = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : '1234';
+  const autoPassword = `${namePrefix}${phoneSuffix}`;
 
   // Search existing user by phone in this school
   const allUsers = db.select().from(schema.users).where(eq(schema.users.schoolId, schoolId)).all();
@@ -19,7 +38,7 @@ export function ensureDriverUserAccount(schoolId: string, driverName: string, dr
     return uPhone === digitsOnly || (uPhone.length >= 10 && uPhone.endsWith(digitsOnly.slice(-10)));
   });
 
-  const defaultPassHash = hashPassword('Driver@123');
+  const passHash = hashPassword(autoPassword);
   const now = new Date().toISOString();
 
   if (existingUser) {
@@ -28,11 +47,17 @@ export function ensureDriverUserAccount(schoolId: string, driverName: string, dr
         role: 'driver',
         name: driverName || existingUser.name,
         vehicleId: vehicleId || existingUser.vehicleId,
+        passwordHash: passHash,
         isActive: 1,
       })
       .where(eq(schema.users.id, existingUser.id))
       .run();
-    return existingUser.id;
+    return {
+      driverUserId: existingUser.id,
+      loginId: digitsOnly,
+      autoPassword,
+      driverName: driverName || existingUser.name,
+    };
   } else {
     const driverUserId = crypto.randomUUID();
     const driverEmail = `driver.${digitsOnly.slice(-10)}@transport.school`;
@@ -42,14 +67,19 @@ export function ensureDriverUserAccount(schoolId: string, driverName: string, dr
       role: 'driver',
       name: driverName || 'School Bus Driver',
       email: driverEmail,
-      phone: cleanPhone,
-      passwordHash: defaultPassHash,
+      phone: digitsOnly,
+      passwordHash: passHash,
       appInstalled: 0,
       isActive: 1,
       createdAt: now,
       vehicleId: vehicleId || null,
     }).run();
-    return driverUserId;
+    return {
+      driverUserId,
+      loginId: digitsOnly,
+      autoPassword,
+      driverName: driverName || 'School Bus Driver',
+    };
   }
 }
 
@@ -62,11 +92,28 @@ transportRoutes.get('/vehicles', async (c) => {
   const user = verifyToken(authHeader.substring(7));
   if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
 
-  const vehicles = db
+  const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
+
+  const rawVehicles = db
     .select()
     .from(schema.transportVehicles)
     .where(eq(schema.transportVehicles.schoolId, user.schoolId))
     .all();
+
+  const vehicles = rawVehicles.map((v: any) => {
+    const cleanPhone = (v.driverPhone || '').replace(/\D/g, '');
+    const cleanLetters = (v.driverName || 'DRIVER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const pfx = (cleanLetters.length >= 4 ? cleanLetters.slice(0, 4) : cleanLetters.padEnd(4, 'D')).toUpperCase();
+    const sfx = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+    const autoPassword = `${pfx}${sfx}`;
+    return {
+      ...v,
+      driverLoginId: cleanPhone,
+      driverDefaultPassword: autoPassword,
+      schoolCode: school?.code || '',
+      schoolName: school?.name || 'School ERP',
+    };
+  });
 
   return c.json({ vehicles });
 });
@@ -90,7 +137,9 @@ transportRoutes.post('/vehicles', async (c) => {
   }
 
   const vehicleId = crypto.randomUUID();
-  const driverUserId = ensureDriverUserAccount(user.schoolId, driverName, driverPhone, vehicleId);
+  const driverAccount = ensureDriverUserAccount(user.schoolId, driverName, driverPhone, vehicleId);
+
+  const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
 
   db.insert(schema.transportVehicles).values({
     id: vehicleId,
@@ -102,10 +151,25 @@ transportRoutes.post('/vehicles', async (c) => {
     driverPhone,
     driverLicense: driverLicense || '',
     status: 'ACTIVE',
-    driverUserId: driverUserId || null,
+    driverUserId: driverAccount?.driverUserId || null,
   }).run();
 
-  return c.json({ success: true, message: 'Vehicle added successfully', vehicleId, driverUserId }, 201);
+  const driverCredentials = driverAccount ? {
+    loginId: driverAccount.loginId,
+    password: driverAccount.autoPassword,
+    driverName: driverAccount.driverName,
+    vehicleNo,
+    schoolCode: school?.code || '',
+    schoolName: school?.name || 'School ERP',
+  } : null;
+
+  return c.json({
+    success: true,
+    message: 'Vehicle and Driver registered successfully',
+    vehicleId,
+    driverUserId: driverAccount?.driverUserId || null,
+    driverCredentials,
+  }, 201);
 });
 
 // Update vehicle (Principal or SuperAdmin only)
@@ -131,15 +195,17 @@ transportRoutes.put('/vehicles/:id', async (c) => {
 
   if (!existing) return c.json({ error: 'Vehicle not found' }, 404);
 
-  let driverUserId = existing.driverUserId;
+  let driverAccount: DriverAccountResult | null = null;
   if (driverPhone || driverName) {
-    driverUserId = ensureDriverUserAccount(
+    driverAccount = ensureDriverUserAccount(
       user.schoolId,
       driverName ?? existing.driverName,
       driverPhone ?? existing.driverPhone,
       id
     );
   }
+
+  const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
 
   db.update(schema.transportVehicles)
     .set({
@@ -150,12 +216,85 @@ transportRoutes.put('/vehicles/:id', async (c) => {
       driverPhone: driverPhone ?? existing.driverPhone,
       driverLicense: driverLicense ?? existing.driverLicense,
       status: status ?? existing.status,
-      driverUserId: driverUserId ?? existing.driverUserId,
+      driverUserId: driverAccount?.driverUserId ?? existing.driverUserId,
     })
     .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
     .run();
 
-  return c.json({ success: true, message: 'Vehicle updated successfully' });
+  const vNo = vehicleNo ?? existing.vehicleNo;
+  const dName = driverName ?? existing.driverName;
+  const dPhone = driverPhone ?? existing.driverPhone;
+
+  let driverCredentials = null;
+  if (driverAccount) {
+    driverCredentials = {
+      loginId: driverAccount.loginId,
+      password: driverAccount.autoPassword,
+      driverName: driverAccount.driverName,
+      vehicleNo: vNo,
+      schoolCode: school?.code || '',
+      schoolName: school?.name || 'School ERP',
+    };
+  } else if (dPhone) {
+    const cleanPhone = (dPhone || '').replace(/\D/g, '');
+    const cleanLetters = (dName || 'DRIVER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const pfx = (cleanLetters.length >= 4 ? cleanLetters.slice(0, 4) : cleanLetters.padEnd(4, 'D')).toUpperCase();
+    const sfx = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+    driverCredentials = {
+      loginId: cleanPhone,
+      password: `${pfx}${sfx}`,
+      driverName: dName,
+      vehicleNo: vNo,
+      schoolCode: school?.code || '',
+      schoolName: school?.name || 'School ERP',
+    };
+  }
+
+  return c.json({
+    success: true,
+    message: 'Vehicle updated successfully',
+    driverCredentials,
+  });
+});
+
+// View Driver Credentials for a Vehicle (Principal or SuperAdmin only)
+transportRoutes.get('/vehicles/:id/driver-credentials', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
+  const user = verifyToken(authHeader.substring(7));
+  if (!user || !user.schoolId) return c.json({ error: 'Unauthorized' }, 401);
+
+  if (user.role !== 'principal' && user.role !== 'super_admin') {
+    return c.json({ error: 'Forbidden: Principal or SuperAdmin only' }, 403);
+  }
+
+  const id = c.req.param('id');
+  const vehicle = db
+    .select()
+    .from(schema.transportVehicles)
+    .where(and(eq(schema.transportVehicles.schoolId, user.schoolId), eq(schema.transportVehicles.id, id)))
+    .get();
+
+  if (!vehicle) return c.json({ error: 'Vehicle not found' }, 404);
+
+  const school = db.select().from(schema.schools).where(eq(schema.schools.id, user.schoolId)).get();
+  const cleanPhone = (vehicle.driverPhone || '').replace(/\D/g, '');
+  const cleanLetters = (vehicle.driverName || 'DRIVER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+  const pfx = (cleanLetters.length >= 4 ? cleanLetters.slice(0, 4) : cleanLetters.padEnd(4, 'D')).toUpperCase();
+  const sfx = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+  const autoPassword = `${pfx}${sfx}`;
+
+  return c.json({
+    success: true,
+    driverCredentials: {
+      loginId: cleanPhone,
+      password: autoPassword,
+      driverName: vehicle.driverName,
+      vehicleNo: vehicle.vehicleNo,
+      schoolCode: school?.code || '',
+      schoolName: school?.name || 'School ERP',
+    },
+  });
 });
 
 // Delete vehicle (Principal or SuperAdmin only)

@@ -856,7 +856,19 @@ export class ApiService {
     driverPhone: string;
     driverLicense?: string;
   }) {
-    return this.request<{ success: boolean; message: string; vehicleId: string }>('/transport/vehicles', {
+    return this.request<{
+      success: boolean;
+      message: string;
+      vehicleId: string;
+      driverCredentials?: {
+        loginId: string;
+        password: string;
+        driverName: string;
+        vehicleNo: string;
+        schoolCode?: string;
+        schoolName?: string;
+      };
+    }>('/transport/vehicles', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -921,10 +933,35 @@ export class ApiService {
     driverLicense?: string;
     status?: string;
   }) {
-    return this.request<{ success: boolean; message: string }>(`/transport/vehicles/${id}`, {
+    return this.request<{
+      success: boolean;
+      message: string;
+      driverCredentials?: {
+        loginId: string;
+        password: string;
+        driverName: string;
+        vehicleNo: string;
+        schoolCode?: string;
+        schoolName?: string;
+      };
+    }>(`/transport/vehicles/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  static async getVehicleDriverCredentials(id: string) {
+    return this.request<{
+      success: boolean;
+      driverCredentials: {
+        loginId: string;
+        password: string;
+        driverName: string;
+        vehicleNo: string;
+        schoolCode: string;
+        schoolName: string;
+      };
+    }>(`/transport/vehicles/${id}/driver-credentials`);
   }
 
   static async deleteTransportVehicle(id: string) {

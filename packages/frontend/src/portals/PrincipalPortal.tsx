@@ -4035,7 +4035,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
 
         {/* ================= MODULE: TRANSPORT FLEET ================= */}
         {activeTab === 'transport' && (
-          <TransportDesk students={students} />
+          <TransportDesk students={students} school={currentSchool} />
         )}
       </main>
 
@@ -4822,6 +4822,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 >
                   <option value="teacher">Teacher / Faculty</option>
                   <option value="staff">Administrative / Support Staff</option>
+                  <option value="driver">School Bus Driver</option>
                 </select>
               </div>
 

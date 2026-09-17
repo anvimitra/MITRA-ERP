@@ -21,13 +21,17 @@ import {
   Navigation,
   Shield,
   Search,
+  Key,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 interface TransportDeskProps {
   students?: Student[];
+  school?: { id: string; name: string; code: string } | null;
 }
 
-export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStudents }) => {
+export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStudents, school }) => {
   const [internalStudents, setInternalStudents] = useState<Student[]>([]);
   const students = (propStudents && propStudents.length > 0) ? propStudents : internalStudents;
 
@@ -53,6 +57,18 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [driverLicense, setDriverLicense] = useState('');
+
+  // Driver credentials modal state
+  const [showDriverCredsModal, setShowDriverCredsModal] = useState(false);
+  const [createdDriverCreds, setCreatedDriverCreds] = useState<{
+    loginId: string;
+    password: string;
+    driverName: string;
+    vehicleNo: string;
+    schoolCode?: string;
+    schoolName?: string;
+  } | null>(null);
+  const [copiedDriverCreds, setCopiedDriverCreds] = useState(false);
 
   // Routes
   const [routes, setRoutes] = useState<TransportRouteItem[]>([]);
@@ -214,7 +230,7 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
     e.preventDefault();
     try {
       if (editingVehicleId) {
-        await ApiService.updateTransportVehicle(editingVehicleId, {
+        const res = await ApiService.updateTransportVehicle(editingVehicleId, {
           vehicleNo: vehNo,
           vehicleModel: vehModel,
           seatingCapacity: vehCapacity,
@@ -222,9 +238,14 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
           driverPhone,
           driverLicense,
         });
-        alert('✅ Vehicle details updated!');
+        if (res.driverCredentials) {
+          setCreatedDriverCreds(res.driverCredentials);
+          setShowDriverCredsModal(true);
+        } else {
+          alert('✅ Vehicle details updated successfully!');
+        }
       } else {
-        await ApiService.createTransportVehicle({
+        const res = await ApiService.createTransportVehicle({
           vehicleNo: vehNo,
           vehicleModel: vehModel,
           seatingCapacity: vehCapacity,
@@ -232,7 +253,12 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
           driverPhone,
           driverLicense,
         });
-        alert('✅ Vehicle added to fleet!');
+        if (res.driverCredentials) {
+          setCreatedDriverCreds(res.driverCredentials);
+          setShowDriverCredsModal(true);
+        } else {
+          alert('✅ Vehicle added to fleet successfully!');
+        }
       }
       setShowVehicleModal(false);
       setEditingVehicleId(null);
@@ -556,6 +582,28 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => {
+                            const cleanPhone = (v.driverPhone || '').replace(/\D/g, '');
+                            const cleanLetters = (v.driverName || 'DRIVER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+                            const pfx = (cleanLetters.length >= 4 ? cleanLetters.slice(0, 4) : cleanLetters.padEnd(4, 'D')).toUpperCase();
+                            const sfx = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '1234';
+                            const autoPassword = (v as any).driverDefaultPassword || `${pfx}${sfx}`;
+                            setCreatedDriverCreds({
+                              loginId: cleanPhone || v.driverPhone,
+                              password: autoPassword,
+                              driverName: v.driverName || 'School Bus Driver',
+                              vehicleNo: v.vehicleNo,
+                              schoolCode: (v as any).schoolCode || school?.code || '',
+                              schoolName: (v as any).schoolName || school?.name || 'School ERP',
+                            });
+                            setShowDriverCredsModal(true);
+                          }}
+                          className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition"
+                          title="View / Copy Driver Mobile App Credentials"
+                        >
+                          <Key size={13} />
+                        </button>
+                        <button
                           onClick={() => handleOpenEditVehicle(v)}
                           className="p-1.5 text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 rounded-lg transition"
                           title="Edit Vehicle"
@@ -677,6 +725,11 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                 <label className="block text-slate-600 font-bold mb-1">Driver License No</label>
                 <input value={driverLicense} onChange={(e) => setDriverLicense(e.target.value)} className="w-full p-2 bg-slate-50 border rounded-xl" />
               </div>
+
+              <div className="p-3 bg-cyan-50/70 border border-cyan-200 rounded-xl text-[11px] text-cyan-900 leading-relaxed">
+                🔑 <strong>Auto-Generated Driver Login:</strong> A driver account for the <strong>MITRA-ERP All-In-One Mobile App</strong> will automatically be created. The driver can log in using their <strong>Mobile Number</strong> and auto-generated password (Name+Mobile).
+              </div>
+
               <div className="pt-3 border-t flex justify-end gap-2">
                 <button type="button" onClick={() => setShowVehicleModal(false)} className="px-3 py-1.5 text-slate-500 font-bold">Cancel</button>
                 <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">{editingVehicleId ? "Update Vehicle" : "Save Vehicle"}</button>
@@ -827,6 +880,83 @@ export const TransportDesk: React.FC<TransportDeskProps> = ({ students: propStud
                 <button type="submit" className="px-4 py-1.5 bg-cyan-800 text-white rounded-xl font-bold shadow">Allocate Seat</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: DRIVER CREDENTIALS AUTO-GENERATED ================= */}
+      {showDriverCredsModal && createdDriverCreds && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-cyan-200 space-y-5 animate-slide-up relative">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-700 text-white flex items-center justify-center font-black shadow-lg shadow-cyan-600/30">
+                <Bus size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Driver & Vehicle Registered!</h3>
+                <p className="text-xs text-cyan-700 font-bold">✓ Driver Login Credentials Auto-Generated</p>
+              </div>
+            </div>
+
+            <div className="bg-cyan-50/60 rounded-2xl p-4 border border-cyan-200 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-cyan-200/60">
+                <span className="text-slate-600 font-bold">Driver Name:</span>
+                <span className="font-extrabold text-slate-900 uppercase">{createdDriverCreds.driverName}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-cyan-200/60">
+                <span className="text-slate-600 font-bold">Assigned Bus No:</span>
+                <span className="font-mono font-bold text-slate-800">{createdDriverCreds.vehicleNo}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-cyan-200/60">
+                <span className="text-slate-600 font-bold">Driver Login ID (Mobile):</span>
+                <span className="font-mono font-black text-cyan-800 bg-cyan-100 px-2.5 py-0.5 rounded-lg text-sm">
+                  {createdDriverCreds.loginId}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-cyan-200/60">
+                <span className="text-slate-600 font-bold">Auto-Password (Name+Phone):</span>
+                <span className="font-mono font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg text-sm">
+                  {createdDriverCreds.password}
+                </span>
+              </div>
+              {createdDriverCreds.schoolCode && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 font-bold">School Tenant Code:</span>
+                  <span className="font-mono font-bold text-slate-700">
+                    {createdDriverCreds.schoolCode}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              💡 Driver can log into the <strong>MITRA-ERP All-In-One Mobile App</strong> using their <strong>Mobile Number</strong> as Login ID and the above password to start live GPS trip tracking.
+            </p>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const sName = createdDriverCreds.schoolName || school?.name || 'School ERP';
+                  const sCode = createdDriverCreds.schoolCode || school?.code || '';
+                  const msg = `🚍 *${sName}*\nDear ${createdDriverCreds.driverName},\nYou have been registered as the Driver for Bus: *${createdDriverCreds.vehicleNo}*.\n\n📱 *MITRA-ERP All-In-One Mobile App Login Details:*\n- *Login ID (Mobile)*: ${createdDriverCreds.loginId}\n- *Password*: ${createdDriverCreds.password}\n${sCode ? `- *School Code*: ${sCode}\n` : ''}\nPlease open the MITRA-ERP Mobile App to log in and start live bus GPS trip tracking.`;
+                  navigator.clipboard.writeText(msg);
+                  setCopiedDriverCreds(true);
+                  setTimeout(() => setCopiedDriverCreds(false), 2500);
+                }}
+                className="w-full py-3 bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl shadow-lg shadow-cyan-700/30 flex items-center justify-center gap-2 transition"
+              >
+                {copiedDriverCreds ? <Check size={16} /> : <Copy size={16} />}
+                <span>{copiedDriverCreds ? 'Copied Details to Clipboard!' : '📋 Copy Driver Credentials (WhatsApp / SMS)'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDriverCredsModal(false)}
+                className="w-full py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition"
+              >
+                Close & Continue
+              </button>
+            </div>
           </div>
         </div>
       )}

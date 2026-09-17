@@ -454,7 +454,7 @@ export const AccountantPortal: React.FC<{ school?: any }> = ({ school: initialSc
       {/* ================= TAB 6: TRANSPORT & FLEET ================= */}
       {activeTab === 'transport' && (
         <div>
-          <TransportDesk />
+          <TransportDesk school={currentSchool} />
         </div>
       )}
 
