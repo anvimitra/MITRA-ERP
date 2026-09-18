@@ -69,8 +69,16 @@ studentRoutes.get('/', async (c) => {
   // Apply filters in memory for flexibility
   if (classId) {
     allStudents = allStudents.filter((s: any) => s.classId === classId);
-  }
-  if (sectionId) {
+    if (sectionId) {
+      allStudents = allStudents.filter((s: any) => {
+        if (s.sectionId === sectionId) return true;
+        if (sectionId.endsWith('-a') && (!s.sectionId || s.sectionId === 'sec-default' || !s.sectionId.includes(classId.replace('cls-', '')))) {
+          return true;
+        }
+        return false;
+      });
+    }
+  } else if (sectionId) {
     allStudents = allStudents.filter((s: any) => s.sectionId === sectionId);
   }
   if (search) {

@@ -202,18 +202,66 @@ export async function listGoogleDriveBackups() {
 
 /**
  * Download a backup file from Google Drive and return parsed JSON
+ * Supports both standard binary JSON files and Google Docs files created in Drive
  */
 export async function downloadGoogleDriveBackup(fileId: string): Promise<any> {
   const { drive } = getDriveClient();
-  const res = await drive.files.get(
-    {
-      fileId,
-      alt: 'media',
-      supportsAllDrives: true,
-    },
-    { responseType: 'text' }
-  );
 
-  const rawData = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-  return JSON.parse(rawData);
+  // 1. Check file metadata (mimeType, name)
+  let mimeType = '';
+  try {
+    const meta = await drive.files.get({
+      fileId,
+      fields: 'id, name, mimeType',
+      supportsAllDrives: true,
+    });
+    mimeType = meta.data.mimeType || '';
+  } catch (err: any) {
+    console.warn('[Google Drive] Unable to inspect file metadata, attempting direct fetch:', err.message);
+  }
+
+  let rawData: string;
+
+  // If this is a Google Docs document created/edited via Docs UI, use files.export
+  if (mimeType && mimeType.startsWith('application/vnd.google-apps.')) {
+    console.log(`[Google Drive] Exporting Docs file (${fileId}) as plain text...`);
+    const exportRes = await drive.files.export({
+      fileId,
+      mimeType: 'text/plain',
+    });
+    rawData = typeof exportRes.data === 'string' ? exportRes.data : JSON.stringify(exportRes.data);
+  } else {
+    // Try standard binary/text download
+    try {
+      const res = await drive.files.get(
+        {
+          fileId,
+          alt: 'media',
+          supportsAllDrives: true,
+        },
+        { responseType: 'text' }
+      );
+      rawData = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+    } catch (err: any) {
+      // If personal drive quota or docs editor requires export instead of media download
+      if (err.message && (err.message.includes('fileNotDownloadable') || err.message.includes('Docs Editors'))) {
+        console.log(`[Google Drive] Fallback: Exporting file (${fileId}) with files.export text/plain...`);
+        const exportRes = await drive.files.export({
+          fileId,
+          mimeType: 'text/plain',
+        });
+        rawData = typeof exportRes.data === 'string' ? exportRes.data : JSON.stringify(exportRes.data);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // Strip potential UTF-8 BOM or whitespace
+  let cleanStr = rawData.trim();
+  if (cleanStr.charCodeAt(0) === 0xfeff) {
+    cleanStr = cleanStr.slice(1);
+  }
+
+  return JSON.parse(cleanStr);
 }

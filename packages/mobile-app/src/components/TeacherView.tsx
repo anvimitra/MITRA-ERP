@@ -109,10 +109,11 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       const alloc = await fetchMyAllocations();
       setAllocations(alloc);
 
-      // 1. Filter attendance classes strictly to those where teacher is assigned as Class Teacher
+      // 1. Collect attendance classes (Class Teacher assignments, Subject/Timetable allocations, with fallback)
       const ctList: AssignedClassOption[] = [];
       const seenKeys = new Set<string>();
 
+      // 1A. Explicit Class Teacher assignments
       (alloc.classTeacherOf || []).forEach((ct: any) => {
         const key = `${ct.classId}_${ct.sectionId}`;
         if (!seenKeys.has(key)) {
@@ -127,10 +128,54 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             sectionId: ct.sectionId,
             className,
             sectionName,
-            label: `${className} (Sec ${sectionName})`,
+            label: `${className} (Sec ${sectionName}) ⭐`,
           });
         }
       });
+
+      // 1B. Subject allocations and Timetable periods
+      (alloc.subjectsAssigned || []).forEach((sa: any) => {
+        if (sa.classId && sa.sectionId) {
+          const key = `${sa.classId}_${sa.sectionId}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            const cls = (alloc.allClasses || []).find((c: any) => c.id === sa.classId);
+            const sec = (alloc.allSections || []).find((s: any) => s.id === sa.sectionId);
+            const className = cls?.name || `Class ${sa.classId}`;
+            const sectionName = sec?.name || 'A';
+            ctList.push({
+              key,
+              classId: sa.classId,
+              sectionId: sa.sectionId,
+              className,
+              sectionName,
+              label: `${className} (Sec ${sectionName})`,
+            });
+          }
+        }
+      });
+
+      // 1C. Fallback: If no explicit allocations found, provide all school classes so teacher can select their class
+      if (ctList.length === 0 && Array.isArray(alloc.allClasses) && alloc.allClasses.length > 0) {
+        alloc.allClasses.forEach((cls: any) => {
+          const sectionsForClass = (alloc.allSections || []).filter((sec: any) => sec.classId === cls.id);
+          const secs = sectionsForClass.length > 0 ? sectionsForClass : [{ id: `sec-${cls.id}-a`, name: 'A' }];
+          secs.forEach((sec: any) => {
+            const key = `${cls.id}_${sec.id}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              ctList.push({
+                key,
+                classId: cls.id,
+                sectionId: sec.id,
+                className: cls.name,
+                sectionName: sec.name,
+                label: `${cls.name} (Sec ${sec.name})`,
+              });
+            }
+          });
+        });
+      }
 
       setAssignedClasses(ctList);
 

@@ -132,15 +132,76 @@ classRoutes.get('/my-allocations', async (c) => {
     .where(and(eq(schema.subjectAllocations.schoolId, user.schoolId), eq(schema.subjectAllocations.teacherId, user.userId)))
     .all();
 
+  // Find timetable period assignments for this teacher
+  let teacherPeriods: any[] = [];
+  try {
+    teacherPeriods = db
+      .select()
+      .from(schema.timetablePeriods)
+      .where(and(eq(schema.timetablePeriods.schoolId, user.schoolId), eq(schema.timetablePeriods.teacherId, user.userId)))
+      .all();
+  } catch {}
+
+  const timetableClassMap = new Map<string, any>();
+  for (const tp of teacherPeriods) {
+    if (tp.classId && tp.sectionId) {
+      const key = `${tp.classId}_${tp.sectionId}`;
+      if (!timetableClassMap.has(key)) {
+        timetableClassMap.set(key, {
+          id: `tt-${tp.id}`,
+          schoolId: user.schoolId,
+          teacherId: user.userId,
+          classId: tp.classId,
+          sectionId: tp.sectionId,
+          subjectId: tp.subjectId,
+        });
+      }
+    }
+  }
+
+  // If teacher has no explicit classTeacherOf row, synthesize from timetable or subject allocations
+  const effectiveClassTeacherOf = [...classTeacherOf];
+  if (effectiveClassTeacherOf.length === 0) {
+    for (const item of timetableClassMap.values()) {
+      if (!effectiveClassTeacherOf.some((ct) => ct.classId === item.classId && ct.sectionId === item.sectionId)) {
+        effectiveClassTeacherOf.push({
+          id: `auto-ct-${item.id}`,
+          schoolId: user.schoolId,
+          classId: item.classId,
+          sectionId: item.sectionId,
+          teacherId: user.userId,
+        });
+      }
+    }
+    for (const sa of subjectsAssigned) {
+      if (!effectiveClassTeacherOf.some((ct) => ct.classId === sa.classId && ct.sectionId === sa.sectionId)) {
+        effectiveClassTeacherOf.push({
+          id: `auto-ct-${sa.id}`,
+          schoolId: user.schoolId,
+          classId: sa.classId,
+          sectionId: sa.sectionId,
+          teacherId: user.userId,
+        });
+      }
+    }
+  }
+
+  const allSubjectsAssigned = [...subjectsAssigned];
+  for (const item of timetableClassMap.values()) {
+    if (!allSubjectsAssigned.some((sa) => sa.classId === item.classId && sa.sectionId === item.sectionId && sa.subjectId === item.subjectId)) {
+      allSubjectsAssigned.push(item);
+    }
+  }
+
   const classes = db.select().from(schema.classes).where(eq(schema.classes.schoolId, user.schoolId)).all();
   classes.sort((a: any, b: any) => (Number(a.gradeLevel) || 0) - (Number(b.gradeLevel) || 0));
   const sections = db.select().from(schema.sections).where(eq(schema.sections.schoolId, user.schoolId)).all();
   const subjects = db.select().from(schema.subjects).where(eq(schema.subjects.schoolId, user.schoolId)).all();
 
   return c.json({
-    isClassTeacher: classTeacherOf.length > 0,
-    classTeacherOf,
-    subjectsAssigned,
+    isClassTeacher: effectiveClassTeacherOf.length > 0,
+    classTeacherOf: effectiveClassTeacherOf,
+    subjectsAssigned: allSubjectsAssigned,
     allClasses: classes,
     allSections: sections,
     allSubjects: subjects,

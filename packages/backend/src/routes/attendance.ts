@@ -133,18 +133,27 @@ attendanceRoutes.get('/class', async (c) => {
     return c.json({ error: 'classId and sectionId query params required' }, 400);
   }
 
-  // Fetch all students in this class and section
-  const studentList = db
+  // Fetch all students in this class strictly
+  const classStudents = db
     .select()
     .from(schema.students)
     .where(
       and(
         eq(schema.students.schoolId, user.schoolId),
-        eq(schema.students.classId, classId),
-        eq(schema.students.sectionId, sectionId)
+        eq(schema.students.classId, classId)
       )
     )
     .all();
+
+  const studentList = classStudents.filter((s: any) => {
+    if (!sectionId) return true;
+    if (s.sectionId === sectionId) return true;
+    // Resilient fallback for legacy records where sectionId might be sec-default or orphaned
+    if (sectionId.endsWith('-a') && (!s.sectionId || s.sectionId === 'sec-default' || !s.sectionId.includes(classId.replace('cls-', '')))) {
+      return true;
+    }
+    return false;
+  });
 
   // Fetch attendance records for this date
   const records = db

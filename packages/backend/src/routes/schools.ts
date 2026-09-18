@@ -876,61 +876,49 @@ schoolRoutes.post('/google-drive-restore', async (c) => {
       return c.json({ error: 'Downloaded file does not contain valid ERP backup dataset' }, 400);
     }
 
+    const restoreTable = (tableName: string, rows: any[]) => {
+      if (!Array.isArray(rows) || rows.length === 0) return 0;
+      const tableObj = (schema as any)[tableName];
+      if (!tableObj) return 0;
+
+      let count = 0;
+      for (const row of rows) {
+        try {
+          db.insert(tableObj).values(row).run();
+          count++;
+        } catch {
+          if (row.id && tableObj.id) {
+            try {
+              db.update(tableObj).set(row).where(eq(tableObj.id, row.id)).run();
+              count++;
+            } catch {}
+          }
+        }
+      }
+      return count;
+    };
+
     let restoredSchools = 0;
-    for (const s of dataset.schools) {
-      try {
-        db.insert(schema.schools).values(s).run();
-        restoredSchools++;
-      } catch {}
+    if (Array.isArray(dataset.schools)) {
+      restoredSchools = restoreTable('schools', dataset.schools);
     }
-
-    if (Array.isArray(dataset.users)) {
-      for (const u of dataset.users) {
-        try {
-          db.insert(schema.users).values(u).run();
-        } catch {}
-      }
-    }
-
-    if (Array.isArray(dataset.classes)) {
-      for (const cl of dataset.classes) {
-        try {
-          db.insert(schema.classes).values(cl).run();
-        } catch {}
-      }
-    }
-
-    if (Array.isArray(dataset.sections)) {
-      for (const sec of dataset.sections) {
-        try {
-          db.insert(schema.sections).values(sec).run();
-        } catch {}
-      }
-    }
-
-    if (Array.isArray(dataset.students)) {
-      for (const st of dataset.students) {
-        try {
-          db.insert(schema.students).values(st).run();
-        } catch {}
-      }
-    }
-
-    if (Array.isArray(dataset.feeStructures)) {
-      for (const fs of dataset.feeStructures) {
-        try {
-          db.insert(schema.feeStructures).values(fs).onConflictDoNothing().run();
-        } catch {}
-      }
-    }
-
-    if (Array.isArray(dataset.feePayments)) {
-      for (const fp of dataset.feePayments) {
-        try {
-          db.insert(schema.feePayments).values(fp).onConflictDoNothing().run();
-        } catch {}
-      }
-    }
+    if (Array.isArray(dataset.users)) restoreTable('users', dataset.users);
+    if (Array.isArray(dataset.classes)) restoreTable('classes', dataset.classes);
+    if (Array.isArray(dataset.sections)) restoreTable('sections', dataset.sections);
+    if (Array.isArray(dataset.subjects)) restoreTable('subjects', dataset.subjects);
+    if (Array.isArray(dataset.subjectAllocations)) restoreTable('subjectAllocations', dataset.subjectAllocations);
+    if (Array.isArray(dataset.classTeachers)) restoreTable('classTeachers', dataset.classTeachers);
+    if (Array.isArray(dataset.parents)) restoreTable('parents', dataset.parents);
+    if (Array.isArray(dataset.students)) restoreTable('students', dataset.students);
+    if (Array.isArray(dataset.attendance)) restoreTable('attendance', dataset.attendance);
+    if (Array.isArray(dataset.exams)) restoreTable('exams', dataset.exams);
+    if (Array.isArray(dataset.marks)) restoreTable('marks', dataset.marks);
+    if (Array.isArray(dataset.feeStructures)) restoreTable('feeStructures', dataset.feeStructures);
+    if (Array.isArray(dataset.feePayments)) restoreTable('feePayments', dataset.feePayments);
+    if (Array.isArray(dataset.timetable)) restoreTable('timetablePeriods', dataset.timetable);
+    if (Array.isArray(dataset.certificates)) restoreTable('certificates', dataset.certificates);
+    if (Array.isArray(dataset.studentLogs)) restoreTable('studentLogs', dataset.studentLogs);
+    if (Array.isArray(dataset.staffLeaves)) restoreTable('staffLeaves', dataset.staffLeaves);
 
     try {
       const sqlite = getDatabaseInstance();
