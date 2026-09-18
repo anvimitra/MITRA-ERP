@@ -3,6 +3,7 @@ import { User, Student, StaffLeaveItem, ExamItem, NotificationItem } from '../ty
 import {
   submitClassAttendance,
   fetchLiveStudents,
+  fetchClassAttendance,
   fetchLiveClasses,
   fetchStaffLeaves,
   applyStaffLeave,
@@ -38,6 +39,15 @@ interface Props {
   onSubTabChange?: (tab: 'attendance' | 'marks' | 'leaves' | 'notices') => void;
 }
 
+interface AssignedClassOption {
+  key: string;
+  classId: string;
+  sectionId: string;
+  className: string;
+  sectionName: string;
+  label: string;
+}
+
 export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTab, onSubTabChange }) => {
   const [internalTab, setInternalTab] = useState<'attendance' | 'marks' | 'leaves' | 'notices'>('attendance');
   const activeSubTab = externalTab || internalTab;
@@ -47,8 +57,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   };
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [classList, setClassList] = useState<any[]>([]);
-  const [sectionList, setSectionList] = useState<any[]>([]);
+  const [assignedClasses, setAssignedClasses] = useState<AssignedClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [students, setStudents] = useState<
@@ -97,21 +106,42 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const loadClassData = async () => {
     setLoading(true);
     try {
-      const [alloc, studentsData] = await Promise.all([
-        fetchMyAllocations(),
-        fetchLiveStudents(),
-      ]);
+      const alloc = await fetchMyAllocations();
       setAllocations(alloc);
 
-      // 1. Filter attendance classes to ONLY those where teacher is Class Teacher
-      if (alloc.classTeacherOf && alloc.classTeacherOf.length > 0) {
-        const allowedClassIds = new Set(alloc.classTeacherOf.map((ct: any) => ct.classId));
-        const allowedClasses = (alloc.allClasses || []).filter((c: any) => allowedClassIds.has(c.id));
-        setClassList(allowedClasses);
-        setSelectedClassId(alloc.classTeacherOf[0].classId);
-        setSelectedSectionId(alloc.classTeacherOf[0].sectionId);
+      // 1. Filter attendance classes strictly to those where teacher is assigned as Class Teacher
+      const ctList: AssignedClassOption[] = [];
+      const seenKeys = new Set<string>();
+
+      (alloc.classTeacherOf || []).forEach((ct: any) => {
+        const key = `${ct.classId}_${ct.sectionId}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const cls = (alloc.allClasses || []).find((c: any) => c.id === ct.classId);
+          const sec = (alloc.allSections || []).find((s: any) => s.id === ct.sectionId);
+          const className = cls?.name || `Class ${ct.classId}`;
+          const sectionName = sec?.name || 'A';
+          ctList.push({
+            key,
+            classId: ct.classId,
+            sectionId: ct.sectionId,
+            className,
+            sectionName,
+            label: `${className} (Sec ${sectionName})`,
+          });
+        }
+      });
+
+      setAssignedClasses(ctList);
+
+      let initClassId = '';
+      let initSectionId = '';
+      if (ctList.length > 0) {
+        initClassId = ctList[0].classId;
+        initSectionId = ctList[0].sectionId;
+        setSelectedClassId(initClassId);
+        setSelectedSectionId(initSectionId);
       } else {
-        setClassList([]);
         setSelectedClassId('');
         setSelectedSectionId('');
       }
@@ -124,54 +154,126 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
         setSelectedSubject(sub?.name || 'Subject');
       }
 
-      if (studentsData?.length > 0) {
-        setStudents(
-          studentsData.map((s) => ({
-            ...s,
-            status: 'present',
-            marks: '',
-          }))
-        );
+      // 3. Load attendance sheet for assigned class
+      if (initClassId && initSectionId) {
+        await loadAttendanceForAssignedClass(initClassId, initSectionId, selectedDate);
       } else {
         setStudents([]);
       }
-    } catch {
+    } catch (err) {
+      console.warn('Error loading teacher data:', err);
       setStudents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load marks sheet when exam or subject or class changes
-  const loadMarksSheetData = async (examId: string, classId: string, sectionId: string, subject: string) => {
-    if (!examId || !classId) return;
+  // Strictly load attendance for the designated class & section
+  const loadAttendanceForAssignedClass = async (classId: string, sectionId: string, date: string) => {
+    if (!classId || !sectionId) {
+      setStudents([]);
+      return;
+    }
+    setLoading(true);
     try {
-      const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
-      if (sheet && sheet.length > 0) {
-        setStudents((prev) =>
-          prev.map((s) => {
-            const entry = sheet.find((sh) => sh.studentId === s.id);
-            return {
-              ...s,
-              marks: entry && entry.marksObtained !== '' ? entry.marksObtained : s.marks ?? '',
-            };
-          })
+      const attData = await fetchClassAttendance(classId, sectionId, date);
+      if (attData && attData.students && attData.students.length > 0) {
+        setStudents(
+          attData.students.map((s: any) => ({
+            id: s.studentId,
+            classId,
+            sectionId,
+            admissionNo: s.admissionNo,
+            rollNo: s.rollNo,
+            firstName: s.firstName || s.name?.split(' ')[0] || 'Student',
+            lastName: s.lastName || s.name?.split(' ').slice(1).join(' ') || '',
+            className: '',
+            sectionName: '',
+            bloodGroup: 'B+',
+            photoUrl: s.photoUrl || '',
+            status: (s.status === 'unmarked' ? 'present' : s.status) as 'present' | 'absent' | 'late',
+            remarks: s.remarks || '',
+            marks: '',
+          }))
+        );
+      } else {
+        const stus = await fetchLiveStudents(classId, sectionId);
+        const filtered = stus.filter((s) => s.classId === classId && (!sectionId || s.sectionId === sectionId));
+        setStudents(
+          filtered.map((s) => ({
+            ...s,
+            status: 'present',
+            marks: '',
+          }))
         );
       }
     } catch (err) {
+      console.warn('Error loading class attendance:', err);
+      setStudents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load marks sheet strictly for students of this exam, class, section, and subject
+  const loadMarksSheetData = async (examId: string, classId: string, sectionId: string, subject: string) => {
+    if (!examId || !classId) return;
+    setLoading(true);
+    try {
+      const classStudents = await fetchLiveStudents(classId, sectionId);
+      const filtered = classStudents.filter((s) => s.classId === classId && (!sectionId || s.sectionId === sectionId));
+
+      const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
+      setStudents(
+        filtered.map((s) => {
+          const entry = sheet?.find((sh) => sh.studentId === s.id);
+          return {
+            ...s,
+            status: 'present',
+            marks: entry && entry.marksObtained !== '' ? entry.marksObtained : '',
+          };
+        })
+      );
+    } catch (err) {
       console.warn('Marks sheet fetch error', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeSubTab === 'marks' && selectedClassId) {
-      loadMarksSheetData(selectedExam, selectedClassId, selectedSectionId, selectedSubject);
+    if (activeSubTab === 'attendance') {
+      if (selectedClassId && selectedSectionId) {
+        loadAttendanceForAssignedClass(selectedClassId, selectedSectionId, selectedDate);
+      }
+    } else if (activeSubTab === 'marks') {
+      let targetClassId = selectedClassId;
+      let targetSectionId = selectedSectionId;
+      if (allocations?.subjectsAssigned && selectedAllocationId) {
+        const curAlloc = allocations.subjectsAssigned.find((a: any) => a.id === selectedAllocationId);
+        if (curAlloc) {
+          targetClassId = curAlloc.classId;
+          targetSectionId = curAlloc.sectionId;
+        }
+      }
+      if (targetClassId) {
+        loadMarksSheetData(selectedExam, targetClassId, targetSectionId, selectedSubject);
+      }
     }
-  }, [activeSubTab, selectedExam, selectedClassId, selectedSectionId, selectedSubject]);
+  }, [activeSubTab]);
 
   const toggleStatus = (id: string, newStatus: 'present' | 'absent' | 'late') => {
     setStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
+    );
+  };
+
+  const handleMarkAllPresent = () => {
+    setStudents((prev) =>
+      prev.map((s) => ({
+        ...s,
+        status: 'present',
+      }))
     );
   };
 
@@ -185,18 +287,26 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
 
   // Save Attendance to ERP
   const handleSubmitAttendance = async () => {
+    if (!selectedClassId || !selectedSectionId) {
+      setFeedback('⚠️ Please select your assigned class and section first.');
+      return;
+    }
     setIsSubmitting(true);
     setFeedback(null);
 
     try {
-      const records = students.map((s) => ({
+      const targetStudents = students.filter(
+        (s) => s.classId === selectedClassId && (!selectedSectionId || s.sectionId === selectedSectionId)
+      );
+
+      const records = targetStudents.map((s) => ({
         studentId: s.id,
         status: s.status,
         remarks: s.status === 'late' ? 'Marked late' : undefined,
       }));
 
-      await submitClassAttendance(selectedClassId || 'class-1', selectedSectionId || 'sec-a', selectedDate, records);
-      setFeedback('✅ Attendance recorded successfully! Instant In-App Notifications dispatched to all parents.');
+      await submitClassAttendance(selectedClassId, selectedSectionId, selectedDate, records);
+      setFeedback(`✅ Attendance recorded for ${records.length} students of assigned class! Instant in-app notifications dispatched to parents.`);
     } catch (err: any) {
       setFeedback(err.message || 'Error recording attendance.');
     } finally {
@@ -364,7 +474,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
 
       {/* ATTENDANCE MODE */}
       {activeSubTab === 'attendance' && (
-        classList.length === 0 && !loading ? (
+        assignedClasses.length === 0 && !loading ? (
           <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-dashed border-amber-300 space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
               <ShieldAlert className="w-6 h-6" />
@@ -382,28 +492,51 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                 <h3 className="font-bold text-sm text-slate-800">Daily Attendance Roll Call</h3>
                 {loading && <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin" />}
               </div>
-              <p className="text-xs text-slate-500">Tap status badge to mark Present, Absent, or Late</p>
+              <p className="text-xs text-slate-500">
+                Tap status badge to mark Present, Absent, or Late. Only students of your assigned class are shown.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              {classList.length > 0 && (
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
-                >
-                  {classList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex items-center gap-2 flex-wrap">
+              {assignedClasses.length > 0 && (
+                <div className="flex items-center gap-1 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-xl">
+                  <span className="text-[10px] font-black uppercase text-purple-700">Class:</span>
+                  <select
+                    value={`${selectedClassId}_${selectedSectionId}`}
+                    onChange={(e) => {
+                      const [cId, sId] = e.target.value.split('_');
+                      setSelectedClassId(cId);
+                      setSelectedSectionId(sId);
+                      loadAttendanceForAssignedClass(cId, sId, selectedDate);
+                    }}
+                    className="text-xs font-bold bg-transparent text-purple-950 focus:outline-none cursor-pointer"
+                  >
+                    {assignedClasses.map((c) => (
+                      <option key={c.key} value={c.key} className="text-slate-900">
+                        {c.label} ⭐
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  setSelectedDate(newDate);
+                  if (selectedClassId && selectedSectionId) {
+                    loadAttendanceForAssignedClass(selectedClassId, selectedSectionId, newDate);
+                  }
+                }}
                 className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
               />
+              <button
+                type="button"
+                onClick={handleMarkAllPresent}
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition"
+              >
+                All Present
+              </button>
             </div>
           </div>
 
@@ -420,12 +553,17 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           </div>
 
           <div className="space-y-2">
-            {students.length === 0 ? (
+            {students.filter(
+              (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
+            ).length === 0 ? (
               <div className="text-center py-8 text-slate-400 text-xs">
-                {loading ? 'Loading class students...' : 'No students found in this class.'}
+                {loading ? 'Loading assigned class students...' : 'No students found in this assigned class.'}
               </div>
             ) : (
               students
+                .filter(
+                  (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
+                )
                 .filter((stu) => {
                   if (!attSearch.trim()) return true;
                   const q = attSearch.toLowerCase().trim();
@@ -441,11 +579,17 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                   className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <img
-                      src={stu.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                      alt=""
-                      className="w-8 h-8 rounded-lg object-cover"
-                    />
+                    {stu.photoUrl ? (
+                      <img
+                        src={stu.photoUrl}
+                        alt=""
+                        className="w-8 h-8 rounded-lg object-cover border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-800 font-black text-xs flex items-center justify-center border border-purple-200">
+                        {stu.firstName?.[0] || 'S'}
+                      </div>
+                    )}
                     <div>
                       <h4 className="font-bold text-xs text-slate-800">
                         {stu.firstName} {stu.lastName}
@@ -517,7 +661,19 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
               <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Select Exam</label>
               <select
                 value={selectedExam}
-                onChange={(e) => setSelectedExam(e.target.value)}
+                onChange={(e) => {
+                  const exId = e.target.value;
+                  setSelectedExam(exId);
+                  let tClass = selectedClassId;
+                  let tSec = selectedSectionId;
+                  if (allocations?.subjectsAssigned && selectedAllocationId) {
+                    const a = allocations.subjectsAssigned.find((x: any) => x.id === selectedAllocationId);
+                    if (a) { tClass = a.classId; tSec = a.sectionId; }
+                  }
+                  if (tClass) {
+                    loadMarksSheetData(exId, tClass, tSec, selectedSubject);
+                  }
+                }}
                 className="w-full text-xs font-semibold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800"
               >
                 {exams.length > 0 ? (
@@ -552,7 +708,9 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                       setSelectedClassId(curAlloc.classId);
                       setSelectedSectionId(curAlloc.sectionId);
                       const sub = allocations.allSubjects?.find((s: any) => s.id === curAlloc.subjectId);
-                      setSelectedSubject(sub?.name || 'Subject');
+                      const sName = sub?.name || 'Subject';
+                      setSelectedSubject(sName);
+                      loadMarksSheetData(selectedExam, curAlloc.classId, curAlloc.sectionId, sName);
                     }
                   }}
                   className="w-full text-xs font-semibold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 font-bold"
@@ -608,12 +766,17 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           </div>
 
           <div className="space-y-2 mt-2">
-            {students.length === 0 ? (
+            {students.filter(
+              (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
+            ).length === 0 ? (
               <div className="text-center py-6 text-slate-400 text-xs">
-                No students enrolled to grade.
+                No students enrolled in this assigned class to grade.
               </div>
             ) : (
               students
+                .filter(
+                  (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
+                )
                 .filter((stu) => {
                   if (!marksSearch.trim()) return true;
                   const q = marksSearch.toLowerCase().trim();

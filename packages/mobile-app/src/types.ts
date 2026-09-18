@@ -38,6 +38,8 @@ export interface User {
 
 export interface Student {
   id: string;
+  classId?: string;
+  sectionId?: string;
   admissionNo: string;
   rollNo: number;
   firstName: string;

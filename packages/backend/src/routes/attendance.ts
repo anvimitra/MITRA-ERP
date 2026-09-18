@@ -167,6 +167,11 @@ attendanceRoutes.get('/class', async (c) => {
     admissionNo: s.admissionNo,
     rollNo: s.rollNo,
     name: `${s.firstName} ${s.lastName || ''}`.trim(),
+    firstName: s.firstName,
+    lastName: s.lastName || '',
+    classId: s.classId,
+    sectionId: s.sectionId,
+    photoUrl: s.photoUrl || null,
     status: attendanceMap.get(s.id)?.status || 'unmarked',
     remarks: attendanceMap.get(s.id)?.remarks || '',
   }));

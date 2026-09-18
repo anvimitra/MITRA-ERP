@@ -154,14 +154,22 @@ export async function fetchMe(): Promise<{ user: User; school: School; linkedStu
 }
 
 // 4. Fetch Live Students from ERP
-export async function fetchLiveStudents(): Promise<Student[]> {
+export async function fetchLiveStudents(classId?: string, sectionId?: string): Promise<Student[]> {
   try {
-    const res = await authFetch('/students');
+    let url = '/students';
+    const params = new URLSearchParams();
+    if (classId) params.append('classId', classId);
+    if (sectionId) params.append('sectionId', sectionId);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    const res = await authFetch(url);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.students) && data.students.length > 0) {
         return data.students.map((s: any) => ({
           id: s.id,
+          classId: s.classId,
+          sectionId: s.sectionId,
           admissionNo: s.admissionNo,
           rollNo: s.rollNo,
           firstName: s.firstName,
@@ -169,7 +177,7 @@ export async function fetchLiveStudents(): Promise<Student[]> {
           className: s.className || `Class ${s.gradeLevel || 8}`,
           sectionName: s.sectionName || 'A',
           bloodGroup: s.bloodGroup || 'B+',
-          photoUrl: s.photoUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          photoUrl: s.photoUrl || '',
           fatherName: s.fatherName || 'Father',
           motherName: s.motherName || 'Mother',
           parentPhone: s.primaryPhone || '',
@@ -180,6 +188,41 @@ export async function fetchLiveStudents(): Promise<Student[]> {
     console.warn('Live students offline:', err);
   }
   return [];
+}
+
+// 4b. Fetch Daily Class Attendance Sheet from ERP (Strictly for assigned Class & Section)
+export async function fetchClassAttendance(classId: string, sectionId: string, date: string): Promise<{
+  date: string;
+  students: Array<{
+    studentId: string;
+    admissionNo: string;
+    rollNo: number;
+    name: string;
+    firstName?: string;
+    lastName?: string;
+    classId?: string;
+    sectionId?: string;
+    photoUrl?: string;
+    status: 'present' | 'absent' | 'late' | 'unmarked';
+    remarks?: string;
+  }>;
+  summary: { total: number; present: number; absent: number; late: number; unmarked: number };
+}> {
+  try {
+    const res = await authFetch(
+      `/attendance/class?classId=${encodeURIComponent(classId)}&sectionId=${encodeURIComponent(sectionId)}&date=${encodeURIComponent(date)}`
+    );
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('fetchClassAttendance offline:', err);
+  }
+  return {
+    date,
+    students: [],
+    summary: { total: 0, present: 0, absent: 0, late: 0, unmarked: 0 },
+  };
 }
 
 // 5. Fetch Live Classes (Classes 1-12 & Sections A & B)
