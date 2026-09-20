@@ -54,10 +54,33 @@ export function playNotificationSound(): void {
   }
 }
 
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+
 /**
- * Request Notification permission and configure background/lock screen handling
+ * Request Notification permission and configure background/lock screen handling.
+ * Supports both Native Android (via Capacitor) and Web/PWA browsers.
  */
 export async function requestAppNotificationPermission(): Promise<NotificationPermission> {
+  // 1. Native Android APK via Capacitor
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const check = await LocalNotifications.checkPermissions();
+      if (check.display === 'granted') {
+        return 'granted';
+      }
+      const requested = await LocalNotifications.requestPermissions();
+      if (requested.display === 'granted') {
+        playNotificationSound();
+        return 'granted';
+      }
+      return requested.display === 'denied' ? 'denied' : 'default';
+    } catch (err) {
+      console.warn('Native Capacitor notification permission error:', err);
+    }
+  }
+
+  // 2. Standard Web / PWA browser fallback
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'denied';
   }
@@ -80,10 +103,32 @@ export async function requestAppNotificationPermission(): Promise<NotificationPe
 /**
  * Trigger an OS / Lock Screen Notification with sound and vibration
  */
-export function showSystemNotification(title: string, body: string, icon?: string): void {
-  if (typeof window === 'undefined' || !('Notification' in window)) return;
-
+export async function showSystemNotification(title: string, body: string, icon?: string): Promise<void> {
   playNotificationSound();
+
+  // 1. Native Android APK via Capacitor
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 1000000) + 1,
+            title,
+            body,
+            schedule: { at: new Date(Date.now() + 100) },
+            sound: undefined,
+            smallIcon: 'ic_launcher',
+          },
+        ],
+      });
+      return;
+    } catch (err) {
+      console.warn('Capacitor LocalNotifications schedule error:', err);
+    }
+  }
+
+  // 2. Standard Web / Browser Fallback
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
 
   if (Notification.permission === 'granted') {
     const options: NotificationOptions = {

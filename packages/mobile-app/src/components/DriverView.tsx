@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, School, DriverBusInfo, TransportStopItem } from '../types';
 import { fetchDriverMyBus, updateDriverLiveLocation, toggleDriverTrip } from '../api';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import {
   Bus,
   Navigation,
@@ -42,12 +44,38 @@ export const DriverView: React.FC<Props> = ({ driver, school }) => {
   const watchIdRef = useRef<number | null>(null);
   const syncIntervalRef = useRef<any>(null);
 
-  const promptDriverGpsPermission = () => {
-    if (!navigator.geolocation) {
+  const promptDriverGpsPermission = async () => {
+    setGpsStatus('searching');
+
+    // 1. Native Capacitor Geolocation
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const check = await Geolocation.checkPermissions();
+        if (check.location !== 'granted') {
+          const req = await Geolocation.requestPermissions();
+          if (req.location !== 'granted') {
+            setGpsStatus('denied');
+            setShowGpsModal(true);
+            return;
+          }
+        }
+        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+        setCurrentLat(pos.coords.latitude);
+        setCurrentLng(pos.coords.longitude);
+        setGpsAccuracy(Math.round(pos.coords.accuracy));
+        setGpsStatus('locked');
+        setShowGpsModal(false);
+        return;
+      } catch (err) {
+        console.warn('Native GPS permission error:', err);
+      }
+    }
+
+    // 2. Web browser fallback
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       setGpsStatus('denied');
       return;
     }
-    setGpsStatus('searching');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCurrentLat(pos.coords.latitude);
