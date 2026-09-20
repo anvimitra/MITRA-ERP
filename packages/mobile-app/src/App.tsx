@@ -29,6 +29,7 @@ import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { requestAppNotificationPermission, showSystemNotification, playNotificationSound } from './utils/sound';
+import { Capacitor } from '@capacitor/core';
 import { LogIn, Sparkles, AlertTriangle, BellRing } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -92,11 +93,12 @@ export const App: React.FC = () => {
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showIdCard, setShowIdCard] = useState(false);
+  const [showNotifModal, setShowNotifModal] = useState(false);
   const [showNotifBanner, setShowNotifBanner] = useState(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      return Notification.permission === 'default';
+      return Notification.permission !== 'granted';
     }
-    return false;
+    return true;
   });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -138,7 +140,43 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleAllowNotifications = async () => {
+    try {
+      const perm = await requestAppNotificationPermission();
+      localStorage.setItem('anvimitra_notif_modal_dismissed', 'true');
+      setShowNotifModal(false);
+      setShowNotifBanner(false);
+      if (perm === 'granted') {
+        playNotificationSound();
+        showSystemNotification('MITRA-ERP Alerts Active', 'School notices, attendance & homework alerts will now ring with sound.');
+      }
+    } catch {
+      setShowNotifModal(false);
+    }
+  };
+
   useEffect(() => {
+    // 0. Auto-check Notification Permission on App Startup / Install
+    const checkNotificationPrompt = async () => {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const perm = await requestAppNotificationPermission();
+          if (perm !== 'granted') {
+            setShowNotifModal(true);
+          }
+          return;
+        } catch {}
+      }
+
+      const isGranted = typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+      const hasSeenModal = localStorage.getItem('anvimitra_notif_modal_dismissed');
+
+      if (!isGranted && !hasSeenModal) {
+        setTimeout(() => setShowNotifModal(true), 600);
+      }
+    };
+    checkNotificationPrompt();
+
     // 1. Verify existing session with ERP
     fetchMe().then(async (res) => {
       if (res && res.user) {
@@ -469,7 +507,7 @@ export const App: React.FC = () => {
                 <TeacherView
                   teacher={user}
                   activeSubTab={
-                    activeTab === 'marks' || activeTab === 'leaves' || activeTab === 'notices'
+                    activeTab === 'marks' || activeTab === 'homework' || activeTab === 'leaves' || activeTab === 'notices'
                       ? activeTab
                       : 'attendance'
                   }
@@ -576,6 +614,48 @@ export const App: React.FC = () => {
             school={school}
             onClose={() => setShowIdCard(false)}
           />
+        )}
+
+        {/* System Notification Permission Prompt Modal */}
+        {showNotifModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl border border-slate-100 text-center space-y-4 animate-scale-up">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-700 to-indigo-700 text-white flex items-center justify-center mx-auto shadow-lg shadow-purple-600/30">
+                <BellRing className="w-8 h-8 animate-bounce" />
+              </div>
+
+              <div>
+                <h3 className="text-base font-black text-slate-900 leading-snug">
+                  Allow System Alerts?
+                </h3>
+                <p className="text-xs font-bold text-purple-700 mt-0.5">
+                  नोटिफिकेशन एवं साउंड अलर्ट की अनुमति दें
+                </p>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  School attendance, Bus GPS alerts, homework aur notices lock screen par <strong>sound chime</strong> ke sath prapt karne ke liye permission ko Allow karein.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  onClick={handleAllowNotifications}
+                  className="w-full py-3 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 active:scale-98 text-white rounded-2xl text-xs font-bold shadow-lg shadow-purple-600/30 transition flex items-center justify-center space-x-2"
+                >
+                  <BellRing className="w-4 h-4" />
+                  <span>Allow / अनुमति दें</span>
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('anvimitra_notif_modal_dismissed', 'true');
+                    setShowNotifModal(false);
+                  }}
+                  className="w-full py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 transition"
+                >
+                  Later / बाद में
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
