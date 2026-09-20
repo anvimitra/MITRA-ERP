@@ -33,6 +33,7 @@ const TABLE_MAP: { tableName: string; propName: string }[] = [
   { tableName: 'marks', propName: 'marks' },
   { tableName: 'timetable', propName: 'timetable' },
   { tableName: 'notices', propName: 'notices' },
+  { tableName: 'homework', propName: 'homework' },
 ];
 
 export function saveLocalBackup(sqlite: DatabaseSync) {

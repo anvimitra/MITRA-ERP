@@ -746,11 +746,11 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     }
   };
 
-  const handleDeactivateStaff = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to deactivate staff member "${name}"?`)) return;
+  const handleDeleteStaff = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to permanently delete staff member "${name}"? This will remove their record from school staff roster.`)) return;
     try {
       await ApiService.deleteTeacher(id);
-      alert('✅ Staff deactivated.');
+      alert(`✅ Staff member "${name}" deleted successfully.`);
       const res = await ApiService.getTeachers();
       setStaffList(res.staff || []);
     } catch (err: any) {
@@ -3606,12 +3606,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                           >
                             Edit
                           </button>
-                          {st.role !== 'principal' && st.isActive ? (
+                          {st.role !== 'principal' ? (
                             <button
-                              onClick={() => handleDeactivateStaff(st.id, st.name)}
+                              onClick={() => handleDeleteStaff(st.id, st.name)}
                               className="text-[11px] font-bold text-rose-600 hover:text-rose-800 p-1"
+                              title="Delete staff member permanently"
                             >
-                              Deactivate
+                              Delete
                             </button>
                           ) : null}
                         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApiService } from '../api';
+import { ApiService, PRODUCTION_RENDER_API_URL } from '../api';
 import { FeeStructure, FeePayment } from '../types';
 import { StaffPayrollDesk } from '../components/StaffPayrollDesk';
 import { InventoryDesk } from '../components/InventoryDesk';
@@ -152,7 +152,7 @@ export const AccountantPortal: React.FC<{ school?: any }> = ({ school: initialSc
     try {
       // Direct fetch or API call
       const token = ApiService.getToken();
-      const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+      const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || PRODUCTION_RENDER_API_URL;
       const res = await fetch(`${API_BASE}/fees/structures`, {
         method: 'POST',
         headers: {

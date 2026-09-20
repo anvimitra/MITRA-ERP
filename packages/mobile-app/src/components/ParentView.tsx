@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Student, AttendanceRecord, FeeItem, ExamReport, StudentTransportItem, LibraryIssueItem, School } from '../types';
-import { fetchStudentTransport, fetchLibraryIssues, fetchAdmitCard } from '../api';
-import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download, Navigation } from 'lucide-react';
+import { Student, AttendanceRecord, FeeItem, ExamReport, StudentTransportItem, LibraryIssueItem, School, HomeworkItem } from '../types';
+import { fetchStudentTransport, fetchLibraryIssues, fetchAdmitCard, fetchHomeworkList } from '../api';
+import { CheckCircle2, AlertCircle, Clock, Award, ArrowRight, Wallet, Calendar, ShieldCheck, CreditCard, Sparkles, RefreshCw, Bus, FileText, BookOpen, Phone, Printer, X, MapPin, Download, Navigation, ClipboardList } from 'lucide-react';
 import { TabType } from './BottomNavBar';
 import { LiveBusMapModal } from './LiveBusMapModal';
 
@@ -40,6 +40,7 @@ export const ParentView: React.FC<Props> = ({
   const [admitCard, setAdmitCard] = useState<any | null>(null);
   const [showAdmitCardModal, setShowAdmitCardModal] = useState(false);
   const [showLiveTrackingModal, setShowLiveTrackingModal] = useState(false);
+  const [homeworkList, setHomeworkList] = useState<HomeworkItem[]>([]);
 
   useEffect(() => {
     if (student?.id) {
@@ -47,7 +48,12 @@ export const ParentView: React.FC<Props> = ({
       fetchLibraryIssues(student.id).then(setBooks).catch(() => {});
       fetchAdmitCard(student.id).then(setAdmitCard).catch(() => {});
     }
-  }, [student?.id]);
+    if (student?.classId) {
+      fetchHomeworkList(student.classId, student.sectionId).then(setHomeworkList).catch(() => {});
+    } else {
+      setHomeworkList([]);
+    }
+  }, [student?.id, student?.classId, student?.sectionId]);
 
   if (!student) {
     return (
@@ -244,6 +250,55 @@ export const ParentView: React.FC<Props> = ({
           <span>View Monthly Attendance History</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
+      </div>
+
+      {/* Daily Homework & Assignments Card */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center space-x-1.5">
+            <ClipboardList className="w-4 h-4 text-purple-600" />
+            <span>Daily Homework & Assignments</span>
+          </h3>
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+            {homeworkList.length} Active
+          </span>
+        </div>
+
+        {homeworkList.length === 0 ? (
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
+            <p className="text-xs font-medium text-slate-500">🎉 No pending homework for today!</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+            {homeworkList.map((hw) => (
+              <div key={hw.id} className="p-3 rounded-xl bg-purple-50/50 border border-purple-100/70 hover:border-purple-200 transition">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-1.5 mb-1">
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-600 text-white">
+                        {hw.subject || 'General'}
+                      </span>
+                      {hw.dueDate && (
+                        <span className="text-[10px] font-medium text-slate-500 flex items-center space-x-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>Due: {hw.dueDate}</span>
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-xs leading-snug">{hw.title}</h4>
+                    {hw.description && (
+                      <p className="text-[11px] text-slate-600 mt-1 line-clamp-3 whitespace-pre-wrap">{hw.description}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 pt-1.5 border-t border-purple-100/50 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Assigned: {hw.assignedDate || 'Today'}</span>
+                  {hw.teacherName && <span className="font-medium text-purple-700">By: {hw.teacherName}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Fee Due Alert */}

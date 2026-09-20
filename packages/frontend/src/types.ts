@@ -491,3 +491,21 @@ export interface InventoryTransactionItem {
   notes?: string;
   creatorName?: string;
 }
+
+export interface HomeworkItem {
+  id: string;
+  schoolId: string;
+  classId: string;
+  sectionId?: string;
+  className?: string;
+  sectionName?: string;
+  subjectId?: string;
+  subjectName?: string;
+  teacherId: string;
+  teacherName: string;
+  title: string;
+  description: string;
+  dueDate?: string;
+  attachmentUrl?: string;
+  createdAt: string;
+}

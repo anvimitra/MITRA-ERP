@@ -13,6 +13,7 @@ import {
   TimetablePeriod,
   StudentLog,
   Student,
+  HomeworkItem,
 } from './types';
 
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -1152,6 +1153,37 @@ export class ApiService {
     }>('/schools/google-drive-restore', {
       method: 'POST',
       body: JSON.stringify({ fileId }),
+    });
+  }
+
+  static async getHomeworkList(classId?: string, sectionId?: string): Promise<{ homework: HomeworkItem[] }> {
+    let endpoint = '/homework';
+    const params = new URLSearchParams();
+    if (classId) params.append('classId', classId);
+    if (sectionId) params.append('sectionId', sectionId);
+    if (params.toString()) endpoint += `?${params.toString()}`;
+    return this.request<{ homework: HomeworkItem[] }>(endpoint);
+  }
+
+  static async createHomework(data: {
+    classId: string;
+    sectionId?: string;
+    subjectId?: string;
+    subjectName?: string;
+    title: string;
+    description: string;
+    dueDate?: string;
+    attachmentUrl?: string;
+  }) {
+    return this.request<{ success: boolean; homework: HomeworkItem }>('/homework', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async deleteHomework(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/homework/${id}`, {
+      method: 'DELETE',
     });
   }
 }

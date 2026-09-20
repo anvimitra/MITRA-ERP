@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo, DriverBusInfo, ParentLiveBusTracking, FleetLiveInfo } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo, DriverBusInfo, ParentLiveBusTracking, FleetLiveInfo, HomeworkItem } from './types';
 
 // Canonical Live Production Render API Endpoint
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -108,10 +108,10 @@ export async function loginUser(
     }
     return data;
   } catch (err: any) {
-    if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError') && !err.message.includes('Failed to fetch')) {
+    if (err.message && !err.message.includes('fetch')) {
       throw err;
     }
-    throw new Error(`Unable to reach ERP Cloud Server (${getApiBaseUrl()}). Please check your internet connection or server status.`);
+    throw new Error('Unable to reach Institutional ERP Cloud Server. Please check your internet connection or server status.');
   }
 }
 
@@ -1158,6 +1158,57 @@ export async function updateUserProfile(profileData: {
     setMobileToken(data.token);
   }
   return data;
+}
+
+// 46. Homework & Assignments API
+export async function fetchHomeworkList(classId?: string, sectionId?: string): Promise<HomeworkItem[]> {
+  try {
+    let url = '/homework';
+    const params = new URLSearchParams();
+    if (classId) params.append('classId', classId);
+    if (sectionId) params.append('sectionId', sectionId);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    const res = await authFetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      return data.homework || [];
+    }
+  } catch (err) {
+    console.warn('API fetchHomeworkList error:', err);
+  }
+  return [];
+}
+
+export async function createHomework(homeworkData: {
+  classId: string;
+  sectionId?: string;
+  subjectId?: string;
+  subjectName?: string;
+  title: string;
+  description: string;
+  dueDate?: string;
+  attachmentUrl?: string;
+}): Promise<HomeworkItem> {
+  const res = await authFetch('/homework', {
+    method: 'POST',
+    body: JSON.stringify(homeworkData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create homework assignment');
+  }
+  return data.homework;
+}
+
+export async function deleteHomework(id: string): Promise<void> {
+  const res = await authFetch(`/homework/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to delete homework');
+  }
 }
 
 

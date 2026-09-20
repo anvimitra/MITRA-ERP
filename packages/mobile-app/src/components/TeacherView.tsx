@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Student, StaffLeaveItem, ExamItem, NotificationItem } from '../types';
+import { User, Student, StaffLeaveItem, ExamItem, NotificationItem, HomeworkItem } from '../types';
 import {
   submitClassAttendance,
   fetchLiveStudents,
@@ -12,6 +12,9 @@ import {
   saveExamMarks,
   fetchLiveNotices,
   fetchMyAllocations,
+  fetchHomeworkList,
+  createHomework,
+  deleteHomework,
 } from '../api';
 import {
   Check,
@@ -30,13 +33,18 @@ import {
   Save,
   Search,
   Bus,
+  Edit3,
+  Trash2,
+  FileText,
+  Calendar,
+  ClipboardList,
 } from 'lucide-react';
 import { LiveBusMapModal } from './LiveBusMapModal';
 
 interface Props {
   teacher: User;
-  activeSubTab?: 'attendance' | 'marks' | 'leaves' | 'notices';
-  onSubTabChange?: (tab: 'attendance' | 'marks' | 'leaves' | 'notices') => void;
+  activeSubTab?: 'attendance' | 'marks' | 'homework' | 'leaves' | 'notices';
+  onSubTabChange?: (tab: 'attendance' | 'marks' | 'homework' | 'leaves' | 'notices') => void;
 }
 
 interface AssignedClassOption {
@@ -49,9 +57,9 @@ interface AssignedClassOption {
 }
 
 export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTab, onSubTabChange }) => {
-  const [internalTab, setInternalTab] = useState<'attendance' | 'marks' | 'leaves' | 'notices'>('attendance');
+  const [internalTab, setInternalTab] = useState<'attendance' | 'marks' | 'homework' | 'leaves' | 'notices'>('attendance');
   const activeSubTab = externalTab || internalTab;
-  const setActiveSubTab = (tab: 'attendance' | 'marks' | 'leaves' | 'notices') => {
+  const setActiveSubTab = (tab: 'attendance' | 'marks' | 'homework' | 'leaves' | 'notices') => {
     setInternalTab(tab);
     if (onSubTabChange) onSubTabChange(tab);
   };
@@ -87,6 +95,21 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [leaveReason, setLeaveReason] = useState('');
   const [submittingLeave, setSubmittingLeave] = useState(false);
+
+  // Attendance submitted/edit state
+  const [isAttendanceSubmitted, setIsAttendanceSubmitted] = useState(false);
+  const [isEditingAttendance, setIsEditingAttendance] = useState(false);
+
+  // Homework state
+  const [homeworkList, setHomeworkList] = useState<HomeworkItem[]>([]);
+  const [showAddHwModal, setShowAddHwModal] = useState(false);
+  const [hwClassKey, setHwClassKey] = useState('');
+  const [hwSubject, setHwSubject] = useState('');
+  const [hwTitle, setHwTitle] = useState('');
+  const [hwDescription, setHwDescription] = useState('');
+  const [hwDueDate, setHwDueDate] = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+  const [submittingHw, setSubmittingHw] = useState(false);
+  const [deletingHwId, setDeletingHwId] = useState<string | null>(null);
 
   // Notices state
   const [notices, setNotices] = useState<NotificationItem[]>([]);
@@ -222,6 +245,18 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
     setLoading(true);
     try {
       const attData = await fetchClassAttendance(classId, sectionId, date);
+      const isSubmitted = !!(
+        attData &&
+        attData.students &&
+        attData.students.length > 0 &&
+        (attData.summary?.present > 0 ||
+          attData.summary?.absent > 0 ||
+          attData.summary?.late > 0 ||
+          attData.students.some((s: any) => s.status && s.status !== 'unmarked'))
+      );
+      setIsAttendanceSubmitted(isSubmitted);
+      setIsEditingAttendance(false);
+
       if (attData && attData.students && attData.students.length > 0) {
         setStudents(
           attData.students.map((s: any) => ({
@@ -247,6 +282,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
         setStudents(
           filtered.map((s) => ({
             ...s,
+            classId,
+            sectionId,
             status: 'present',
             marks: '',
           }))
@@ -265,15 +302,18 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
     if (!examId || !classId) return;
     setLoading(true);
     try {
-      const classStudents = await fetchLiveStudents(classId, sectionId);
-      const filtered = classStudents.filter((s) => s.classId === classId && (!sectionId || s.sectionId === sectionId));
+      // Fetch all students for this class - do NOT let section differences drop students!
+      const classStudents = await fetchLiveStudents(classId);
+      const matching = classStudents.filter((s) => s.classId === classId);
 
       const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
       setStudents(
-        filtered.map((s) => {
+        matching.map((s) => {
           const entry = sheet?.find((sh) => sh.studentId === s.id);
           return {
             ...s,
+            classId,
+            sectionId: sectionId || s.sectionId || 'sec-a',
             status: 'present',
             marks: entry && entry.marksObtained !== '' ? entry.marksObtained : '',
           };
@@ -283,6 +323,15 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       console.warn('Marks sheet fetch error', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadHomeworkData = async (classId?: string, sectionId?: string) => {
+    try {
+      const list = await fetchHomeworkList(classId, sectionId);
+      setHomeworkList(list || []);
+    } catch (err) {
+      console.warn('Error loading homework:', err);
     }
   };
 
@@ -304,6 +353,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       if (targetClassId) {
         loadMarksSheetData(selectedExam, targetClassId, targetSectionId, selectedSubject);
       }
+    } else if (activeSubTab === 'homework') {
+      loadHomeworkData(selectedClassId, selectedSectionId);
     }
   }, [activeSubTab]);
 
@@ -351,11 +402,64 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       }));
 
       await submitClassAttendance(selectedClassId, selectedSectionId, selectedDate, records);
+      setIsAttendanceSubmitted(true);
+      setIsEditingAttendance(false);
       setFeedback(`✅ Attendance recorded for ${records.length} students of assigned class! Instant in-app notifications dispatched to parents.`);
     } catch (err: any) {
       setFeedback(err.message || 'Error recording attendance.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateHomework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hwTitle.trim() || !hwDescription.trim()) {
+      alert('Please fill out the homework title and description');
+      return;
+    }
+
+    const targetKey = hwClassKey || `${selectedClassId}_${selectedSectionId}` || (assignedClasses[0]?.key || '');
+    const [cId, sId] = targetKey.split('_');
+    if (!cId) {
+      alert('Please select a target class');
+      return;
+    }
+
+    setSubmittingHw(true);
+    try {
+      await createHomework({
+        classId: cId,
+        sectionId: sId || undefined,
+        subjectName: hwSubject.trim() || 'General Homework',
+        title: hwTitle.trim(),
+        description: hwDescription.trim(),
+        dueDate: hwDueDate,
+      });
+
+      setShowAddHwModal(false);
+      setHwTitle('');
+      setHwDescription('');
+      setFeedback('✅ Homework assigned! In-app notification with alert sound dispatched to all parents of this class.');
+      loadHomeworkData(cId, sId);
+    } catch (err: any) {
+      alert(err.message || 'Failed to create homework');
+    } finally {
+      setSubmittingHw(false);
+    }
+  };
+
+  const handleDeleteHomework = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this homework assignment?')) return;
+    setDeletingHwId(id);
+    try {
+      await deleteHomework(id);
+      setHomeworkList((prev) => prev.filter((h) => h.id !== id));
+      setFeedback('✅ Homework assignment removed.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete homework');
+    } finally {
+      setDeletingHwId(null);
     }
   };
 
@@ -452,7 +556,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
         </div>
 
         {/* Sub Tabs */}
-        <div className="grid grid-cols-4 gap-1 mt-3 pt-3 border-t border-white/10 text-[10px] font-bold">
+        <div className="grid grid-cols-5 gap-1 mt-3 pt-3 border-t border-white/10 text-[10px] font-bold">
           <button
             onClick={() => setActiveSubTab('attendance')}
             className={`py-1.5 px-1 rounded-xl transition text-center ${
@@ -468,6 +572,14 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             }`}
           >
             Marks Entry
+          </button>
+          <button
+            onClick={() => setActiveSubTab('homework')}
+            className={`py-1.5 px-1 rounded-xl transition text-center ${
+              activeSubTab === 'homework' ? 'bg-white text-purple-900 shadow' : 'text-purple-200 hover:bg-white/10'
+            }`}
+          >
+            Homework
           </button>
           <button
             onClick={() => setActiveSubTab('leaves')}
@@ -531,6 +643,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           </div>
         ) : (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+          {/* Header Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2">
@@ -538,7 +651,9 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                 {loading && <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin" />}
               </div>
               <p className="text-xs text-slate-500">
-                Tap status badge to mark Present, Absent, or Late. Only students of your assigned class are shown.
+                {isAttendanceSubmitted && !isEditingAttendance
+                  ? 'Attendance for this date has been recorded. Tap "Edit Attendance" to make changes.'
+                  : 'Tap status badge to mark Present, Absent, or Late. Only students of your assigned class are shown.'}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -575,15 +690,84 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                 }}
                 className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-lg border border-slate-200 text-slate-700"
               />
-              <button
-                type="button"
-                onClick={handleMarkAllPresent}
-                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition"
-              >
-                All Present
-              </button>
+              {(!isAttendanceSubmitted || isEditingAttendance) && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllPresent}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition"
+                >
+                  All Present
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Submitted Indicator Card */}
+          {isAttendanceSubmitted && !isEditingAttendance && (
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-md space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black">
+                    <CheckCircle2 className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black tracking-wide">
+                      ✅ Attendance Submitted for {selectedDate === new Date().toISOString().split('T')[0] ? 'Today' : selectedDate}
+                    </h4>
+                    <p className="text-[11px] text-emerald-100">
+                      Records stored in cloud database & instant alerts delivered to parents.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAttendance(true)}
+                  className="px-3 py-1.5 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-black shadow transition flex items-center space-x-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Attendance</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/20 text-center text-xs">
+                <div className="bg-white/15 rounded-xl p-1.5">
+                  <span className="text-[10px] text-emerald-100 block font-bold uppercase">Present</span>
+                  <span className="text-base font-black text-white">
+                    {students.filter((s) => s.status === 'present').length}
+                  </span>
+                </div>
+                <div className="bg-white/15 rounded-xl p-1.5">
+                  <span className="text-[10px] text-emerald-100 block font-bold uppercase">Absent</span>
+                  <span className="text-base font-black text-white">
+                    {students.filter((s) => s.status === 'absent').length}
+                  </span>
+                </div>
+                <div className="bg-white/15 rounded-xl p-1.5">
+                  <span className="text-[10px] text-emerald-100 block font-bold uppercase">Late</span>
+                  <span className="text-base font-black text-white">
+                    {students.filter((s) => s.status === 'late').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Active Editing Notice */}
+          {isEditingAttendance && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex items-center justify-between text-xs font-bold shadow-sm">
+              <span className="flex items-center gap-1.5">
+                <Edit3 className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Editing Submitted Attendance for {selectedDate}. Adjust below and tap Update.</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsEditingAttendance(false)}
+                className="text-slate-600 hover:text-slate-900 underline text-[11px] font-semibold ml-2"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
           {/* Search student by name or roll */}
           <div className="relative">
@@ -645,55 +829,85 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                     </div>
                   </div>
 
-                  {/* Attendance Toggle Buttons */}
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => toggleStatus(stu.id, 'present')}
-                      className={`p-1.5 rounded-lg text-xs font-black transition ${
+                  {/* Attendance Toggle or Locked Status Badge */}
+                  {isAttendanceSubmitted && !isEditingAttendance ? (
+                    <span
+                      className={`px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider ${
                         stu.status === 'present'
-                          ? 'bg-emerald-600 text-white shadow'
-                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : stu.status === 'absent'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
                       }`}
-                      title="Present"
                     >
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => toggleStatus(stu.id, 'late')}
-                      className={`p-1.5 rounded-lg text-xs font-black transition ${
-                        stu.status === 'late'
-                          ? 'bg-amber-500 text-white shadow'
-                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                      }`}
-                      title="Late"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => toggleStatus(stu.id, 'absent')}
-                      className={`p-1.5 rounded-lg text-xs font-black transition ${
-                        stu.status === 'absent'
-                          ? 'bg-rose-600 text-white shadow'
-                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                      }`}
-                      title="Absent"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                      {stu.status}
+                    </span>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => toggleStatus(stu.id, 'present')}
+                        className={`p-1.5 rounded-lg text-xs font-black transition ${
+                          stu.status === 'present'
+                            ? 'bg-emerald-600 text-white shadow'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                        title="Present"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => toggleStatus(stu.id, 'late')}
+                        className={`p-1.5 rounded-lg text-xs font-black transition ${
+                          stu.status === 'late'
+                            ? 'bg-amber-500 text-white shadow'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                        title="Late"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => toggleStatus(stu.id, 'absent')}
+                        className={`p-1.5 rounded-lg text-xs font-black transition ${
+                          stu.status === 'absent'
+                            ? 'bg-rose-600 text-white shadow'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                        title="Absent"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
 
-          <button
-            onClick={handleSubmitAttendance}
-            disabled={isSubmitting || students.length === 0}
-            className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50 mt-3"
-          >
-            <Send className="w-4 h-4" />
-            <span>{isSubmitting ? 'Recording & Notifying Parents...' : 'Submit Attendance & Notify Parents'}</span>
-          </button>
+          {(!isAttendanceSubmitted || isEditingAttendance) ? (
+            <button
+              onClick={handleSubmitAttendance}
+              disabled={isSubmitting || students.length === 0}
+              className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50 mt-3"
+            >
+              <Send className="w-4 h-4" />
+              <span>
+                {isSubmitting
+                  ? 'Recording & Notifying Parents...'
+                  : isEditingAttendance
+                  ? 'Update Attendance & Notify Parents'
+                  : 'Submit Attendance & Notify Parents'}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsEditingAttendance(true)}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 rounded-xl text-xs font-bold border border-slate-200 transition flex items-center justify-center space-x-2 mt-3"
+            >
+              <Edit3 className="w-4 h-4 text-purple-700" />
+              <span>Edit Submitted Attendance</span>
+            </button>
+          )}
         </div>
         )
       )}
@@ -701,7 +915,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       {/* MARKS ENTRY MODE */}
       {activeSubTab === 'marks' && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Select Exam</label>
               <select
@@ -709,17 +923,11 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                 onChange={(e) => {
                   const exId = e.target.value;
                   setSelectedExam(exId);
-                  let tClass = selectedClassId;
-                  let tSec = selectedSectionId;
-                  if (allocations?.subjectsAssigned && selectedAllocationId) {
-                    const a = allocations.subjectsAssigned.find((x: any) => x.id === selectedAllocationId);
-                    if (a) { tClass = a.classId; tSec = a.sectionId; }
-                  }
-                  if (tClass) {
-                    loadMarksSheetData(exId, tClass, tSec, selectedSubject);
+                  if (selectedClassId) {
+                    loadMarksSheetData(exId, selectedClassId, selectedSectionId, selectedSubject);
                   }
                 }}
-                className="w-full text-xs font-semibold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800"
+                className="w-full text-xs font-semibold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 focus:outline-none"
               >
                 {exams.length > 0 ? (
                   exams.map((ex) => (
@@ -741,8 +949,28 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Assigned Subject</label>
-              {allocations?.subjectsAssigned?.length > 0 ? (
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Target Class</label>
+              <select
+                value={`${selectedClassId}_${selectedSectionId}`}
+                onChange={(e) => {
+                  const [cId, sId] = e.target.value.split('_');
+                  setSelectedClassId(cId);
+                  setSelectedSectionId(sId);
+                  loadMarksSheetData(selectedExam, cId, sId, selectedSubject);
+                }}
+                className="w-full text-xs font-bold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 focus:outline-none"
+              >
+                {assignedClasses.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Subject</label>
+              {allocations?.subjectsAssigned && allocations.subjectsAssigned.length > 0 ? (
                 <select
                   value={selectedAllocationId}
                   onChange={(e) => {
@@ -750,31 +978,38 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                     setSelectedAllocationId(aId);
                     const curAlloc = allocations.subjectsAssigned.find((a: any) => a.id === aId);
                     if (curAlloc) {
-                      setSelectedClassId(curAlloc.classId);
-                      setSelectedSectionId(curAlloc.sectionId);
                       const sub = allocations.allSubjects?.find((s: any) => s.id === curAlloc.subjectId);
                       const sName = sub?.name || 'Subject';
                       setSelectedSubject(sName);
-                      loadMarksSheetData(selectedExam, curAlloc.classId, curAlloc.sectionId, sName);
+                      loadMarksSheetData(selectedExam, selectedClassId, selectedSectionId, sName);
                     }
                   }}
-                  className="w-full text-xs font-semibold p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 font-bold"
+                  className="w-full text-xs font-bold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 focus:outline-none"
                 >
                   {allocations.subjectsAssigned.map((a: any) => {
                     const sub = allocations.allSubjects?.find((s: any) => s.id === a.subjectId);
-                    const cls = allocations.allClasses?.find((c: any) => c.id === a.classId);
-                    const sec = allocations.allSections?.find((s: any) => s.id === a.sectionId);
                     return (
                       <option key={a.id} value={a.id}>
-                        {sub?.name || 'Subject'} • {cls?.name || 'Class'} ({sec?.name || 'A'})
+                        {sub?.name || 'Subject'}
                       </option>
                     );
                   })}
                 </select>
               ) : (
-                <div className="text-[11px] p-2 bg-amber-50 text-amber-900 font-medium rounded-xl border border-amber-200">
-                  No subjects assigned to you
-                </div>
+                <input
+                  type="text"
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                  }}
+                  onBlur={() => {
+                    if (selectedClassId) {
+                      loadMarksSheetData(selectedExam, selectedClassId, selectedSectionId, selectedSubject);
+                    }
+                  }}
+                  placeholder="e.g. Mathematics"
+                  className="w-full text-xs font-bold p-2 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 focus:outline-none"
+                />
               )}
             </div>
           </div>
@@ -811,17 +1046,12 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           </div>
 
           <div className="space-y-2 mt-2">
-            {students.filter(
-              (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
-            ).length === 0 ? (
+            {students.length === 0 ? (
               <div className="text-center py-6 text-slate-400 text-xs">
-                No students enrolled in this assigned class to grade.
+                {loading ? 'Loading class students...' : 'No students found in this class to grade.'}
               </div>
             ) : (
               students
-                .filter(
-                  (stu) => stu.classId === selectedClassId && (!selectedSectionId || stu.sectionId === selectedSectionId)
-                )
                 .filter((stu) => {
                   if (!marksSearch.trim()) return true;
                   const q = marksSearch.toLowerCase().trim();
@@ -879,6 +1109,110 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             <Save className="w-4 h-4" />
             <span>{savingMarks ? 'Saving Marks to ERP...' : 'Save & Lock Subject Marks'}</span>
           </button>
+        </div>
+      )}
+
+      {/* HOMEWORK & ASSIGNMENTS MODE */}
+      {activeSubTab === 'homework' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+                <ClipboardList className="w-4 h-4 text-purple-600" />
+                <span>Class Homework & Assignments ({homeworkList.length})</span>
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Assign daily homework with automatic in-app alerts to parents
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setHwClassKey(`${selectedClassId}_${selectedSectionId}` || assignedClasses[0]?.key || '');
+                setShowAddHwModal(true);
+              }}
+              className="px-3 py-1.5 bg-gradient-to-r from-purple-700 to-indigo-800 active:scale-95 text-white text-xs font-bold rounded-xl shadow flex items-center space-x-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Assign Homework</span>
+            </button>
+          </div>
+
+          {/* Class Filter */}
+          {assignedClasses.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-purple-50/80 border border-purple-200 p-2 rounded-xl text-xs">
+              <span className="font-bold text-purple-900 shrink-0">Filter Class:</span>
+              <select
+                value={`${selectedClassId}_${selectedSectionId}`}
+                onChange={(e) => {
+                  const [cId, sId] = e.target.value.split('_');
+                  setSelectedClassId(cId);
+                  setSelectedSectionId(sId);
+                  loadHomeworkData(cId, sId);
+                }}
+                className="w-full text-xs font-bold bg-white p-1.5 rounded-lg border border-purple-200 text-purple-950 focus:outline-none"
+              >
+                <option value="">All My Classes</option>
+                {assignedClasses.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Homework List */}
+          <div className="space-y-2.5">
+            {homeworkList.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-300 p-6 space-y-2">
+                <FileText className="w-8 h-8 text-purple-300 mx-auto" />
+                <h4 className="font-bold text-xs text-slate-700">No Homework Assigned Yet</h4>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  Tap "Assign Homework" to send assignments and instructions directly to students and parents.
+                </p>
+              </div>
+            ) : (
+              homeworkList.map((hw) => (
+                <div key={hw.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-purple-100 text-purple-800">
+                          {hw.className || 'Class'} {hw.sectionName ? `(${hw.sectionName})` : ''}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-indigo-100 text-indigo-800">
+                          {hw.subjectName || 'Subject'}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm mt-1.5">{hw.title}</h4>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteHomework(hw.id)}
+                      disabled={deletingHwId === hw.id}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0"
+                      title="Delete Homework"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-slate-700 font-medium whitespace-pre-line leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    {hw.description}
+                  </p>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                    <div className="flex items-center space-x-1 text-purple-900 font-semibold">
+                      <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Due: <strong className="text-rose-600">{hw.dueDate || 'Tomorrow'}</strong></span>
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      By: {hw.teacherName || 'Faculty'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
@@ -1036,6 +1370,97 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
               >
                 <Briefcase className="w-4 h-4" />
                 <span>{submittingLeave ? 'Submitting...' : 'Submit Leave to Principal'}</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ASSIGN HOMEWORK MODAL */}
+      {showAddHwModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-black text-base text-slate-900">Assign Homework to Class</h3>
+                <p className="text-xs text-slate-500">Dispatches in-app alert & chime to all parents</p>
+              </div>
+              <button onClick={() => setShowAddHwModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateHomework} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Target Class *</label>
+                <select
+                  value={hwClassKey || `${selectedClassId}_${selectedSectionId}`}
+                  onChange={(e) => setHwClassKey(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold text-slate-800"
+                  required
+                >
+                  {assignedClasses.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Subject Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Mathematics / Science / English / Hindi"
+                  value={hwSubject}
+                  onChange={(e) => setHwSubject(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Homework Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Chapter 4 Exercise 4.2 Questions 1 to 10"
+                  value={hwTitle}
+                  onChange={(e) => setHwTitle(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Due Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={hwDueDate}
+                  onChange={(e) => setHwDueDate(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 block mb-1">Instructions / Details *</label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Write clear instructions, problems, or pages students need to solve..."
+                  value={hwDescription}
+                  onChange={(e) => setHwDescription(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingHw}
+                className="w-full py-3 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 mt-4 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                <span>{submittingHw ? 'Assigning & Notifying Parents...' : 'Assign Homework & Alert Parents'}</span>
               </button>
             </form>
           </div>

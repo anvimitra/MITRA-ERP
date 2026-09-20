@@ -37,9 +37,33 @@ export const DriverView: React.FC<Props> = ({ driver, school }) => {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [checkedStops, setCheckedStops] = useState<Set<string>>(new Set());
   const [syncCount, setSyncCount] = useState(0);
+  const [showGpsModal, setShowGpsModal] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const syncIntervalRef = useRef<any>(null);
+
+  const promptDriverGpsPermission = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('denied');
+      return;
+    }
+    setGpsStatus('searching');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCurrentLat(pos.coords.latitude);
+        setCurrentLng(pos.coords.longitude);
+        setGpsAccuracy(Math.round(pos.coords.accuracy));
+        setGpsStatus('locked');
+        setShowGpsModal(false);
+      },
+      (err) => {
+        console.warn('Driver GPS permission prompt:', err);
+        setGpsStatus('denied');
+        setShowGpsModal(true);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   // 1. Fetch Assigned Vehicle & Route Details
   const loadDriverBus = async () => {
@@ -64,6 +88,7 @@ export const DriverView: React.FC<Props> = ({ driver, school }) => {
 
   useEffect(() => {
     loadDriverBus();
+    promptDriverGpsPermission();
   }, []);
 
   // 2. Start / Stop GPS Telemetry Watcher based on Trip Status
@@ -205,6 +230,32 @@ export const DriverView: React.FC<Props> = ({ driver, school }) => {
 
   return (
     <div className="space-y-4 pb-20">
+      {/* GPS Location Permission Card */}
+      {gpsStatus !== 'locked' && (
+        <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-4 shadow-md text-amber-950 space-y-2.5">
+          <div className="flex items-start space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow font-black">
+              <Navigation className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-extrabold text-sm leading-tight text-amber-950">
+                GPS Location Permission Required (लोकेशन अनुमति)
+              </h3>
+              <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                School bus live GPS tracking aur vidyarthiyon ki suraksha ke liye location permission on karna anivarya hai.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={promptDriverGpsPermission}
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-md transition active:scale-98 flex items-center justify-center space-x-2"
+          >
+            <Navigation className="w-4 h-4" />
+            <span>Allow GPS Location / लोकेशन ऑन करें</span>
+          </button>
+        </div>
+      )}
+
       {/* Driver & Bus Profile Card */}
       <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 rounded-3xl p-5 text-white shadow-xl shadow-amber-500/20 relative overflow-hidden">
         <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />

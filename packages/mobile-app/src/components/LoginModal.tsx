@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, School } from '../types';
-import { loginUser, getApiBaseUrl, checkServerHealth, PRODUCTION_RENDER_API_URL } from '../api';
-import { X, Sparkles, Lock, Mail, Building2, Globe, CheckCircle2, AlertCircle, RefreshCw, Settings2 } from 'lucide-react';
+import { loginUser, checkServerHealth } from '../api';
+import { X, Sparkles, Lock, Mail, Building2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface Props {
   currentSchool?: School | null;
@@ -16,11 +16,9 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Server health & endpoint state
+  // Server health state
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [checkingServer, setCheckingServer] = useState(false);
-  const [showServerConfig, setShowServerConfig] = useState(false);
-  const [customApiUrl, setCustomApiUrl] = useState(localStorage.getItem('anvimitra_api_url') || '');
 
   const verifyServer = async () => {
     setCheckingServer(true);
@@ -38,17 +36,6 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
     verifyServer();
   }, []);
 
-  const handleSaveCustomServer = () => {
-    const trimmed = customApiUrl.trim();
-    if (trimmed) {
-      localStorage.setItem('anvimitra_api_url', trimmed);
-    } else {
-      localStorage.removeItem('anvimitra_api_url');
-    }
-    setShowServerConfig(false);
-    verifyServer();
-  };
-
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -64,8 +51,6 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
       setLoading(false);
     }
   };
-
-  const currentApiUrl = getApiBaseUrl();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -83,75 +68,34 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
           </button>
         </div>
 
-        {/* Server Connection Status Banner */}
+        {/* Institutional Cloud Security Status Banner */}
         <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between text-[11px]">
           <div className="flex items-center space-x-2 truncate">
             {checkingServer ? (
-              <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin flex-shrink-0" />
+              <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin flex-shrink-0" />
             ) : serverOnline === true ? (
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            ) : serverOnline === false ? (
-              <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
             ) : (
-              <Globe className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
             )}
             <div className="truncate">
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-slate-800 block">
                 {checkingServer
-                  ? 'Connecting to Cloud ERP...'
+                  ? 'Connecting to Institutional Cloud...'
                   : serverOnline
-                  ? 'Cloud ERP Connected'
-                  : 'ERP Server Connecting...'}
+                  ? 'Cloud Core: Active & Encrypted'
+                  : 'Cloud Core: Connecting...'}
               </span>
               <span className="text-slate-400 text-[10px] block truncate">
-                {currentApiUrl.replace(/^https?:\/\//, '')}
+                256-Bit SSL • Multi-Tenant Isolated
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowServerConfig(!showServerConfig)}
-            className="p-1 text-slate-400 hover:text-purple-700 transition"
-            title="Configure Server Endpoint"
-          >
-            <Settings2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Optional Server Config Drawer */}
-        {showServerConfig && (
-          <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
-            <label className="font-bold text-purple-900 block">Cloud / Local Server Endpoint</label>
-            <input
-              type="text"
-              value={customApiUrl}
-              onChange={(e) => setCustomApiUrl(e.target.value)}
-              placeholder={PRODUCTION_RENDER_API_URL}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-            />
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomApiUrl('');
-                  localStorage.removeItem('anvimitra_api_url');
-                  setShowServerConfig(false);
-                  verifyServer();
-                }}
-                className="text-[10px] text-purple-700 hover:underline font-semibold"
-              >
-                Reset to Default Render Cloud
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCustomServer}
-                className="px-3 py-1 bg-purple-700 text-white rounded-lg text-xs font-bold shadow-sm"
-              >
-                Save & Connect
-              </button>
-            </div>
+          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+            <Lock className="w-3 h-3" />
+            <span>Secure</span>
           </div>
-        )}
+        </div>
 
         {error && (
           <div className="p-2.5 rounded-xl bg-rose-50 text-rose-800 text-xs font-semibold border border-rose-200">

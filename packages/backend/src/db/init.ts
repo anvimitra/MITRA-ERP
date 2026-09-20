@@ -511,6 +511,21 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       notes TEXT,
       created_by_user_id TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS homework (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      class_id TEXT NOT NULL,
+      section_id TEXT,
+      subject_id TEXT,
+      teacher_id TEXT NOT NULL,
+      teacher_name TEXT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      due_date TEXT,
+      attachment_url TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Auto-migrate school profile columns if upgrading an existing SQLite DB

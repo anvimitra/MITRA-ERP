@@ -28,7 +28,8 @@ import { LoginModal } from './components/LoginModal';
 import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { LogIn, Sparkles, AlertTriangle } from 'lucide-react';
+import { requestAppNotificationPermission, showSystemNotification, playNotificationSound } from './utils/sound';
+import { LogIn, Sparkles, AlertTriangle, BellRing } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [school, setSchool] = useState<School | null>(() => {
@@ -91,6 +92,12 @@ export const App: React.FC = () => {
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showIdCard, setShowIdCard] = useState(false);
+  const [showNotifBanner, setShowNotifBanner] = useState(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission === 'default';
+    }
+    return false;
+  });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -210,6 +217,15 @@ export const App: React.FC = () => {
     fetchUserNotifications().then((liveNotifs) => {
       if (liveNotifs && liveNotifs.length > 0) {
         setNotifications(liveNotifs);
+        // Play chime and show system lock screen alert for newest unread notification
+        const latestUnread = liveNotifs.find((n) => !n.read);
+        if (latestUnread) {
+          const lastAlertedId = localStorage.getItem('anvimitra_last_alerted_notif');
+          if (lastAlertedId !== latestUnread.id) {
+            localStorage.setItem('anvimitra_last_alerted_notif', latestUnread.id);
+            showSystemNotification(latestUnread.title, latestUnread.message);
+          }
+        }
       }
     });
 
@@ -337,6 +353,39 @@ export const App: React.FC = () => {
                 updateInfo={updateInfo}
                 onDismiss={() => setShowUpdateBanner(false)}
               />
+            )}
+
+            {/* Notification Permission & Sound Prompt Banner */}
+            {showNotifBanner && (
+              <div className="mb-3 bg-gradient-to-r from-purple-800 to-indigo-900 text-white rounded-2xl p-3 shadow-md flex items-center justify-between gap-3 animate-fade-in border border-purple-400/30">
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400 text-purple-950 flex items-center justify-center font-bold shrink-0 shadow">
+                    <BellRing className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold leading-tight truncate">Enable Live Alerts & Chimes</h4>
+                    <p className="text-[10px] text-purple-200 truncate">Get attendance, bus & notices on lock screen with audio</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1.5 shrink-0">
+                  <button
+                    onClick={async () => {
+                      const res = await requestAppNotificationPermission();
+                      setShowNotifBanner(false);
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-purple-950 font-black text-[11px] shadow transition active:scale-95 whitespace-nowrap"
+                  >
+                    Allow / अनुमति दें
+                  </button>
+                  <button
+                    onClick={() => setShowNotifBanner(false)}
+                    className="p-1 text-purple-300 hover:text-white text-xs"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
             )}
 
             {showNotifications ? (

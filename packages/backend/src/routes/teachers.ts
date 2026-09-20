@@ -122,7 +122,10 @@ teacherRoutes.put('/:id', async (c) => {
   return c.json({ success: true, message: 'Faculty details updated successfully' });
 });
 
-// DELETE /api/teachers/:id - Deactivate faculty member
+import { getDatabaseInstance } from '../db/init.js';
+import { saveLocalBackup } from '../db/persistent-backup.js';
+
+// DELETE /api/teachers/:id - Permanently delete staff member
 teacherRoutes.delete('/:id', async (c) => {
   const user = getAuthUser(c);
   if (!user || !user.schoolId || (user.role !== 'principal' && user.role !== 'super_admin')) {
@@ -130,10 +133,31 @@ teacherRoutes.delete('/:id', async (c) => {
   }
 
   const staffId = c.req.param('id');
-  db.update(schema.users)
-    .set({ isActive: 0 })
+
+  // 1. Remove associated class teacher assignments
+  try {
+    db.delete(schema.classTeachers)
+      .where(and(eq(schema.classTeachers.schoolId, user.schoolId), eq(schema.classTeachers.teacherId, staffId)))
+      .run();
+  } catch {}
+
+  // 2. Remove associated subject allocations
+  try {
+    db.delete(schema.subjectAllocations)
+      .where(and(eq(schema.subjectAllocations.schoolId, user.schoolId), eq(schema.subjectAllocations.teacherId, staffId)))
+      .run();
+  } catch {}
+
+  // 3. Delete user record from database
+  db.delete(schema.users)
     .where(and(eq(schema.users.schoolId, user.schoolId), eq(schema.users.id, staffId)))
     .run();
 
-  return c.json({ success: true, message: 'Staff deactivated from institution records' });
+  // 4. Save persistent backup
+  try {
+    const sqlite = getDatabaseInstance();
+    saveLocalBackup(sqlite);
+  } catch {}
+
+  return c.json({ success: true, message: 'Staff member deleted permanently from school records' });
 });
