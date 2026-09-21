@@ -100,6 +100,10 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [isAttendanceSubmitted, setIsAttendanceSubmitted] = useState(false);
   const [isEditingAttendance, setIsEditingAttendance] = useState(false);
 
+  // Marks submitted/edit state
+  const [isMarksSubmitted, setIsMarksSubmitted] = useState(false);
+  const [isEditingMarks, setIsEditingMarks] = useState(false);
+
   // Homework state
   const [homeworkList, setHomeworkList] = useState<HomeworkItem[]>([]);
   const [showAddHwModal, setShowAddHwModal] = useState(false);
@@ -307,6 +311,15 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       const matching = classStudents.filter((s) => s.classId === classId);
 
       const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
+      const hasExistingMarks = !!(
+        sheet &&
+        Array.isArray(sheet) &&
+        sheet.length > 0 &&
+        sheet.some((sh: any) => sh.marksObtained !== undefined && sh.marksObtained !== null && sh.marksObtained !== '')
+      );
+      setIsMarksSubmitted(hasExistingMarks);
+      setIsEditingMarks(false);
+
       setStudents(
         matching.map((s) => {
           const entry = sheet?.find((sh) => sh.studentId === s.id);
@@ -497,6 +510,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
         marksList
       );
 
+      setIsMarksSubmitted(true);
+      setIsEditingMarks(false);
       setFeedback(`✅ Subject marks for ${selectedSubject} (Out of ${maxMarks}) saved successfully!`);
     } catch (err: any) {
       setFeedback(err.message || 'Failed to save subject marks.');
@@ -1026,12 +1041,80 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                 min="1"
                 max="500"
                 value={maxMarks}
+                disabled={isMarksSubmitted && !isEditingMarks}
                 onChange={(e) => setMaxMarks(Math.max(1, parseInt(e.target.value) || 50))}
-                className="w-16 p-1 text-center font-black text-xs text-purple-950 bg-white border border-purple-300 rounded-lg shadow-sm"
+                className="w-16 p-1 text-center font-black text-xs text-purple-950 bg-white border border-purple-300 rounded-lg shadow-sm disabled:bg-slate-100"
               />
               <span className="text-xs font-bold text-purple-900">Marks</span>
             </div>
           </div>
+
+          {/* Submitted Indicator Card for Marks */}
+          {isMarksSubmitted && !isEditingMarks && (() => {
+            const gradedStudents = students.filter((s) => s.marks !== '' && typeof s.marks === 'number');
+            const gradedCount = gradedStudents.length;
+            const totalScore = gradedStudents.reduce((sum, s) => sum + (s.marks as number), 0);
+            const avgScore = gradedCount > 0 ? Math.round((totalScore / (gradedCount * (maxMarks || 50))) * 100) : 0;
+            const highestScore = gradedCount > 0 ? Math.max(...gradedStudents.map((s) => s.marks as number)) : 0;
+            const passCutoff = (maxMarks || 50) * 0.33;
+            const passCount = gradedStudents.filter((s) => (s.marks as number) >= passCutoff).length;
+            const passRate = gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0;
+
+            return (
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-md space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black tracking-wide">
+                        ✅ Marks Submitted for {selectedSubject}
+                      </h4>
+                      <p className="text-[11px] text-emerald-100">
+                        Marks (out of {maxMarks}) recorded in cloud database & published to report cards.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMarks(true)}
+                    className="px-3 py-1.5 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-black shadow transition flex items-center space-x-1.5 shrink-0"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Marks</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/20 text-center text-xs">
+                  <div className="bg-white/15 rounded-xl p-1.5">
+                    <span className="text-[10px] text-emerald-100 block font-bold uppercase">Graded</span>
+                    <span className="text-base font-black text-white">
+                      {gradedCount}/{students.length}
+                    </span>
+                  </div>
+                  <div className="bg-white/15 rounded-xl p-1.5">
+                    <span className="text-[10px] text-emerald-100 block font-bold uppercase">Average</span>
+                    <span className="text-base font-black text-white">
+                      {avgScore}%
+                    </span>
+                  </div>
+                  <div className="bg-white/15 rounded-xl p-1.5">
+                    <span className="text-[10px] text-emerald-100 block font-bold uppercase">Highest</span>
+                    <span className="text-base font-black text-white">
+                      {highestScore} <span className="text-[10px] opacity-75 font-normal">/{maxMarks}</span>
+                    </span>
+                  </div>
+                  <div className="bg-white/15 rounded-xl p-1.5">
+                    <span className="text-[10px] text-emerald-100 block font-bold uppercase">Pass Rate</span>
+                    <span className="text-base font-black text-white">
+                      {passRate}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Search student by name or roll */}
           <div className="relative mt-2">
@@ -1074,16 +1157,24 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                   </div>
 
                   <div className="flex items-center space-x-1.5">
-                    <input
-                      type="number"
-                      min="0"
-                      max={maxMarks}
-                      placeholder="--"
-                      value={stu.marks ?? ''}
-                      onChange={(e) => updateStudentMarks(stu.id, e.target.value)}
-                      className="w-16 p-1 text-center font-black text-sm text-purple-900 bg-white border border-slate-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-600"
-                    />
-                    <span className="text-xs text-slate-400 font-semibold">/ {maxMarks}</span>
+                    {isMarksSubmitted && !isEditingMarks ? (
+                      <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 font-mono">
+                        {stu.marks !== '' ? `${stu.marks} / ${maxMarks}` : 'Unmarked'}
+                      </span>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          max={maxMarks}
+                          placeholder="--"
+                          value={stu.marks ?? ''}
+                          onChange={(e) => updateStudentMarks(stu.id, e.target.value)}
+                          className="w-16 p-1 text-center font-black text-sm text-purple-900 bg-white border border-slate-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        />
+                        <span className="text-xs text-slate-400 font-semibold">/ {maxMarks}</span>
+                      </>
+                    )}
                     {stu.marks !== '' && typeof stu.marks === 'number' && (
                       <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
                         {stu.marks / (maxMarks || 1) >= 0.91 ? 'A1' :
@@ -1101,14 +1192,30 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
             )}
           </div>
 
-          <button
-            onClick={handleSaveMarks}
-            disabled={savingMarks || students.length === 0}
-            className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            <span>{savingMarks ? 'Saving Marks to ERP...' : 'Save & Lock Subject Marks'}</span>
-          </button>
+          {(!isMarksSubmitted || isEditingMarks) ? (
+            <button
+              onClick={handleSaveMarks}
+              disabled={savingMarks || students.length === 0}
+              className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50 mt-3"
+            >
+              <Save className="w-4 h-4" />
+              <span>
+                {savingMarks
+                  ? 'Saving Marks to ERP...'
+                  : isEditingMarks
+                  ? 'Update & Lock Subject Marks'
+                  : 'Save & Lock Subject Marks'}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsEditingMarks(true)}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 rounded-xl text-xs font-bold border border-slate-200 transition flex items-center justify-center space-x-2 mt-3"
+            >
+              <Edit3 className="w-4 h-4 text-purple-700" />
+              <span>Edit Submitted Marks</span>
+            </button>
+          )}
         </div>
       )}
 

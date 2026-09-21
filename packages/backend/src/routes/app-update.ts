@@ -16,3 +16,9 @@ appUpdateRoutes.get('/version', (c) => {
     autoUpdateSupported: true,
   });
 });
+
+// GET /api/app/download - Direct APK download redirect
+appUpdateRoutes.get('/download', (c) => {
+  return c.redirect('https://github.com/anvimitra/MITRA-ERP/releases/latest/download/MITRA-ERP.apk', 302);
+});
+

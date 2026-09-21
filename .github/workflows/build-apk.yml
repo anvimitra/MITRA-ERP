@@ -89,7 +89,8 @@ jobs:
               '    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />',
               '    <uses-feature android:name=\"android.hardware.location.gps\" android:required=\"false\" />',
               '    <uses-permission android:name=\"android.permission.VIBRATE\" />',
-              '    <uses-permission android:name=\"android.permission.WAKE_LOCK\" />'
+              '    <uses-permission android:name=\"android.permission.WAKE_LOCK\" />',
+              '    <uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\" />'
             ].join('\n');
             content = content.replace(/<uses-permission android:name=\"android\.permission\.INTERNET\"\s*\/>/, perms);
             fs.writeFileSync(file, content, 'utf8');
