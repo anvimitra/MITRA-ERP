@@ -1178,23 +1178,7 @@
     }
   ],
   "feePayments": [],
-  "admitCards": [
-    {
-      "id": "adm-1789457859739-42db-6708",
-      "school_id": "cf73013d-e0dd-4c0d-ab34-0a7ba6a01c17",
-      "exam_id": null,
-      "class_id": "cls-lsk1-1",
-      "student_id": "stu-1789378107402-8d42db",
-      "roll_no": 1,
-      "roll_code": "CBSE-LSK1-2026-0001",
-      "exam_title": "RBSE Annual / Board Examination 2026-27",
-      "center_number": "8402",
-      "center_name": "Institutional Examination Wing, Campus Block A",
-      "schedule_json": null,
-      "is_published": 1,
-      "created_at": "2026-09-15T07:37:39.739Z"
-    }
-  ],
+  "admitCards": [],
   "certificates": [
     {
       "id": "a1788114-3387-4705-8ed4-63a421a94ce9",

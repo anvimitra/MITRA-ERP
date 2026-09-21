@@ -239,7 +239,7 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
     )
     .get();
 
-  if (!cardRecord && user.role !== 'principal' && user.role !== 'super_admin') {
+  if (!cardRecord) {
     return c.json({
       admitCard: null,
       isAssigned: false,
@@ -256,25 +256,23 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
   const cls = db.select().from(schema.classes).where(eq(schema.classes.id, student.classId)).get();
   const sec = db.select().from(schema.sections).where(eq(schema.sections.id, student.sectionId)).get();
 
-  const subjects = db
+  const allSubjects = db
     .select()
     .from(schema.subjects)
-    .where(
-      and(
-        eq(schema.subjects.schoolId, user.schoolId),
-        eq(schema.subjects.classId, student.classId)
-      )
-    )
+    .where(eq(schema.subjects.schoolId, user.schoolId))
     .all();
 
+  const subjects = allSubjects.filter(
+    (s: any) => s.classId === student.classId || !s.classId || s.classId === 'ALL'
+  );
+
   const timetableSchedule = subjects.map((sub: any, idx: number) => {
-    const dates = ['2026-10-10', '2026-10-12', '2026-10-14', '2026-10-16', '2026-10-18', '2026-10-20'];
     return {
-      subCode: sub.code,
+      subCode: sub.code || `SUB-0${idx + 1}`,
       subName: sub.name,
-      examDate: dates[idx % dates.length],
-      examTime: '10:30 AM - 01:30 PM',
-      roomNo: `Hall-${Math.floor(idx / 2) + 1}`,
+      examDate: 'As Scheduled by School',
+      examTime: '10:00 AM - 01:00 PM',
+      roomNo: `Room ${idx + 1}`,
     };
   });
 
@@ -290,34 +288,29 @@ certificateRoutes.get('/admit-card/:studentId', async (c) => {
 
   return c.json({
     admitCard: {
-      rollNo: cardRecord?.rollNo || student.rollNo || 1,
-      rollCode: cardRecord?.rollCode || `CBSE-${school?.code || 'SCH'}-2026-${String(student.rollNo || 1).padStart(4, '0')}`,
+      rollNo: cardRecord.rollNo || student.rollNo || 1,
+      rollCode: cardRecord.rollCode || `${school?.code || 'SCH'}-2026-${String(student.rollNo || 1).padStart(4, '0')}`,
       admissionNo: student.admissionNo,
       studentName: `${student.firstName} ${student.lastName || ''}`.trim(),
-      fatherName: parent?.fatherName || 'Guardian Name',
-      motherName: parent?.motherName || 'Mother Name',
-      className: cls?.name || 'Class 10',
+      fatherName: parent?.fatherName || 'Guardian',
+      motherName: parent?.motherName || 'Mother',
+      className: cls?.name || 'Class',
       sectionName: sec?.name || 'A',
-      dob: student.dob || '2010-05-15',
+      dob: student.dob || '',
       photoUrl: student.photoUrl,
-      centerNumber: cardRecord?.centerNumber || '8402',
-      centerName: cardRecord?.centerName || `${school?.name || 'School'} Examination Center, Campus Block-A`,
+      centerNumber: cardRecord.centerNumber || 'Campus',
+      centerName: cardRecord.centerName || `${school?.name || 'School'} Main Campus Examination Wing`,
       schoolName: school?.name || '',
       schoolAffiliation: school?.affiliationNo || '',
-      examTitle: cardRecord?.examTitle || 'Secondary School Examination 2026 (Annual Term)',
-      isAssigned: !!cardRecord,
+      examTitle: cardRecord.examTitle || 'Institutional Examination Admit Card 2026',
+      isAssigned: true,
       instructions: [
         'Candidate must report to examination hall 30 minutes prior to test commencement.',
         'Carry this printed Admit Card along with your School Digital ID Card.',
         'Electronic gadgets, smartwatches, and study notes are strictly forbidden inside the hall.',
-        'Use only blue/black ballpoint pen for filling OMR sheets and answer booklets.',
+        'Use only blue/black ballpoint pen for filling answer booklets.',
       ],
-      schedule: customSchedule || (timetableSchedule.length > 0 ? timetableSchedule : [
-        { subCode: 'MATH-10', subName: 'Mathematics Standard', examDate: '2026-10-10', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
-        { subCode: 'SCI-10', subName: 'Science Theory', examDate: '2026-10-12', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-1' },
-        { subCode: 'ENG-10', subName: 'English Language & Lit', examDate: '2026-10-14', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
-        { subCode: 'SST-10', subName: 'Social Science', examDate: '2026-10-16', examTime: '10:30 AM - 01:30 PM', roomNo: 'Hall-2' },
-      ]),
+      schedule: customSchedule || timetableSchedule,
     },
   });
 });

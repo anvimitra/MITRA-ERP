@@ -465,8 +465,8 @@ export const ParentView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Examination Admit Card Card */}
-      {admitCard?.isAssigned ? (
+      {/* Examination Admit Card Card - Strictly shown ONLY when officially issued by Principal */}
+      {admitCard && admitCard.isAssigned && (
         <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-4 text-white shadow-md space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30">
@@ -487,20 +487,6 @@ export const ParentView: React.FC<Props> = ({
             <Printer className="w-3.5 h-3.5 text-blue-600" />
             <span>View & Print Admit Card</span>
           </button>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
-              <Award size={15} className="text-blue-600" /> Examination Admit Card
-            </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-              Pending Release
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Admit Card has not been assigned or released by the Principal yet. It will appear here automatically once issued for {student?.firstName}'s class.
-          </p>
         </div>
       )}
 
@@ -541,7 +527,9 @@ export const ParentView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="max-w-sm w-full bg-white rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-300">
             <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-xs font-black uppercase text-blue-900">CBSE Admit Card 2026</span>
+              <span className="text-xs font-black uppercase text-blue-900 truncate pr-2">
+                {admitCard.examTitle || 'Official Examination Admit Card'}
+              </span>
               <button onClick={() => setShowAdmitCardModal(false)} className="text-slate-400 p-1">
                 <X className="w-5 h-5" />
               </button>

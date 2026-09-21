@@ -417,6 +417,16 @@ export async function fetchUserNotifications(): Promise<NotificationItem[]> {
   return [];
 }
 
+// Mark all user notifications as read in ERP
+export async function markAllNotificationsRead(): Promise<boolean> {
+  try {
+    const res = await authFetch('/notifications/read-all', { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // 11. Broadcast Notice / Circular to School
 export async function broadcastLiveNotice(title: string, message: string) {
   const res = await authFetch('/notifications/notices', {

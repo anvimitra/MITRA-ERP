@@ -12,6 +12,7 @@ import {
   fetchStudentFeesLedger,
   fetchStudentExamReport,
   setMobileToken,
+  markAllNotificationsRead,
 } from './api';
 import { SchoolHeader } from './components/SchoolHeader';
 import { BottomNavBar, TabType } from './components/BottomNavBar';
@@ -140,6 +141,43 @@ export const App: React.FC = () => {
     }
   };
 
+  const syncRealtimeNotifications = async () => {
+    try {
+      const liveNotifs = await fetchUserNotifications();
+      if (liveNotifs && Array.isArray(liveNotifs)) {
+        setNotifications(liveNotifs);
+
+        // Track alerted IDs in localStorage to prevent duplicate sound/chimes
+        let alertedIds: Set<string>;
+        try {
+          const raw = localStorage.getItem('anvimitra_alerted_notif_ids');
+          alertedIds = raw ? new Set(JSON.parse(raw)) : new Set();
+        } catch {
+          alertedIds = new Set();
+        }
+        const legacyLastId = localStorage.getItem('anvimitra_last_alerted_notif');
+        if (legacyLastId) alertedIds.add(legacyLastId);
+
+        // Identify unread notifications that haven't triggered sound/push alert yet
+        const newUnalerted = liveNotifs.filter((n) => !n.read && !alertedIds.has(n.id));
+        if (newUnalerted.length > 0) {
+          // Alert the newest unalerted items (up to 3 to prevent notification storm)
+          const toAlert = newUnalerted.slice(0, 3);
+          for (const n of toAlert) {
+            showSystemNotification(n.title, n.message);
+            alertedIds.add(n.id);
+          }
+          // Persist updated alerted IDs (capped at 300 to avoid unbounded storage)
+          const idsArray = Array.from(alertedIds).slice(-300);
+          localStorage.setItem('anvimitra_alerted_notif_ids', JSON.stringify(idsArray));
+          localStorage.setItem('anvimitra_last_alerted_notif', toAlert[0].id);
+        }
+      }
+    } catch (err) {
+      console.warn('Real-time notification sync error:', err);
+    }
+  };
+
   const handleAllowNotifications = async () => {
     try {
       const perm = await requestAppNotificationPermission();
@@ -233,21 +271,23 @@ export const App: React.FC = () => {
       }
     });
 
-    // 3. Fetch live notifications (attendance, fee due, circulars) from ERP
-    fetchUserNotifications().then((liveNotifs) => {
-      if (liveNotifs && liveNotifs.length > 0) {
-        setNotifications(liveNotifs);
-        // Play chime and show system lock screen alert for newest unread notification
-        const latestUnread = liveNotifs.find((n) => !n.read);
-        if (latestUnread) {
-          const lastAlertedId = localStorage.getItem('anvimitra_last_alerted_notif');
-          if (lastAlertedId !== latestUnread.id) {
-            localStorage.setItem('anvimitra_last_alerted_notif', latestUnread.id);
-            showSystemNotification(latestUnread.title, latestUnread.message);
-          }
-        }
+    // 3. Ultra-fast Real-Time Notification Poller & Lock-Screen / Audio Chime Alerting
+    syncRealtimeNotifications();
+    const notifPollTimer = setInterval(() => {
+      syncRealtimeNotifications();
+    }, 4000);
+
+    // Immediate sync whenever user unlocks phone or switches back to app
+    const handleWakeUp = () => {
+      if (document.visibilityState === 'visible') {
+        syncRealtimeNotifications();
       }
-    });
+    };
+    const handleWindowFocus = () => {
+      syncRealtimeNotifications();
+    };
+    document.addEventListener('visibilitychange', handleWakeUp);
+    window.addEventListener('focus', handleWindowFocus);
 
     // 4. Background polling for updates every 3 minutes
     const updateTimer = setInterval(() => {
@@ -259,7 +299,12 @@ export const App: React.FC = () => {
       });
     }, 3 * 60 * 1000);
 
-    return () => clearInterval(updateTimer);
+    return () => {
+      clearInterval(notifPollTimer);
+      clearInterval(updateTimer);
+      document.removeEventListener('visibilitychange', handleWakeUp);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, []);
 
   const handleManualCheckUpdate = async () => {
@@ -324,6 +369,9 @@ export const App: React.FC = () => {
     } else {
       setActiveTab('home');
     }
+
+    // Immediately trigger real-time notification sync for the newly logged in user
+    syncRealtimeNotifications();
   };
 
   const handleLogout = () => {
@@ -344,8 +392,9 @@ export const App: React.FC = () => {
     setShowLogin(true);
   };
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    await markAllNotificationsRead().catch(() => {});
   };
 
   return (
