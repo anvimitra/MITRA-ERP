@@ -30,10 +30,19 @@ homeworkRoutes.get('/', async (c) => {
     .all();
 
   if (classId) {
-    query = query.filter((h: any) => h.classId === classId);
+    query = query.filter((h: any) => h.classId === classId || (classId === 'cls-default' && h.classId === 'cls-lsk1-1') || (h.classId === 'cls-default'));
   }
   if (sectionId) {
-    query = query.filter((h: any) => !h.sectionId || h.sectionId === sectionId);
+    query = query.filter((h: any) => {
+      if (!h.sectionId) return true;
+      if (h.sectionId === sectionId) return true;
+      if (sectionId === 'sec-default' || h.sectionId === 'sec-default') return true;
+      const hNorm = h.sectionId.toLowerCase().replace(/^(sec-)+/, '');
+      const sNorm = sectionId.toLowerCase().replace(/^(sec-)+/, '');
+      if (hNorm.endsWith('-a') && (sNorm.endsWith('-a') || sNorm === 'a')) return true;
+      if (hNorm.endsWith('-b') && (sNorm.endsWith('-b') || sNorm === 'b')) return true;
+      return hNorm === sNorm;
+    });
   }
 
   // Sort descending by createdAt
@@ -108,10 +117,12 @@ homeworkRoutes.post('/', async (c) => {
     const targetStudents = classStudents.filter((s: any) => {
       if (!sectionId) return true;
       if (s.sectionId === sectionId) return true;
-      if (sectionId.endsWith('-a') && (!s.sectionId || s.sectionId === 'sec-default' || !s.sectionId.includes(classId.replace('cls-', '')))) {
-        return true;
-      }
-      return false;
+      if (!s.sectionId || s.sectionId === 'sec-default') return true;
+      const hNorm = sectionId.toLowerCase().replace(/^(sec-)+/, '');
+      const sNorm = (s.sectionId || '').toLowerCase().replace(/^(sec-)+/, '');
+      if (hNorm.endsWith('-a') && (sNorm.endsWith('-a') || sNorm === 'a')) return true;
+      if (hNorm.endsWith('-b') && (sNorm.endsWith('-b') || sNorm === 'b')) return true;
+      return hNorm === sNorm;
     });
 
     const displaySubject = subjectName || (subjectId ? (db.select().from(schema.subjects).where(eq(schema.subjects.id, subjectId)).get()?.name || 'Subject') : 'Homework');

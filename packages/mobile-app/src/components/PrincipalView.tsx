@@ -169,10 +169,12 @@ export const PrincipalView: React.FC<Props> = ({
       setParents(parentsRes || []);
 
       if (clsRes?.classes?.length > 0 && !newStudent.classId) {
+        const firstCId = clsRes.classes[0].id;
+        const firstSec = (clsRes.sections || []).find((s: any) => s.classId === firstCId)?.id || clsRes.sections?.[0]?.id || 'sec-a';
         setNewStudent((prev) => ({
           ...prev,
-          classId: clsRes.classes[0].id,
-          sectionId: clsRes.sections?.[0]?.id || '',
+          classId: firstCId,
+          sectionId: firstSec,
         }));
       }
     } catch (err) {
@@ -205,13 +207,15 @@ export const PrincipalView: React.FC<Props> = ({
       });
 
       setShowAddStudent(false);
+      const initialClassId = classesData.classes?.[0]?.id || '';
+      const initialSectionId = (classesData.sections || []).find((s: any) => s.classId === initialClassId)?.id || classesData.sections?.[0]?.id || 'sec-a';
       setNewStudent({
         admissionNo: '',
         rollNo: '',
         firstName: '',
         lastName: '',
-        classId: classesData.classes?.[0]?.id || '',
-        sectionId: classesData.sections?.[0]?.id || '',
+        classId: initialClassId,
+        sectionId: initialSectionId,
         gender: 'Male',
         fatherName: '',
         motherName: '',
@@ -1238,7 +1242,15 @@ export const PrincipalView: React.FC<Props> = ({
                   <label className="font-bold text-slate-600 block mb-1">Class *</label>
                   <select
                     value={newStudent.classId}
-                    onChange={(e) => setNewStudent({ ...newStudent, classId: e.target.value })}
+                    onChange={(e) => {
+                      const cId = e.target.value;
+                      const validSecs = (classesData?.sections || []).filter((s: any) => s.classId === cId);
+                      setNewStudent({
+                        ...newStudent,
+                        classId: cId,
+                        sectionId: validSecs[0]?.id || 'sec-a',
+                      });
+                    }}
                     className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold"
                   >
                     {classesData.classes.map((c) => (
@@ -1255,8 +1267,20 @@ export const PrincipalView: React.FC<Props> = ({
                     onChange={(e) => setNewStudent({ ...newStudent, sectionId: e.target.value })}
                     className="w-full p-2.5 border rounded-xl bg-slate-50 font-bold"
                   >
-                    <option value="sec-a">Section A</option>
-                    <option value="sec-b">Section B</option>
+                    {((classesData?.sections || []).filter((s: any) => !newStudent.classId || s.classId === newStudent.classId)).length > 0 ? (
+                      (classesData?.sections || [])
+                        .filter((s: any) => !newStudent.classId || s.classId === newStudent.classId)
+                        .map((s: any) => (
+                          <option key={s.id} value={s.id}>
+                            Section {s.name}
+                          </option>
+                        ))
+                    ) : (
+                      <>
+                        <option value="sec-a">Section A</option>
+                        <option value="sec-b">Section B</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

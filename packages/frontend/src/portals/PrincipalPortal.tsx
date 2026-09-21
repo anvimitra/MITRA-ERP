@@ -545,13 +545,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       }
 
       if (cData?.classes?.length > 0) {
-        setCtClassId(cData.classes[0].id);
-        setSubClassId(cData.classes[0].id);
-        setAttClassId(cData.classes[0].id);
-      }
-      if (cData?.sections?.length > 0) {
-        setCtSectionId(cData.sections[0].id);
-        setSubSectionId(cData.sections[0].id);
+        const firstCId = cData.classes[0].id;
+        setCtClassId(firstCId);
+        setSubClassId(firstCId);
+        setAttClassId(firstCId);
+        const firstSec = (cData?.sections || []).find((s: any) => s.classId === firstCId)?.id || cData?.sections?.[0]?.id || '';
+        setCtSectionId(firstSec);
+        setSubSectionId(firstSec);
       }
       if (stData?.staff?.length > 0) {
         const teachers = stData.staff.filter((t: any) => t.role === 'teacher');
@@ -592,13 +592,15 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   // --- Student Handlers ---
   const handleOpenAddStudent = () => {
     setEditingStudentId(null);
+    const initialClassId = classesData?.classes?.[0]?.id || '';
+    const initialSectionId = (classesData?.sections || []).find((s: any) => s.classId === initialClassId)?.id || classesData?.sections?.[0]?.id || '';
     setStudentForm({
       admissionNo: `ADM-${Date.now().toString().slice(-4)}`,
       rollNo: String(students.length + 1),
       firstName: '',
       lastName: '',
-      classId: classesData?.classes?.[0]?.id || '',
-      sectionId: classesData?.sections?.[0]?.id || '',
+      classId: initialClassId,
+      sectionId: initialSectionId,
       gender: 'Male',
       dob: '2012-05-15',
       bloodGroup: 'B+',
@@ -2091,7 +2093,14 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
               <form onSubmit={handleAssignClassTeacher} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                 <select
                   value={ctClassId}
-                  onChange={(e) => setCtClassId(e.target.value)}
+                  onChange={(e) => {
+                    const newClassId = e.target.value;
+                    setCtClassId(newClassId);
+                    const classSecs = (classesData?.sections || []).filter((s: any) => s.classId === newClassId);
+                    if (classSecs.length > 0) {
+                      setCtSectionId(classSecs[0].id);
+                    }
+                  }}
                   className="bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
                 >
                   {classesData?.classes?.map((c: any) => (
@@ -2104,9 +2113,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   onChange={(e) => setCtSectionId(e.target.value)}
                   className="bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
                 >
-                  {classesData?.sections?.map((s: any) => (
-                    <option key={s.id} value={s.id}>Section {s.name}</option>
-                  ))}
+                  {((classesData?.sections || []).filter((s: any) => !ctClassId || s.classId === ctClassId)).length > 0 ? (
+                    (classesData?.sections || [])
+                      .filter((s: any) => !ctClassId || s.classId === ctClassId)
+                      .map((s: any) => (
+                        <option key={s.id} value={s.id}>Section {s.name}</option>
+                      ))
+                  ) : (
+                    <>
+                      <option value="sec-a">Section A</option>
+                      <option value="sec-b">Section B</option>
+                    </>
+                  )}
                 </select>
 
                 <select
@@ -2235,11 +2253,18 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     onChange={(e) => setSubSectionId(e.target.value)}
                     className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-semibold"
                   >
-                    {(classesData?.sections || [])
-                      .filter((s: any) => !subClassId || s.classId === subClassId)
-                      .map((s: any) => (
-                        <option key={s.id} value={s.id}>Section {s.name}</option>
-                      ))}
+                    {((classesData?.sections || []).filter((s: any) => !subClassId || s.classId === subClassId)).length > 0 ? (
+                      (classesData?.sections || [])
+                        .filter((s: any) => !subClassId || s.classId === subClassId)
+                        .map((s: any) => (
+                          <option key={s.id} value={s.id}>Section {s.name}</option>
+                        ))
+                    ) : (
+                      <>
+                        <option value="sec-a">Section A</option>
+                        <option value="sec-b">Section B</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -4623,7 +4648,15 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   <select
                     required
                     value={studentForm.classId}
-                    onChange={(e) => setStudentForm({ ...studentForm, classId: e.target.value })}
+                    onChange={(e) => {
+                      const newClassId = e.target.value;
+                      const validSections = (classesData?.sections || []).filter((s: any) => s.classId === newClassId);
+                      setStudentForm({
+                        ...studentForm,
+                        classId: newClassId,
+                        sectionId: validSections[0]?.id || studentForm.sectionId,
+                      });
+                    }}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                   >
                     {classesData?.classes?.map((c: any) => (
@@ -4641,11 +4674,20 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     onChange={(e) => setStudentForm({ ...studentForm, sectionId: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                   >
-                    {classesData?.sections?.map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        Section {s.name}
-                      </option>
-                    ))}
+                    {((classesData?.sections || []).filter((s: any) => !studentForm.classId || s.classId === studentForm.classId)).length > 0 ? (
+                      (classesData?.sections || [])
+                        .filter((s: any) => !studentForm.classId || s.classId === studentForm.classId)
+                        .map((s: any) => (
+                          <option key={s.id} value={s.id}>
+                            Section {s.name}
+                          </option>
+                        ))
+                    ) : (
+                      <>
+                        <option value="sec-a">Section A</option>
+                        <option value="sec-b">Section B</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>
