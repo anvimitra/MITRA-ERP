@@ -71,6 +71,18 @@ export async function requestAppNotificationPermission(): Promise<NotificationPe
       }
       const requested = await LocalNotifications.requestPermissions();
       if (requested.display === 'granted') {
+        try {
+          await LocalNotifications.createChannel({
+            id: 'mitra_alerts_channel',
+            name: 'School Alerts & Notices',
+            description: 'Institutional alerts, attendance, and homework notifications with audio chime',
+            importance: 5,
+            visibility: 1,
+            vibration: true,
+            lights: true,
+            lightColor: '#7c3aed',
+          });
+        } catch {}
         playNotificationSound();
         return 'granted';
       }
@@ -116,6 +128,7 @@ export async function showSystemNotification(title: string, body: string, icon?:
             title,
             body,
             schedule: { at: new Date(Date.now() + 100) },
+            channelId: 'mitra_alerts_channel',
             sound: undefined,
             smallIcon: 'ic_launcher',
           },

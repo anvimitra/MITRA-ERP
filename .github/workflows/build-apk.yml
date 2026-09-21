@@ -57,7 +57,9 @@ jobs:
             "private": true,
             "dependencies": {
               "@capacitor/core": "^6.2.0",
-              "@capacitor/android": "^6.2.0"
+              "@capacitor/android": "^6.2.0",
+              "@capacitor/local-notifications": "^6.0.0",
+              "@capacitor/geolocation": "^6.0.0"
             },
             "devDependencies": {
               "@capacitor/cli": "^6.2.0"
@@ -68,6 +70,34 @@ jobs:
           npm install --no-audit --no-fund
           npx cap add android
           npx cap sync android
+
+          # Copy custom app icons/res from repo if available
+          if [ -d "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/res" ]; then
+            cp -r "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/res/"* "$BUILD_DIR/android/app/src/main/res/" || true
+          fi
+
+          # Inject real Android OS permissions into AndroidManifest.xml
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          node -e "
+            const fs = require('fs');
+            const file = '$MANIFEST';
+            let content = fs.readFileSync(file, 'utf8');
+            const perms = [
+              '    <uses-permission android:name=\"android.permission.INTERNET\" />',
+              '    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />',
+              '    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />',
+              '    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />',
+              '    <uses-feature android:name=\"android.hardware.location.gps\" android:required=\"false\" />',
+              '    <uses-permission android:name=\"android.permission.VIBRATE\" />',
+              '    <uses-permission android:name=\"android.permission.WAKE_LOCK\" />'
+            ].join('\n');
+            content = content.replace(/<uses-permission android:name=\"android\.permission\.INTERNET\"\s*\/>/, perms);
+            fs.writeFileSync(file, content, 'utf8');
+          "
+          echo "=========================================="
+          echo "VERIFIED INJECTED ANDROID PERMISSIONS:"
+          grep "uses-permission" "$MANIFEST"
+          echo "=========================================="
 
           # Configure Android SDK location for Gradle
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
