@@ -146,13 +146,18 @@ export interface AppUpdateInfo {
   appName: string;
   version: string;
   versionCode: number;
-  minSupportedVersion: string;
+  minSupportedVersion?: string;
   latestApkUrl: string;
   releaseNotes: string;
   publishedAt: string;
-  isMandatory: boolean;
-  autoUpdateSupported: boolean;
+  isMandatory?: boolean;
+  autoUpdateSupported?: boolean;
+  releaseId?: string;
+  assetId?: string | null;
+  assetUpdatedAt?: string;
+  sizeBytes?: number;
 }
+
 
 export interface CertificateItem {
   id: string;

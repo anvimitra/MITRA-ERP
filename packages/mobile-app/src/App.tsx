@@ -13,6 +13,7 @@ import {
   fetchStudentExamReport,
   setMobileToken,
   markAllNotificationsRead,
+  CURRENT_APP_VERSION,
 } from './api';
 import { SchoolHeader } from './components/SchoolHeader';
 import { BottomNavBar, TabType } from './components/BottomNavBar';
@@ -308,12 +309,12 @@ export const App: React.FC = () => {
   }, []);
 
   const handleManualCheckUpdate = async () => {
-    const info = await checkAppUpdate();
+    const info = await checkAppUpdate(true);
     if (info) {
       setUpdateInfo(info);
       setShowUpdateBanner(true);
     } else {
-      alert('✓ Your Mobile App is already running the latest version!');
+      alert(`✓ Aapka app already GitHub ke latest version (v${CURRENT_APP_VERSION}) par chal raha hai! Koi naya update nahi hai.`);
     }
   };
 

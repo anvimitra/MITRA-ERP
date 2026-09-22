@@ -71,10 +71,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
+          # Copy custom Java source files (MainActivity, AppUpdateInstallerPlugin, etc.)
+          if [ -d "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/java" ]; then
+            cp -r "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/java/"* "$BUILD_DIR/android/app/src/main/java/" || true
+          fi
+
           # Copy custom app icons/res from repo if available
           if [ -d "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/res" ]; then
             cp -r "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/res/"* "$BUILD_DIR/android/app/src/main/res/" || true
           fi
+
 
           # Inject real Android OS permissions into AndroidManifest.xml
           MANIFEST="android/app/src/main/AndroidManifest.xml"

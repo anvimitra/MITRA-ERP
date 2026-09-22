@@ -513,19 +513,63 @@ export async function createStudentObservationLog(data: {
 // Version & Auto-Update
 export const CURRENT_APP_VERSION = '1.2.0';
 export const CURRENT_BUILD_NUMBER = 102;
+// Baseline build release timestamp
+export const CURRENT_APP_BUILD_TIME = '2026-09-21T16:16:24Z';
 
-export async function checkAppUpdate(): Promise<AppUpdateInfo | null> {
+function isVersionNewer(remote: string, local: string): boolean {
+  const pRemote = remote.split('.').map((n) => parseInt(n, 10) || 0);
+  const pLocal = local.split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pRemote.length, pLocal.length); i++) {
+    const r = pRemote[i] || 0;
+    const l = pLocal[i] || 0;
+    if (r > l) return true;
+    if (r < l) return false;
+  }
+  return false;
+}
+
+export function markReleaseAsInstalled(releaseInfo: AppUpdateInfo) {
+  const t = releaseInfo.assetUpdatedAt ? new Date(releaseInfo.assetUpdatedAt).getTime() : Date.now();
+  localStorage.setItem('anvimitra_installed_release_time', String(t));
+  if (releaseInfo.releaseId) {
+    localStorage.setItem('anvimitra_installed_release_id', releaseInfo.releaseId);
+  }
+  if (releaseInfo.version) {
+    localStorage.setItem('anvimitra_installed_version', releaseInfo.version);
+  }
+}
+
+export async function checkAppUpdate(forceManualCheck = false): Promise<AppUpdateInfo | null> {
   try {
     const res = await fetch(`${getApiBaseUrl()}/app/version`);
     if (res.ok) {
       const data: AppUpdateInfo = await res.json();
-      return data;
+      
+      const remoteTime = data.assetUpdatedAt ? new Date(data.assetUpdatedAt).getTime() : 0;
+      const localBuildTime = new Date(CURRENT_APP_BUILD_TIME).getTime();
+      const installedReleaseTime = parseInt(localStorage.getItem('anvimitra_installed_release_time') || '0', 10);
+      
+      // If user has already installed this exact release, do not show update unless forced
+      if (!forceManualCheck && installedReleaseTime >= remoteTime && remoteTime > 0) {
+        return null;
+      }
+
+      const isSemanticNewer = isVersionNewer(data.version, CURRENT_APP_VERSION);
+      // A release is considered newer only if its GitHub asset timestamp is strictly after our local build time
+      const isTimestampNewer = remoteTime > localBuildTime;
+
+      if (isSemanticNewer || isTimestampNewer) {
+        return data;
+      }
+      
+      return null;
     }
   } catch (err) {
     console.warn('Unable to reach app update server:', err);
   }
   return null;
 }
+
 
 // 16. Fetch Certificates
 export async function fetchCertificates(studentId?: string): Promise<CertificateItem[]> {
