@@ -16,10 +16,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -34,34 +34,27 @@ jobs:
           npm run build
           ls -la dist/
 
-      - name: Sync Capacitor iOS Platform
+      - name: Sync Capacitor iOS Platform & Pods
         run: |
           cd packages/mobile-app
           npx cap sync ios
 
-      - name: Install CocoaPods
+      - name: Build iOS App for Physical Devices (.ipa)
         run: |
           cd packages/mobile-app/ios/App
-          pod install --repo-update
-
-      - name: Build iOS Archive (Physical Device .ipa)
-        run: |
-          cd packages/mobile-app/ios/App
+          echo "Compiling native iOS Release build..."
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/App.xcarchive \
-            archive \
+            -derivedDataPath build-device \
+            build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
-
-      - name: Package Unsigned iOS IPA
-        run: |
-          cd packages/mobile-app/ios/App
+          
           mkdir -p Payload
-          cp -r build/App.xcarchive/Products/Applications/App.app Payload/
+          cp -r build-device/Build/Products/Release-iphoneos/App.app Payload/
           zip -qr MITRA-ERP-iOS.ipa Payload
           mkdir -p "$GITHUB_WORKSPACE/output-ios"
           cp MITRA-ERP-iOS.ipa "$GITHUB_WORKSPACE/output-ios/"
@@ -70,9 +63,10 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/output-ios/MITRA-ERP-iOS.ipa"
           echo "=========================================="
 
-      - name: Build iOS Simulator App
+      - name: Build iOS App for Simulators
         run: |
           cd packages/mobile-app/ios/App
+          echo "Compiling native iOS Simulator build..."
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \

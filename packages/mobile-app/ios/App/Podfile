@@ -1,7 +1,15 @@
 def resolve_module(subpath)
-  root_path = File.expand_path("../../../../node_modules/#{subpath}", __FILE__)
-  local_path = File.expand_path("../../node_modules/#{subpath}", __FILE__)
-  File.exist?(root_path) ? root_path : (File.exist?(local_path) ? local_path : root_path)
+  cur = __dir__
+  while cur && cur != '/' && cur != ''
+    candidate = File.join(cur, 'node_modules', subpath)
+    return "#{candidate}.rb" if File.exist?("#{candidate}.rb")
+    return candidate if File.exist?(candidate) || Dir.exist?(candidate)
+    parent = File.dirname(cur)
+    break if parent == cur
+    cur = parent
+  end
+  # Fallback relative to __dir__
+  File.expand_path("../../../../node_modules/#{subpath}", __dir__)
 end
 
 require resolve_module('@capacitor/ios/scripts/pods_helpers')
@@ -15,10 +23,10 @@ use_frameworks!
 install! 'cocoapods', :disable_input_output_paths => true
 
 def capacitor_pods
-  pod 'Capacitor', :path => '../../../../node_modules/@capacitor/ios'
-  pod 'CapacitorCordova', :path => '../../../../node_modules/@capacitor/ios'
-  pod 'CapacitorGeolocation', :path => '../../../../node_modules/@capacitor/geolocation'
-  pod 'CapacitorLocalNotifications', :path => '../../../../node_modules/@capacitor/local-notifications'
+  pod 'Capacitor', :path => resolve_module('@capacitor/ios')
+  pod 'CapacitorCordova', :path => resolve_module('@capacitor/ios')
+  pod 'CapacitorGeolocation', :path => resolve_module('@capacitor/geolocation')
+  pod 'CapacitorLocalNotifications', :path => resolve_module('@capacitor/local-notifications')
 end
 
 target 'App' do
