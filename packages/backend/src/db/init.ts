@@ -526,6 +526,27 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
       attachment_url TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS letter_pad_documents (
+      id TEXT PRIMARY KEY,
+      school_id TEXT NOT NULL,
+      ref_no TEXT,
+      doc_date TEXT NOT NULL,
+      recipient TEXT,
+      subject TEXT NOT NULL,
+      salutation TEXT,
+      body_content TEXT,
+      table_data TEXT,
+      template_id TEXT DEFAULT 'classic',
+      header_mode TEXT DEFAULT 'with_header',
+      signatory_name TEXT,
+      signatory_title TEXT,
+      watermark_enabled INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'ISSUED',
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Auto-migrate school profile columns if upgrading an existing SQLite DB

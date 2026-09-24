@@ -48,6 +48,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
+import { LetterPadDesk } from '../components/LetterPadDesk';
 import { StaffPayrollDesk } from '../components/StaffPayrollDesk';
 import { LibraryDesk } from '../components/LibraryDesk';
 import { TransportDesk } from '../components/TransportDesk';
@@ -87,6 +88,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
     | 'faculty'
     | 'discipline'
     | 'certificates'
+    | 'letter_pad'
     | 'payroll'
     | 'library'
     | 'transport'
@@ -1359,6 +1361,19 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('letter_pad')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition ${
+                activeTab === 'letter_pad' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText size={16} />
+                <span>Official Letter Pad</span>
+              </div>
+              <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">Pro</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('payroll')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition ${
                 activeTab === 'payroll' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800'
@@ -1442,6 +1457,13 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                 >
                   <UserPlus size={15} />
                   <span>Admit Student</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('letter_pad')}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5"
+                >
+                  <FileText size={15} />
+                  <span>Letter Pad</span>
                 </button>
                 <button
                   onClick={() => setShowNoticeModal(true)}
@@ -4176,6 +4198,15 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
               setStudents(sRes.students || []);
               setParentsList(pRes.parents || []);
             }}
+          />
+        )}
+
+        {/* ================= MODULE: OFFICIAL LETTER PAD & LETTERHEAD ================= */}
+        {activeTab === 'letter_pad' && (
+          <LetterPadDesk
+            schoolInfo={currentSchool || classesData?.school}
+            students={students}
+            staffList={staffList}
           />
         )}
 

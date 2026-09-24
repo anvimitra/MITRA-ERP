@@ -1186,6 +1186,66 @@ export class ApiService {
       method: 'DELETE',
     });
   }
+
+  // ==================== OFFICIAL LETTER PAD SERVICE ====================
+  static async fetchLetterPadDocuments(): Promise<any[]> {
+    try {
+      const res = await this.request<{ letters: any[] }>('/letter-pad');
+      return res.letters || [];
+    } catch (e) {
+      console.warn('Letter pad documents API fallback:', e);
+      const cached = localStorage.getItem('anvimitra_cached_letter_pad');
+      return cached ? JSON.parse(cached) : [];
+    }
+  }
+
+  static async saveLetterPadDocument(doc: any): Promise<any> {
+    try {
+      const res = await this.request<{ success: boolean; letter: any }>('/letter-pad', {
+        method: 'POST',
+        body: JSON.stringify(doc),
+      });
+      return res.letter;
+    } catch (e) {
+      console.warn('Saving letter pad locally due to offline:', e);
+      const cached = localStorage.getItem('anvimitra_cached_letter_pad');
+      const list = cached ? JSON.parse(cached) : [];
+      const newDoc = { ...doc, id: doc.id || `LP-${Date.now()}`, createdAt: new Date().toISOString() };
+      list.unshift(newDoc);
+      localStorage.setItem('anvimitra_cached_letter_pad', JSON.stringify(list));
+      return newDoc;
+    }
+  }
+
+  static async updateLetterPadDocument(id: string, doc: any): Promise<any> {
+    try {
+      const res = await this.request<{ success: boolean; letter: any }>(`/letter-pad/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(doc),
+      });
+      return res.letter;
+    } catch (e) {
+      console.warn('Updating letter pad locally:', e);
+      return doc;
+    }
+  }
+
+  static async deleteLetterPadDocument(id: string): Promise<any> {
+    try {
+      return await this.request<{ success: boolean; message: string }>(`/letter-pad/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.warn('Deleting letter pad locally:', e);
+      const cached = localStorage.getItem('anvimitra_cached_letter_pad');
+      if (cached) {
+        const list = JSON.parse(cached).filter((item: any) => item.id !== id);
+        localStorage.setItem('anvimitra_cached_letter_pad', JSON.stringify(list));
+      }
+      return { success: true };
+    }
+  }
 }
+
 
 

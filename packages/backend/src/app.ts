@@ -20,6 +20,7 @@ import { libraryRoutes } from './routes/library.js';
 import { transportRoutes } from './routes/transport.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { homeworkRoutes } from './routes/homework.js';
+import { letterPadRoutes } from './routes/letter-pad.js';
 import { isPostgresConnected } from './db/postgres-sync.js';
 import { verifyToken } from './services/auth.js';
 import { db, schema, eq } from './db/index.js';
@@ -115,3 +116,5 @@ app.route('/api/library', libraryRoutes);
 app.route('/api/transport', transportRoutes);
 app.route('/api/inventory', inventoryRoutes);
 app.route('/api/homework', homeworkRoutes);
+app.route('/api/letter-pad', letterPadRoutes);
+
