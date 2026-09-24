@@ -11,6 +11,7 @@ interface GitHubReleaseCache {
   assetUpdatedAt: string;
   publishedAt: string;
   latestApkUrl: string;
+  latestIpaUrl: string;
   releaseNotes: string;
   sizeBytes: number;
   isMandatory: boolean;
@@ -36,7 +37,8 @@ async function fetchLatestGitHubRelease(): Promise<GitHubReleaseCache> {
     assetUpdatedAt: '2026-09-21T16:16:24Z',
     publishedAt: '2026-09-21T16:16:24Z',
     latestApkUrl: 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP.apk',
-    releaseNotes: 'Official MITRA-ERP release with real-time updates and in-app installation.',
+    latestIpaUrl: 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP-iOS.ipa',
+    releaseNotes: 'Official MITRA-ERP release with real-time updates and iOS/Android support.',
     sizeBytes: 4414701,
     isMandatory: false,
     autoUpdateSupported: true,
@@ -55,21 +57,25 @@ async function fetchLatestGitHubRelease(): Promise<GitHubReleaseCache> {
       const apkAsset = Array.isArray(data.assets)
         ? data.assets.find((a: any) => a.name && a.name.endsWith('.apk')) || data.assets[0]
         : null;
+      const ipaAsset = Array.isArray(data.assets)
+        ? data.assets.find((a: any) => a.name && (a.name.endsWith('.ipa') || a.name.includes('iOS')))
+        : null;
 
       const rawTag = String(data.tag_name || 'latest').replace(/^v/, '');
-      const assetUpdate = apkAsset?.updated_at || data.updated_at || data.published_at || new Date().toISOString();
+      const assetUpdate = apkAsset?.updated_at || ipaAsset?.updated_at || data.updated_at || data.published_at || new Date().toISOString();
 
       cachedRelease = {
         appName: 'MITRA-ERP Mobile',
         version: rawTag !== 'latest' ? rawTag : '1.2.0',
         versionCode: 102,
         releaseId: String(data.id || 'latest'),
-        assetId: apkAsset ? String(apkAsset.id) : null,
+        assetId: apkAsset ? String(apkAsset.id) : (ipaAsset ? String(ipaAsset.id) : null),
         assetUpdatedAt: assetUpdate,
         publishedAt: data.published_at || assetUpdate,
         latestApkUrl: apkAsset?.browser_download_url || 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP.apk',
+        latestIpaUrl: ipaAsset?.browser_download_url || 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP-iOS.ipa',
         releaseNotes: data.body || 'New features, real-time push synchronization and speed improvements.',
-        sizeBytes: apkAsset?.size || 4414701,
+        sizeBytes: apkAsset?.size || ipaAsset?.size || 4414701,
         isMandatory: false,
         autoUpdateSupported: true,
       };
@@ -89,8 +95,18 @@ appUpdateRoutes.get('/version', async (c) => {
   return c.json(releaseInfo);
 });
 
-// GET /api/app/download - Direct APK download redirect
+// GET /api/app/download - Direct APK download redirect (Android)
 appUpdateRoutes.get('/download', (c) => {
   return c.redirect('https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP.apk', 302);
+});
+
+// GET /api/app/download/android - Direct APK download redirect
+appUpdateRoutes.get('/download/android', (c) => {
+  return c.redirect('https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP.apk', 302);
+});
+
+// GET /api/app/download/ios - Direct iOS IPA package redirect (Apple)
+appUpdateRoutes.get('/download/ios', (c) => {
+  return c.redirect('https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP-iOS.ipa', 302);
 });
 

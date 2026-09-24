@@ -1,0 +1,114 @@
+name: Build MITRA-ERP iOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Generate Apple iOS App (.ipa & Simulator)
+    runs-on: macos-14
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          echo "Installing Monorepo dependencies..."
+          npm install --legacy-peer-deps
+
+      - name: Build MITRA-ERP Mobile Web Bundle
+        run: |
+          echo "Building Vite web bundle for MITRA-ERP Mobile..."
+          cd packages/mobile-app
+          npm run build
+          ls -la dist/
+
+      - name: Sync Capacitor iOS Platform
+        run: |
+          cd packages/mobile-app
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        run: |
+          cd packages/mobile-app/ios/App
+          pod install --repo-update
+
+      - name: Build iOS Archive (Physical Device .ipa)
+        run: |
+          cd packages/mobile-app/ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package Unsigned iOS IPA
+        run: |
+          cd packages/mobile-app/ios/App
+          mkdir -p Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app Payload/
+          zip -qr MITRA-ERP-iOS.ipa Payload
+          mkdir -p "$GITHUB_WORKSPACE/output-ios"
+          cp MITRA-ERP-iOS.ipa "$GITHUB_WORKSPACE/output-ios/"
+          echo "=========================================="
+          echo "SUCCESSFULLY GENERATED APPLE IOS IPA:"
+          ls -lh "$GITHUB_WORKSPACE/output-ios/MITRA-ERP-iOS.ipa"
+          echo "=========================================="
+
+      - name: Build iOS Simulator App
+        run: |
+          cd packages/mobile-app/ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          
+          cd build-sim/Build/Products/Release-iphonesimulator
+          zip -qr MITRA-ERP-iOS-Simulator.zip App.app
+          cp MITRA-ERP-iOS-Simulator.zip "$GITHUB_WORKSPACE/output-ios/"
+          echo "=========================================="
+          echo "SUCCESSFULLY GENERATED IOS SIMULATOR APP:"
+          ls -lh "$GITHUB_WORKSPACE/output-ios/MITRA-ERP-iOS-Simulator.zip"
+          echo "=========================================="
+
+      - name: Upload iOS Builds to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MITRA-ERP-Apple-iOS-Builds
+          path: output-ios/*
+          retention-days: 30
+
+      - name: Publish or Update GitHub Release with iOS Assets
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          files: |
+            output-ios/MITRA-ERP-iOS.ipa
+            output-ios/MITRA-ERP-iOS-Simulator.zip
+          name: MITRA-ERP Mobile App (Latest Release)
+          tag_name: latest
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

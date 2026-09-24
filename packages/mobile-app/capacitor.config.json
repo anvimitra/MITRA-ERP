@@ -1,5 +1,16 @@
 {
   "appId": "com.anvimitra.erp",
   "appName": "MITRA-ERP",
-  "webDir": "dist"
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "allowsLinkPreview": false,
+    "scrollEnabled": true,
+    "backgroundColor": "#0f172a"
+  },
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor"
+  }
 }

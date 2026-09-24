@@ -27,6 +27,25 @@ Open `http://localhost:5174` in any browser or on your phone via local Wi-Fi.
 ## Building for Android APK
 ```bash
 npm run build
-npx cap add android
+npx cap sync android
 npx cap open android
 ```
+
+## Building for Apple iOS (iPhone & iPad)
+```bash
+npm run build
+npx cap sync ios
+npx cap open ios   # Opens App.xcworkspace in Xcode on macOS
+```
+On macOS / Xcode:
+1. Open `ios/App/App.xcworkspace` in Xcode.
+2. Under **Signing & Capabilities**, select your Team (a free personal Apple ID works).
+3. Connect your physical iPhone/iPad via USB or select any iPhone/iPad Simulator.
+4. Press **Run** (`Cmd + R`) to launch directly on your Apple device.
+
+## Cloud CI/CD Automated Releases
+- **Android**: `.github/workflows/build-apk.yml` automatically builds `MITRA-ERP.apk`.
+- **Apple iOS**: `.github/workflows/build-ios.yml` runs on macOS runners and compiles:
+  - `MITRA-ERP-iOS.ipa` (for physical iOS devices via AltStore, Sideloadly, or Apple Developer Program)
+  - `MITRA-ERP-iOS-Simulator.zip` (for Xcode iOS Simulators)
+Both assets are automatically attached to the latest GitHub Release!

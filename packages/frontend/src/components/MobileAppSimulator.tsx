@@ -60,10 +60,20 @@ export const MobileAppSimulator: React.FC<Props> = ({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-xl text-xs shadow transition"
-            title="Download latest compiled MITRA-ERP APK build with auto-update"
+            title="Download latest compiled MITRA-ERP APK build for Android"
           >
             <Download size={13} />
-            <span>Download MITRA-ERP APK</span>
+            <span>Android APK</span>
+          </a>
+          <a
+            href="https://github.com/anvimitra/MITRA-ERP/releases/latest/download/MITRA-ERP-iOS.ipa"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1 rounded-xl text-xs shadow transition"
+            title="Download latest compiled MITRA-ERP iOS IPA build for Apple devices"
+          >
+            <Download size={13} />
+            <span>Apple iOS (IPA)</span>
           </a>
           <button
             onClick={onClose}
