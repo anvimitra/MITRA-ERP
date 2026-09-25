@@ -81,6 +81,16 @@ jobs:
             cp -r "$GITHUB_WORKSPACE/packages/mobile-app/android/app/src/main/res/"* "$BUILD_DIR/android/app/src/main/res/" || true
           fi
 
+          # Copy persistent signing keystore
+          mkdir -p "$BUILD_DIR/android/keystore"
+          if [ -d "$GITHUB_WORKSPACE/packages/mobile-app/android/keystore" ]; then
+            cp -r "$GITHUB_WORKSPACE/packages/mobile-app/android/keystore/"* "$BUILD_DIR/android/keystore/" || true
+          fi
+
+          # Copy customized app build.gradle with permanent signingConfig
+          if [ -f "$GITHUB_WORKSPACE/packages/mobile-app/android/app/build.gradle" ]; then
+            cp "$GITHUB_WORKSPACE/packages/mobile-app/android/app/build.gradle" "$BUILD_DIR/android/app/build.gradle"
+          fi
 
           # Inject real Android OS permissions into AndroidManifest.xml
           MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -110,22 +120,72 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           cat android/local.properties
 
+      - name: Verify Signing Keystore with Java 17 Keytool
+        run: |
+          BUILD_DIR="${RUNNER_TEMP}/mobile-apk-build"
+          KEYSTORE_FILE="$BUILD_DIR/android/keystore/mitra-release.keystore"
+          mkdir -p "$BUILD_DIR/android/keystore"
+          
+          if [ -f "$KEYSTORE_FILE" ]; then
+            echo "Verifying existing keystore..."
+            keytool -list -v -keystore "$KEYSTORE_FILE" -storepass mitraErp2026 || {
+              echo "Re-generating clean keystore using Java 17 keytool..."
+              rm -f "$KEYSTORE_FILE"
+              keytool -genkeypair -v \
+                -keystore "$KEYSTORE_FILE" \
+                -alias mitra_erp \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -storepass mitraErp2026 \
+                -keypass mitraErp2026 \
+                -dname "CN=MITRA-ERP, OU=Mobile, O=Anvimitra, L=Jaipur, ST=Rajasthan, C=IN"
+            }
+          else
+            echo "Generating new permanent keystore..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_FILE" \
+              -alias mitra_erp \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass mitraErp2026 \
+              -keypass mitraErp2026 \
+              -dname "CN=MITRA-ERP, OU=Mobile, O=Anvimitra, L=Jaipur, ST=Rajasthan, C=IN"
+          fi
+          
+          # Print keystore certificate details
+          keytool -list -v -keystore "$KEYSTORE_FILE" -storepass mitraErp2026
+          
+          # Sync back to workspace
+          mkdir -p "$GITHUB_WORKSPACE/packages/mobile-app/android/keystore"
+          cp "$KEYSTORE_FILE" "$GITHUB_WORKSPACE/packages/mobile-app/android/keystore/mitra-release.keystore"
+
       - name: Accept Android SDK Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Build Android Debug APK with Gradle
+      - name: Build Android Signed APK with Gradle
         run: |
           BUILD_DIR="${RUNNER_TEMP}/mobile-apk-build"
           cd "$BUILD_DIR/android"
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug assembleRelease --no-daemon --stacktrace
 
       - name: Collect and Verify Built APK
         run: |
           BUILD_DIR="${RUNNER_TEMP}/mobile-apk-build"
           mkdir -p output-apk
-          find "$BUILD_DIR/android" -name "*.apk" -exec cp {} output-apk/MITRA-ERP.apk \;
+          # Prefer release APK if signed, otherwise debug APK (both signed with identical mitra-release.keystore)
+          RELEASE_APK=$(find "$BUILD_DIR/android" -name "*release*.apk" | head -n 1)
+          if [ -n "$RELEASE_APK" ] && [ -f "$RELEASE_APK" ]; then
+            echo "Using signed release APK: $RELEASE_APK"
+            cp "$RELEASE_APK" output-apk/MITRA-ERP.apk
+          else
+            DEBUG_APK=$(find "$BUILD_DIR/android" -name "*.apk" | head -n 1)
+            echo "Using signed debug APK: $DEBUG_APK"
+            cp "$DEBUG_APK" output-apk/MITRA-ERP.apk
+          fi
           echo "=========================================="
           echo "SUCCESSFULLY GENERATED ANDROID APK:"
           ls -lh output-apk/MITRA-ERP.apk
@@ -171,3 +231,12 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit Locked Release Keystore if Changed
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        continue-on-error: true
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/mobile-app/android/keystore/mitra-release.keystore
+          git diff --staged --quiet || (git commit -m "chore(android): lock permanent Java 17 release keystore [skip ci]" && git push)

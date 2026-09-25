@@ -511,10 +511,10 @@ export async function createStudentObservationLog(data: {
 }
 
 // Version & Auto-Update
-export const CURRENT_APP_VERSION = '1.2.0';
-export const CURRENT_BUILD_NUMBER = 102;
+export const CURRENT_APP_VERSION = '1.2.1';
+export const CURRENT_BUILD_NUMBER = 103;
 // Baseline build release timestamp
-export const CURRENT_APP_BUILD_TIME = '2026-09-21T16:16:24Z';
+export const CURRENT_APP_BUILD_TIME = '2026-09-25T15:25:58Z';
 
 function isVersionNewer(remote: string, local: string): boolean {
   const pRemote = remote.split('.').map((n) => parseInt(n, 10) || 0);

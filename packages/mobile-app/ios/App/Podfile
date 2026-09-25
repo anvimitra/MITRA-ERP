@@ -23,10 +23,10 @@ use_frameworks!
 install! 'cocoapods', :disable_input_output_paths => true
 
 def capacitor_pods
-  pod 'Capacitor', :path => resolve_module('@capacitor/ios')
-  pod 'CapacitorCordova', :path => resolve_module('@capacitor/ios')
-  pod 'CapacitorGeolocation', :path => resolve_module('@capacitor/geolocation')
-  pod 'CapacitorLocalNotifications', :path => resolve_module('@capacitor/local-notifications')
+  pod 'Capacitor', :path => '../../../../node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../../../node_modules/@capacitor/ios'
+  pod 'CapacitorGeolocation', :path => '../../../../node_modules/@capacitor/geolocation'
+  pod 'CapacitorLocalNotifications', :path => '../../../../node_modules/@capacitor/local-notifications'
 end
 
 target 'App' do
