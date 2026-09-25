@@ -56,9 +56,14 @@ export const LoginModal: React.FC<Props> = ({ currentSchool, onClose, onLoginSuc
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <div>
-            <h3 className="font-extrabold text-base text-slate-900">MITRA-ERP Institutional Sign In</h3>
-            <p className="text-xs text-slate-500">Parent, Teacher, Principal & Bus Driver Portal</p>
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-xl bg-white p-1 flex items-center justify-center border border-slate-200 shadow-sm flex-shrink-0">
+              <img src="/logo.png" alt="MITRA-ERP" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900 leading-tight">MITRA-ERP Institutional Sign In</h3>
+              <p className="text-xs text-slate-500">Parent, Teacher, Principal & Bus Driver Portal</p>
+            </div>
           </div>
           <button
             onClick={onClose}

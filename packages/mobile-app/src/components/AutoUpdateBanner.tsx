@@ -314,8 +314,8 @@ export const AutoUpdateBanner: React.FC<Props> = ({ updateInfo, onDismiss }) => 
       {/* Header Info Bar */}
       <div className="flex items-start justify-between">
         <div className="flex items-start space-x-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0 mt-0.5 shadow-inner">
-            <ArrowUpCircle className="w-5 h-5 text-amber-300 animate-bounce" />
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 mt-0.5 shadow-md border border-white/30 overflow-hidden">
+            <img src="/logo.png" alt="MITRA-ERP" className="w-full h-full object-contain" />
           </div>
           <div className="space-y-0.5">
             <div className="flex items-center space-x-2">

@@ -34,7 +34,7 @@ export const SchoolHeader: React.FC<Props> = ({
       <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
         {/* School Logo & Title */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md p-1 flex items-center justify-center border border-white/20 shadow-inner overflow-hidden">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-white/40 shadow-md overflow-hidden flex-shrink-0">
             {logoUrl && !imgError ? (
               <img
                 src={logoUrl}
@@ -43,9 +43,11 @@ export const SchoolHeader: React.FC<Props> = ({
                 onError={() => setImgError(true)}
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center text-purple-950 font-black text-sm shadow">
-                {initial}
-              </div>
+              <img
+                src="/logo.png"
+                alt="MITRA-ERP Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
             )}
           </div>
           <div>
