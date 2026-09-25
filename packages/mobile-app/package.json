@@ -1,6 +1,6 @@
 {
   "name": "@anvimitra/mobile-app",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "MITRA-ERP All-In-One Mobile App (Parent, Teacher, Principal & Student)",
   "private": true,
   "type": "module",

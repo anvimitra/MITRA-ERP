@@ -540,33 +540,76 @@ export function markReleaseAsInstalled(releaseInfo: AppUpdateInfo) {
 }
 
 export async function checkAppUpdate(forceManualCheck = false): Promise<AppUpdateInfo | null> {
+  let data: AppUpdateInfo | null = null;
+
+  // 1. Try ERP Cloud Backend
   try {
-    const res = await fetch(`${getApiBaseUrl()}/app/version`);
+    const res = await fetch(`${getApiBaseUrl()}/app/version`, { cache: 'no-store' });
     if (res.ok) {
-      const data: AppUpdateInfo = await res.json();
-      
-      const remoteTime = data.assetUpdatedAt ? new Date(data.assetUpdatedAt).getTime() : 0;
-      const localBuildTime = new Date(CURRENT_APP_BUILD_TIME).getTime();
-      const installedReleaseTime = parseInt(localStorage.getItem('anvimitra_installed_release_time') || '0', 10);
-      
-      // If user has already installed this exact release, do not show update unless forced
-      if (!forceManualCheck && installedReleaseTime >= remoteTime && remoteTime > 0) {
-        return null;
-      }
-
-      const isSemanticNewer = isVersionNewer(data.version, CURRENT_APP_VERSION);
-      // A release is considered newer only if its GitHub asset timestamp is strictly after our local build time
-      const isTimestampNewer = remoteTime > localBuildTime;
-
-      if (isSemanticNewer || isTimestampNewer) {
-        return data;
-      }
-      
-      return null;
+      data = await res.json();
     }
   } catch (err) {
     console.warn('Unable to reach app update server:', err);
   }
+
+  // 2. Direct GitHub API Fallback (runs from client device with independent IP rate-limit)
+  const remoteTime = data?.assetUpdatedAt ? new Date(data.assetUpdatedAt).getTime() : 0;
+  const localBuildTime = new Date(CURRENT_APP_BUILD_TIME).getTime();
+
+  if (!data || remoteTime <= localBuildTime) {
+    try {
+      const ghRes = await fetch('https://api.github.com/repos/anvimitra/MITRA-ERP/releases/latest', {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+      if (ghRes.ok) {
+        const ghData: any = await ghRes.json();
+        const apkAsset = Array.isArray(ghData.assets)
+          ? ghData.assets.find((a: any) => a.name && a.name.endsWith('.apk'))
+          : null;
+        const ipaAsset = Array.isArray(ghData.assets)
+          ? ghData.assets.find((a: any) => a.name && (a.name.endsWith('.ipa') || a.name.includes('iOS')))
+          : null;
+
+        const assetUpdate = apkAsset?.updated_at || ipaAsset?.updated_at || ghData.updated_at || ghData.published_at || new Date().toISOString();
+
+        data = {
+          appName: 'MITRA-ERP Mobile',
+          version: '1.2.1',
+          versionCode: 103,
+          releaseId: String(ghData.id || 'latest'),
+          assetId: apkAsset ? String(apkAsset.id) : 'latest-apk',
+          assetUpdatedAt: assetUpdate,
+          publishedAt: ghData.published_at || assetUpdate,
+          latestApkUrl: apkAsset?.browser_download_url || 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP.apk',
+          latestIpaUrl: ipaAsset?.browser_download_url || 'https://github.com/anvimitra/MITRA-ERP/releases/download/latest/MITRA-ERP-iOS.ipa',
+          releaseNotes: ghData.body || 'New features, real-time push synchronization and speed improvements.',
+          sizeBytes: apkAsset?.size || 4420834,
+          isMandatory: false,
+          autoUpdateSupported: true,
+        };
+      }
+    } catch (ghErr) {
+      console.warn('Direct GitHub releases check error:', ghErr);
+    }
+  }
+
+  if (data) {
+    const finalRemoteTime = data.assetUpdatedAt ? new Date(data.assetUpdatedAt).getTime() : 0;
+    const installedReleaseTime = parseInt(localStorage.getItem('anvimitra_installed_release_time') || '0', 10);
+
+    // If user has already installed this exact release, do not auto-show banner unless forced
+    if (!forceManualCheck && installedReleaseTime >= finalRemoteTime && finalRemoteTime > 0) {
+      return null;
+    }
+
+    const isSemanticNewer = isVersionNewer(data.version, CURRENT_APP_VERSION);
+    const isTimestampNewer = finalRemoteTime > localBuildTime;
+
+    if (isSemanticNewer || isTimestampNewer || forceManualCheck) {
+      return data;
+    }
+  }
+
   return null;
 }
 
