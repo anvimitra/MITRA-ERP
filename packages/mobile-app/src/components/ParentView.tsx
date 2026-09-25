@@ -137,7 +137,7 @@ export const ParentView: React.FC<Props> = ({
               onClick={() => onChangeTab('fees')}
               className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-[11px] shadow transition"
             >
-              Pay / View Ledger
+              View Fee Ledger
             </button>
           </div>
         </div>

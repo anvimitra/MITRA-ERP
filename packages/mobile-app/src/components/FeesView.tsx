@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FeeItem, Student } from '../types';
 import { fetchStudentFeesLedger } from '../api';
-import { CreditCard, CheckCircle2, AlertCircle, Receipt, ArrowRight, ShieldCheck } from 'lucide-react';
+import { CreditCard, CheckCircle2, AlertCircle, Receipt, ShieldCheck, Clock, Building2 } from 'lucide-react';
 
 interface Props {
   student?: Student | null;
@@ -10,7 +10,6 @@ interface Props {
 
 export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
   const [fees, setFees] = useState<FeeItem[]>(propFees || []);
-  const [payingId, setPayingId] = useState<string | null>(null);
   const [receiptModal, setReceiptModal] = useState<FeeItem | null>(null);
 
   useEffect(() => {
@@ -24,25 +23,6 @@ export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
   const totalDue = fees
     .filter((f) => f.status === 'pending')
     .reduce((sum, f) => sum + f.amount, 0);
-
-  const handlePay = (id: string) => {
-    setPayingId(id);
-    setTimeout(() => {
-      setFees((prev) =>
-        prev.map((f) =>
-          f.id === id
-            ? {
-                ...f,
-                status: 'paid',
-                receiptNo: `RCP-${Math.floor(100000 + Math.random() * 900000)}`,
-                paymentDate: new Date().toISOString().split('T')[0],
-              }
-            : f
-        )
-      );
-      setPayingId(null);
-    }, 1200);
-  };
 
   if (!student) {
     return (
@@ -82,6 +62,24 @@ export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
         </div>
       </div>
 
+      {/* Online Payment Gateway Coming Soon Notice */}
+      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/90 rounded-2xl p-3.5 shadow-xs flex items-start space-x-3">
+        <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+          <CreditCard className="w-4 h-4 text-amber-700" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2">
+            <h4 className="font-black text-xs text-amber-950">Online Payment Gateway</h4>
+            <span className="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 shadow-xs animate-pulse">
+              Coming Soon
+            </span>
+          </div>
+          <p className="text-[11px] text-amber-900/90 mt-1 leading-relaxed">
+            In-app UPI, Debit/Credit Card aur NetBanking suvidha jald hi activate ho rahi hai. Filhal fees school accounts office / counter par direct jama karein.
+          </p>
+        </div>
+      </div>
+
       {/* Fee Items List */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
         <h3 className="font-bold text-xs text-slate-500 uppercase tracking-wider">Fee Invoices & Dues</h3>
@@ -93,50 +91,57 @@ export const FeesView: React.FC<Props> = ({ student, fees: propFees }) => {
         ) : (
           <div className="space-y-3">
             {fees.map((fee) => (
-            <div
-              key={fee.id}
-              className={`p-3.5 rounded-xl border transition ${
-                fee.status === 'paid' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/50 border-amber-200'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-bold text-xs text-slate-900">{fee.title}</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {fee.status === 'paid' ? (
-                      <span className="text-emerald-700 font-semibold">
-                        Paid on {fee.paymentDate} • {fee.receiptNo}
-                      </span>
-                    ) : (
-                      <span className="text-rose-600 font-semibold">Due by {fee.dueDate}</span>
-                    )}
-                  </p>
+              <div
+                key={fee.id}
+                className={`p-3.5 rounded-xl border transition ${
+                  fee.status === 'paid' ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/40 border-amber-200'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-900">{fee.title}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {fee.status === 'paid' ? (
+                        <span className="text-emerald-700 font-semibold">
+                          Paid on {fee.paymentDate} • {fee.receiptNo}
+                        </span>
+                      ) : (
+                        <span className="text-rose-600 font-semibold">Due by {fee.dueDate}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="font-black text-sm text-slate-900">₹{fee.amount.toLocaleString()}</span>
                 </div>
-                <span className="font-black text-sm text-slate-900">₹{fee.amount.toLocaleString()}</span>
-              </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                {fee.status === 'paid' ? (
-                  <button
-                    onClick={() => setReceiptModal(fee)}
-                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center space-x-1"
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    <span>View Official Receipt</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handlePay(fee.id)}
-                    disabled={payingId === fee.id}
-                    className="w-full py-2 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-1"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>{payingId === fee.id ? 'Processing UPI Payment...' : 'Pay with UPI / Card (Zero Extra Fee)'}</span>
-                  </button>
-                )}
+                <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between">
+                  {fee.status === 'paid' ? (
+                    <button
+                      onClick={() => setReceiptModal(fee)}
+                      className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center space-x-1"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>View Official Receipt</span>
+                    </button>
+                  ) : (
+                    <div className="w-full space-y-1.5">
+                      <div className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-amber-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-2 text-slate-700">
+                          <CreditCard className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span className="font-bold text-[11px] text-slate-800">Online Payment Gateway</span>
+                        </div>
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 shadow-xs tracking-wide shrink-0">
+                          Coming Soon
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 px-1">
+                        <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>Kripya yeh installment school accounts counter par cash/cheque jama karein.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           </div>
         )}
       </div>
