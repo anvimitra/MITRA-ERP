@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { School, User } from '../types';
-import { Bell, Sparkles, LogOut, RefreshCw, School as SchoolIcon, BookOpen } from 'lucide-react';
+import { Bell, Sparkles, LogOut, RefreshCw, School as SchoolIcon } from 'lucide-react';
 
 interface Props {
   school?: School | null;
@@ -81,17 +81,6 @@ export const SchoolHeader: React.FC<Props> = ({
               )}
             </button>
           )}
-
-          <a
-            href="/MITRA-ERP-Mobile-App-User-Guide.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            download="MITRA-ERP-Mobile-App-User-Guide.pdf"
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition active:scale-95 text-white flex items-center justify-center"
-            title="Download Official User Guide (PDF) / मार्गदर्शिका डाउनलोड करें"
-          >
-            <BookOpen className="w-4 h-4 text-purple-200 hover:text-amber-300" />
-          </a>
 
           <button
             onClick={onOpenNotifications}

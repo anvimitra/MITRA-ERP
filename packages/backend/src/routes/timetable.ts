@@ -116,6 +116,42 @@ timetableRoutes.post('/period', async (c) => {
     return c.json({ error: 'Missing required period details' }, 400);
   }
 
+  const pNum = Number(periodNumber);
+  const start = startTime || '09:00 AM';
+  const end = endTime || '09:45 AM';
+  const room = roomNumber || 'Room 101';
+
+  if (dayOfWeek.toLowerCase() === 'all' || dayOfWeek.toLowerCase() === 'all_days' || dayOfWeek === 'All Days') {
+    const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    for (const d of allDays) {
+      // Remove any existing slot for this class, section, day, periodNumber
+      db.delete(schema.timetablePeriods).where(
+        and(
+          eq(schema.timetablePeriods.schoolId, user.schoolId),
+          eq(schema.timetablePeriods.classId, classId),
+          eq(schema.timetablePeriods.sectionId, sectionId),
+          eq(schema.timetablePeriods.dayOfWeek, d),
+          eq(schema.timetablePeriods.periodNumber, pNum)
+        )
+      ).run();
+
+      db.insert(schema.timetablePeriods).values({
+        id: crypto.randomUUID(),
+        schoolId: user.schoolId,
+        classId,
+        sectionId,
+        dayOfWeek: d,
+        periodNumber: pNum,
+        startTime: start,
+        endTime: end,
+        subjectId,
+        teacherId,
+        roomNumber: room,
+      }).run();
+    }
+    return c.json({ success: true, message: 'All-day timetable period slots configured successfully for Monday to Saturday' }, 201);
+  }
+
   const periodId = id || crypto.randomUUID();
 
   if (id) {
@@ -128,12 +164,12 @@ timetableRoutes.post('/period', async (c) => {
     classId,
     sectionId,
     dayOfWeek,
-    periodNumber: Number(periodNumber),
-    startTime: startTime || '09:00 AM',
-    endTime: endTime || '09:45 AM',
+    periodNumber: pNum,
+    startTime: start,
+    endTime: end,
     subjectId,
     teacherId,
-    roomNumber: roomNumber || 'Room 101',
+    roomNumber: room,
   }).run();
 
   return c.json({ success: true, message: 'Timetable period saved successfully', periodId }, 201);

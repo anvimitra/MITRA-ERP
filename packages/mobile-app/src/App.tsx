@@ -529,9 +529,9 @@ export const App: React.FC = () => {
                     }
                   }
                   activeSubTab={
-                    activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
+                    activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations' || activeTab === 'exams'
                       ? activeTab
-                      : activeTab === 'marks'
+                      : activeTab === 'marks' || activeTab === 'report'
                       ? 'exams'
                       : 'overview'
                   }

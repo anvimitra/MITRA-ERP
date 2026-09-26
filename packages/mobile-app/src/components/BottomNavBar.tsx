@@ -16,6 +16,7 @@ import {
   Layers,
   Bus,
   ClipboardList,
+  Award,
 } from 'lucide-react';
 import { Role } from '../types';
 
@@ -32,6 +33,7 @@ export type TabType =
   | 'staff'
   | 'operations'
   | 'marks'
+  | 'exams'
   | 'homework'
   | 'leaves'
   | 'notices'
@@ -130,7 +132,7 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
 
             <button
               onClick={() => onChangeTab('fees')}
-              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1 rounded-xl transition ${
                 activeTab === 'fees' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -139,8 +141,18 @@ export const BottomNavBar: React.FC<Props> = ({ activeTab, role, onChangeTab }) 
             </button>
 
             <button
+              onClick={() => onChangeTab('exams')}
+              className={`flex flex-col items-center py-1 px-1 rounded-xl transition ${
+                activeTab === 'exams' || activeTab === 'marks' || activeTab === 'report' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Award className={`w-5 h-5 ${activeTab === 'exams' || activeTab === 'marks' || activeTab === 'report' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+              <span className="text-[9px] mt-0.5 font-bold">Results</span>
+            </button>
+
+            <button
               onClick={() => onChangeTab('operations')}
-              className={`flex flex-col items-center py-1 px-1.5 rounded-xl transition ${
+              className={`flex flex-col items-center py-1 px-1 rounded-xl transition ${
                 activeTab === 'operations' ? 'text-purple-700 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >

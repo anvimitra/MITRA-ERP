@@ -4,7 +4,7 @@ import { CbseOfficialTemplate } from '../templates/CbseOfficialTemplate';
 import { ModernGradientTemplate } from '../templates/ModernGradientTemplate';
 import { MinimalExecutiveTemplate } from '../templates/MinimalExecutiveTemplate';
 import { JuniorVibrantTemplate } from '../templates/JuniorVibrantTemplate';
-import { TimetablePeriod, StudentLog } from '../types';
+import { TimetablePeriod, StudentLog, ExamSubmissionMatrix } from '../types';
 import {
   LayoutDashboard,
   Users,
@@ -46,6 +46,12 @@ import {
   HeartHandshake,
   Key,
   Upload,
+  BellRing,
+  ChevronUp,
+  ChevronDown,
+  RefreshCw,
+  FileCheck,
+  Layers,
 } from 'lucide-react';
 import { CertificatesDesk } from '../components/CertificatesDesk';
 import { LetterPadDesk } from '../components/LetterPadDesk';
@@ -348,6 +354,140 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
   const [selectedReportCard, setSelectedReportCard] = useState<any | null>(null);
   const [principalReportTemplate, setPrincipalReportTemplate] = useState<'cbse' | 'modern' | 'minimal' | 'junior'>('cbse');
 
+  // Exam submission audit matrix state
+  const [selectedAuditExamId, setSelectedAuditExamId] = useState<string>('');
+  const [submissionMatrix, setSubmissionMatrix] = useState<ExamSubmissionMatrix | null>(null);
+  const [loadingMatrix, setLoadingMatrix] = useState<boolean>(false);
+  const [expandedClasses, setExpandedClasses] = useState<{ [classKey: string]: boolean }>({});
+  const [publishingClassKey, setPublishingClassKey] = useState<string | null>(null);
+  const [remindingTeacherKey, setRemindingTeacherKey] = useState<string | null>(null);
+  const [isPublishingAll, setIsPublishingAll] = useState<boolean>(false);
+  const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
+
+  const loadExamAuditData = async (targetExamId?: string) => {
+    setLoadingMatrix(true);
+    try {
+      const activeId = targetExamId || selectedAuditExamId || (exams && exams.length > 0 ? exams[0].id : '');
+      if (activeId) {
+        setSelectedAuditExamId(activeId);
+        const matrix = await ApiService.getExamSubmissionStatus(activeId);
+        setSubmissionMatrix(matrix);
+        if (matrix?.classes?.length) {
+          setExpandedClasses((prev) => {
+            if (Object.keys(prev).length === 0) {
+              const firstKey = `${matrix.classes[0].classId}_${matrix.classes[0].sectionId}`;
+              return { [firstKey]: true };
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('PrincipalPortal loadExamAuditData error', err);
+    } finally {
+      setLoadingMatrix(false);
+    }
+  };
+
+  const handleAuditExamChange = async (eId: string) => {
+    setSelectedAuditExamId(eId);
+    setLoadingMatrix(true);
+    try {
+      const matrix = await ApiService.getExamSubmissionStatus(eId);
+      setSubmissionMatrix(matrix);
+    } catch (err) {
+      console.warn('Error fetching matrix for exam', err);
+    } finally {
+      setLoadingMatrix(false);
+    }
+  };
+
+  const toggleClassAccordion = (classKey: string) => {
+    setExpandedClasses((prev) => ({
+      ...prev,
+      [classKey]: !prev[classKey],
+    }));
+  };
+
+  const handlePublishClassFromMatrix = async (classId: string, sectionId: string, publish: boolean) => {
+    if (!selectedAuditExamId) return;
+    const key = `${classId}_${sectionId}`;
+    setPublishingClassKey(key);
+    try {
+      await ApiService.publishExamResults({
+        examId: selectedAuditExamId,
+        classId,
+        sectionId,
+        isPublished: publish,
+      });
+      setPublishFeedback(publish ? '✅ कक्षा परिणाम सफलतापूर्वक जारी (Publish) किया गया!' : '⚠️ कक्षा परिणाम अप्रकाशित (Unpublished) किया गया।');
+      setTimeout(() => setPublishFeedback(null), 3500);
+      const matrix = await ApiService.getExamSubmissionStatus(selectedAuditExamId);
+      setSubmissionMatrix(matrix);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'त्रुटि: परिणाम जारी करने में समस्या आई');
+    } finally {
+      setPublishingClassKey(null);
+    }
+  };
+
+  const handlePublishEntireExamResults = async (publish: boolean) => {
+    if (!selectedAuditExamId) return;
+    if (publish) {
+      const hasPending = (submissionMatrix?.summary?.totalPendingSheets || 0) > 0;
+      const confirmMsg = hasPending
+        ? `⚠️ ध्यान दें: अभी भी ${submissionMatrix?.summary?.totalPendingSheets} विषयों के अंक शिक्षकों द्वारा दर्ज नहीं किए गए हैं।\n\nक्या आप फिर भी सभी कक्षाओं का परिणाम प्रकाशित (Publish) करना चाहते हैं?`
+        : 'क्या आप संपूर्ण विद्यालय के लिए इस परीक्षा का अंतिम परिणाम घोषित (Publish) करना चाहते हैं? सभी छात्र/अभिभावक तुरंत अपनी अंकतालिका देख सकेंगे।';
+      if (!confirm(confirmMsg)) return;
+    }
+    setIsPublishingAll(true);
+    try {
+      await ApiService.publishExamResults({
+        examId: selectedAuditExamId,
+        isPublished: publish,
+      });
+      setPublishFeedback(publish ? '🎉 संपूर्ण विद्यालय के परीक्षा परिणाम सफलतापूर्वक प्रकाशित हो चुके हैं!' : '⚠️ सभी कक्षाओं के परिणाम अप्रकाशित (Withheld) किए गए।');
+      setTimeout(() => setPublishFeedback(null), 4000);
+      const matrix = await ApiService.getExamSubmissionStatus(selectedAuditExamId);
+      setSubmissionMatrix(matrix);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'त्रुटि: परिणाम प्रकाशित करने में समस्या आई');
+    } finally {
+      setIsPublishingAll(false);
+    }
+  };
+
+  const handleSendTeacherReminder = async (teacherId: string, subjectName: string, className: string) => {
+    if (!selectedAuditExamId || !teacherId) {
+      alert('इस विषय के लिए कोई शिक्षक आवंटित नहीं है।');
+      return;
+    }
+    const currentExam = exams.find((e) => e.id === selectedAuditExamId);
+    const key = `${teacherId}_${subjectName}`;
+    setRemindingTeacherKey(key);
+    try {
+      await ApiService.sendMarksReminder({
+        teacherId,
+        subjectName,
+        className,
+        examName: currentExam?.name || 'Examination',
+      });
+      alert(`🔔 शिक्षक को ${className} - ${subjectName} के अंक शीघ्र दर्ज करने हेतु स्मरण पत्र (Reminder Notification) भेज दिया गया है।`);
+    } catch (err: any) {
+      alert(err.message || 'स्मरण पत्र भेजने में त्रुटि');
+    } finally {
+      setRemindingTeacherKey(null);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'exams') {
+      loadExamAuditData();
+    }
+  }, [activeTab, exams.length]);
+
   // Notice broadcast state
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('');
@@ -447,18 +587,36 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
       return;
     }
     try {
-      await ApiService.saveTimetablePeriod({
-        classId: ttClassId,
-        sectionId: ttSectionId,
-        dayOfWeek: periodForm.dayOfWeek,
-        periodNumber: Number(periodForm.periodNumber),
-        startTime: periodForm.startTime,
-        endTime: periodForm.endTime,
-        subjectId: periodForm.subjectId,
-        teacherId: periodForm.teacherId,
-        roomNumber: periodForm.roomNumber,
-      });
-      alert('✅ Period schedule saved successfully!');
+      if (periodForm.dayOfWeek === 'All' || periodForm.dayOfWeek === 'all') {
+        const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        for (const d of allDays) {
+          await ApiService.saveTimetablePeriod({
+            classId: ttClassId,
+            sectionId: ttSectionId,
+            dayOfWeek: d,
+            periodNumber: Number(periodForm.periodNumber),
+            startTime: periodForm.startTime,
+            endTime: periodForm.endTime,
+            subjectId: periodForm.subjectId,
+            teacherId: periodForm.teacherId,
+            roomNumber: periodForm.roomNumber,
+          });
+        }
+        alert('✅ All-day period schedule (Mon-Sat) saved successfully! (पूरे सप्ताह के लिए पीरियड निर्धारित किया गया)');
+      } else {
+        await ApiService.saveTimetablePeriod({
+          classId: ttClassId,
+          sectionId: ttSectionId,
+          dayOfWeek: periodForm.dayOfWeek,
+          periodNumber: Number(periodForm.periodNumber),
+          startTime: periodForm.startTime,
+          endTime: periodForm.endTime,
+          subjectId: periodForm.subjectId,
+          teacherId: periodForm.teacherId,
+          roomNumber: periodForm.roomNumber,
+        });
+        alert('✅ Period schedule saved successfully!');
+      }
       setShowPeriodModal(false);
       loadTimetableData(ttClassId, ttSectionId);
     } catch (err: any) {
@@ -2713,6 +2871,341 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* ================= EXAMINATION MARKS SUBMISSION AUDIT & PUBLISHING DESK ================= */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-indigo-500/20 space-y-6">
+              {/* Header & Controls */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-indigo-900/60 pb-5">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold mb-2">
+                    <Layers size={13} className="text-indigo-400" />
+                    <span>Academic Audit & Results Governance</span>
+                  </div>
+                  <h3 className="text-xl font-black text-white flex items-center gap-2.5">
+                    <FileCheck className="text-emerald-400" size={24} />
+                    <span>परीक्षा अंक स्थिति व परिणाम घोषणा डेस्क (Marks Audit & Results Desk)</span>
+                  </h3>
+                  <p className="text-xs text-indigo-200/80 mt-1 max-w-2xl leading-relaxed">
+                    कक्षा-वार एवं विषय-वार शिक्षकों द्वारा अंक प्रविष्टि की समीक्षा करें, बकाएदारों को रिमाइंडर भेजें, और परिणाम घोषित (Publish) करें।
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-2xl px-3 py-1.5 border border-white/10">
+                    <span className="text-xs font-bold text-indigo-200">परीक्षा:</span>
+                    <select
+                      value={selectedAuditExamId}
+                      onChange={(e) => handleAuditExamChange(e.target.value)}
+                      className="bg-slate-900 text-white font-bold text-xs rounded-xl px-3 py-1.5 border border-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                      {exams.map((ex) => (
+                        <option key={ex.id} value={ex.id} className="bg-slate-900 text-white">
+                          {ex.name} ({ex.examType?.toUpperCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => loadExamAuditData(selectedAuditExamId)}
+                    disabled={loadingMatrix}
+                    className="p-2.5 bg-indigo-600/60 hover:bg-indigo-600 text-white rounded-xl transition border border-indigo-400/30 disabled:opacity-50"
+                    title="ताज़ा करें (Refresh Matrix)"
+                  >
+                    <RefreshCw size={15} className={loadingMatrix ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Alert Toast */}
+              {publishFeedback && (
+                <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-bold text-xs flex items-center justify-between animate-fadeIn">
+                  <span>{publishFeedback}</span>
+                  <button onClick={() => setPublishFeedback(null)} className="text-emerald-300 hover:text-white text-xs">✕</button>
+                </div>
+              )}
+
+              {loadingMatrix ? (
+                <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                  <RefreshCw className="animate-spin text-indigo-400" size={32} />
+                  <p className="text-xs text-indigo-200 font-bold">शिक्षकों की अंक प्रविष्टि स्थिति लोड हो रही है...</p>
+                </div>
+              ) : !submissionMatrix ? (
+                <div className="p-8 text-center text-indigo-200/70 text-xs">
+                  कोई परीक्षा चक्र उपलब्ध नहीं है। कृपया पहले एक परीक्षा चक्र बनाएं।
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">कुल कक्षाएं</span>
+                      <div className="text-2xl font-black text-white mt-1">{submissionMatrix.summary.totalClasses}</div>
+                      <span className="text-[10px] text-slate-400 mt-1">Total Active Classes</span>
+                    </div>
+
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">पूर्ण मूल्यांकन (100%)</span>
+                      <div className="text-2xl font-black text-emerald-400 mt-1">{submissionMatrix.summary.fullySubmittedClasses}</div>
+                      <span className="text-[10px] text-emerald-300/70 mt-1">Ready to Publish</span>
+                    </div>
+
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">मूल्यांकन प्रगति पर</span>
+                      <div className="text-2xl font-black text-amber-400 mt-1">{submissionMatrix.summary.pendingClasses}</div>
+                      <span className="text-[10px] text-amber-300/70 mt-1">{submissionMatrix.summary.totalPendingSheets} विषय पत्र शेष</span>
+                    </div>
+
+                    <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">जारी परिणाम</span>
+                      <div className="text-2xl font-black text-indigo-300 mt-1">{submissionMatrix.summary.publishedClasses}</div>
+                      <span className="text-[10px] text-indigo-300/70 mt-1">Live to Parents</span>
+                    </div>
+                  </div>
+
+                  {/* Readiness Progress Bar & School-wide Master Control */}
+                  <div className="bg-slate-800/80 border border-indigo-500/20 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-5">
+                    <div className="w-full md:w-3/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <span>विद्यालय परिणाम तैयारी स्तर (Overall Readiness)</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300">
+                            {submissionMatrix.summary.totalSubmittedSheets} / {submissionMatrix.summary.totalRequiredSheets} विषय अंक दर्ज
+                          </span>
+                        </span>
+                        <span className="font-black text-indigo-300 text-sm">
+                          {submissionMatrix.summary.overallReadinessPercentage}%
+                        </span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-700/80 rounded-full overflow-hidden border border-white/5">
+                        <div
+                          className={`h-full transition-all duration-700 rounded-full ${
+                            submissionMatrix.summary.overallReadinessPercentage === 100
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : 'bg-gradient-to-r from-indigo-500 to-amber-400'
+                          }`}
+                          style={{ width: `${submissionMatrix.summary.overallReadinessPercentage}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handlePublishEntireExamResults(true)}
+                        disabled={isPublishingAll}
+                        className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center gap-2 disabled:opacity-60"
+                      >
+                        <Award size={15} />
+                        <span>{isPublishingAll ? 'प्रक्रिया चल रही है...' : '🚀 संपूर्ण परीक्षा परिणाम जारी करें (Publish All)'}</span>
+                      </button>
+
+                      {submissionMatrix.summary.publishedClasses > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePublishEntireExamResults(false)}
+                          disabled={isPublishingAll}
+                          className="px-4 py-2.5 bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 border border-rose-500/30 font-bold text-xs rounded-xl transition"
+                        >
+                          अप्रकाशित करें (Unpublish All)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Class-wise Audit Table / Accordion */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-indigo-200 font-bold px-1">
+                      <span>कक्षा-वार मूल्यांकन रिपोर्ट व प्रकाशन स्थिति (Class-Wise Grading Audit)</span>
+                      <span>कक्षा पर क्लिक करके विषय विवरण देखें</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {submissionMatrix.classes.map((cls) => {
+                        const classKey = `${cls.classId}_${cls.sectionId}`;
+                        const isExpanded = !!expandedClasses[classKey];
+                        const isPublishingThis = publishingClassKey === classKey;
+
+                        return (
+                          <div
+                            key={classKey}
+                            className="bg-slate-800/90 border border-slate-700/80 rounded-2xl overflow-hidden transition-all shadow-sm"
+                          >
+                            {/* Class Accordion Header */}
+                            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div
+                                onClick={() => toggleClassAccordion(classKey)}
+                                className="flex-1 flex items-center gap-3 cursor-pointer select-none"
+                              >
+                                <button
+                                  type="button"
+                                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-indigo-300 transition"
+                                >
+                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-white text-sm">{cls.className}</span>
+                                    {cls.sectionName && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-700 text-slate-300">
+                                        Section {cls.sectionName}
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-slate-400">({cls.totalStudents} छात्र)</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
+                                    <span>
+                                      अंक दर्ज विषय: <strong className="text-white">{cls.submittedSubjects}/{cls.totalSubjects}</strong>
+                                    </span>
+                                    <span>•</span>
+                                    <span className={cls.isFullySubmitted ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                                      {cls.readinessPercentage}% पूर्ण
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center">
+                                {cls.isPublished ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-3 py-1 rounded-full text-[11px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                                      <span>✓ परिणाम जारी (Published)</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={isPublishingThis}
+                                      onClick={() => handlePublishClassFromMatrix(cls.classId, cls.sectionId, false)}
+                                      className="px-2.5 py-1 text-[11px] font-bold text-rose-300 hover:text-white bg-rose-500/20 hover:bg-rose-500/40 rounded-lg transition"
+                                    >
+                                      रोकें (Unpublish)
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isPublishingThis}
+                                    onClick={() => handlePublishClassFromMatrix(cls.classId, cls.sectionId, true)}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow ${
+                                      cls.isFullySubmitted
+                                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                        : 'bg-indigo-600/80 hover:bg-indigo-600 text-white'
+                                    }`}
+                                  >
+                                    <Award size={13} />
+                                    <span>
+                                      {isPublishingThis
+                                        ? 'जारी हो रहा है...'
+                                        : cls.isFullySubmitted
+                                        ? 'जारी करें (Publish Result)'
+                                        : 'आंशिक जारी करें (Publish)'}
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Class Expanded Subjects List */}
+                            {isExpanded && (
+                              <div className="border-t border-slate-700/60 bg-slate-900/60 p-4">
+                                <div className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                                  <span>विषय-वार अंक प्रविष्टि स्थिति (Subject Breakdown)</span>
+                                  <span>कुल विषय: {cls.subjects.length}</span>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs">
+                                    <thead>
+                                      <tr className="text-slate-400 text-[10px] uppercase border-b border-slate-700/80">
+                                        <th className="pb-2">विषय (Subject)</th>
+                                        <th className="pb-2">आवंटित शिक्षक (Teacher)</th>
+                                        <th className="pb-2 text-center">मूल्यांकन (Graded)</th>
+                                        <th className="pb-2 text-center">औसत प्राप्तांक (Avg %)</th>
+                                        <th className="pb-2 text-center">स्थिति (Status)</th>
+                                        <th className="pb-2 text-right">कार्रवाई (Action)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                      {cls.subjects.map((subj) => {
+                                        const reminderKey = `${subj.teacherId}_${subj.subjectName}`;
+                                        const isReminding = remindingTeacherKey === reminderKey;
+
+                                        return (
+                                          <tr key={subj.subjectId} className="hover:bg-white/5 transition">
+                                            <td className="py-2.5 font-bold text-white">
+                                              {subj.subjectName}
+                                              {subj.subjectCode && (
+                                                <span className="ml-1.5 text-[10px] font-mono text-slate-400">
+                                                  ({subj.subjectCode})
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="py-2.5 text-slate-300">
+                                              {subj.teacherName || <span className="text-rose-400/80 italic">अनआवंटित (Unassigned)</span>}
+                                            </td>
+                                            <td className="py-2.5 text-center font-mono">
+                                              <span className={subj.isCompleted ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
+                                                {subj.gradedStudents}
+                                              </span>
+                                              <span className="text-slate-500"> / {subj.totalStudents} छात्र</span>
+                                            </td>
+                                            <td className="py-2.5 text-center font-bold">
+                                              {subj.averagePercentage !== undefined ? (
+                                                <span className="text-indigo-300">{subj.averagePercentage}%</span>
+                                              ) : (
+                                                <span className="text-slate-500">-</span>
+                                              )}
+                                            </td>
+                                            <td className="py-2.5 text-center">
+                                              {subj.status === 'SUBMITTED' ? (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                  ✓ पूर्ण (Completed)
+                                                </span>
+                                              ) : subj.status === 'PARTIAL' ? (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                                  ⏳ आंशिक ({subj.gradedStudents}/{subj.totalStudents})
+                                                </span>
+                                              ) : (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                                  ✕ लंबित (Pending)
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="py-2.5 text-right">
+                                              {!subj.isCompleted && subj.teacherId ? (
+                                                <button
+                                                  type="button"
+                                                  disabled={isReminding}
+                                                  onClick={() => handleSendTeacherReminder(subj.teacherId!, subj.subjectName, cls.className)}
+                                                  className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-200 border border-amber-500/40 rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 disabled:opacity-50"
+                                                >
+                                                  <BellRing size={12} className={isReminding ? 'animate-bounce' : ''} />
+                                                  <span>{isReminding ? 'भेज रहे हैं...' : 'याद दिलाएं (Remind)'}</span>
+                                                </button>
+                                              ) : !subj.isCompleted ? (
+                                                <span className="text-[10px] text-slate-500 italic">शिक्षक नियत नहीं</span>
+                                              ) : (
+                                                <span className="text-[11px] text-emerald-400 font-bold">✓ स्वीकृत</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Students Marksheet Generation Desk */}
@@ -5424,6 +5917,7 @@ export const PrincipalPortal: React.FC<{ userRole?: string; school?: any }> = ({
                     onChange={(e) => setPeriodForm({ ...periodForm, dayOfWeek: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold"
                   >
+                    <option value="All">✨ All Days (Mon – Sat) / पूरे सप्ताह (सोम-शनि)</option>
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d) => (
                       <option key={d} value={d}>
                         {d}

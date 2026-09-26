@@ -509,3 +509,61 @@ export interface HomeworkItem {
   attachmentUrl?: string;
   createdAt: string;
 }
+
+export interface SubjectSubmissionStatus {
+  subjectId: string;
+  subjectName: string;
+  subjectCode?: string;
+  teacherId?: string;
+  teacherName?: string;
+  teacherEmail?: string;
+  teacherPhone?: string;
+  status: 'SUBMITTED' | 'PARTIAL' | 'PENDING';
+  gradedCount: number;
+  totalStudents: number;
+  maxMarks: number;
+  averagePercentage: number;
+  isPublished: boolean;
+  lastUpdated?: string | null;
+}
+
+export interface ClassSubmissionStatus {
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string;
+  classLabel: string;
+  totalStudents: number;
+  totalSubjects: number;
+  submittedSubjects: number;
+  pendingSubjects: number;
+  completionPercentage: number;
+  isClassReady: boolean;
+  isClassPublished: boolean;
+  subjects: SubjectSubmissionStatus[];
+}
+
+export interface ExamSubmissionSummary {
+  totalClasses: number;
+  totalExpectedSheets: number;
+  totalSubmittedSheets: number;
+  totalPartialSheets: number;
+  totalPendingSheets: number;
+  overallCompletionPercentage: number;
+  readyToPublishClasses: number;
+  publishedClasses: number;
+  isExamPublished: boolean;
+}
+
+export interface ExamSubmissionMatrix {
+  exam: {
+    id: string;
+    name: string;
+    examType: string;
+    academicYear: string;
+    isPublished: boolean;
+  };
+  summary: ExamSubmissionSummary;
+  classes: ClassSubmissionStatus[];
+}
+

@@ -124,7 +124,24 @@ export async function generateStudentReportCard(
     }
   }
 
-  const exam = db.select().from(schema.exams).where(eq(schema.exams.id, examId)).get();
+  let exam = db.select().from(schema.exams).where(eq(schema.exams.id, examId)).get();
+  if (!exam) {
+    exam = db
+      .select()
+      .from(schema.exams)
+      .where(
+        and(
+          eq(schema.exams.schoolId, schoolId),
+          eq(schema.exams.examType, examId)
+        )
+      )
+      .get() ||
+      db
+      .select()
+      .from(schema.exams)
+      .where(eq(schema.exams.schoolId, schoolId))
+      .get();
+  }
   if (!exam) return null;
 
   // Fetch marks

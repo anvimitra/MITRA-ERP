@@ -14,6 +14,7 @@ import {
   StudentLog,
   Student,
   HomeworkItem,
+  ExamSubmissionMatrix,
 } from './types';
 
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -342,6 +343,22 @@ export class ApiService {
     isPublished: boolean;
   }) {
     return this.request<{ success: boolean; message: string; isPublished: boolean }>('/exams/publish', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getExamSubmissionStatus(examId: string) {
+    return this.request<ExamSubmissionMatrix>(`/exams/submission-status?examId=${encodeURIComponent(examId)}`);
+  }
+
+  static async sendMarksReminder(data: {
+    teacherId: string;
+    subjectName: string;
+    className?: string;
+    examName?: string;
+  }) {
+    return this.request<{ success: boolean; message: string }>('/exams/send-reminder', {
       method: 'POST',
       body: JSON.stringify(data),
     });
