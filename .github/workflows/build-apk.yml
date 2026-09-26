@@ -225,6 +225,7 @@ jobs:
           files: |
             output-apk/MITRA-ERP.apk
             output-apk/version.json
+            packages/mobile-app/public/MITRA-ERP-Mobile-App-User-Guide.pdf
           name: MITRA-ERP Mobile App (Latest Release)
           tag_name: latest
           draft: false
