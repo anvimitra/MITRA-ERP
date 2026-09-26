@@ -531,6 +531,8 @@ export const App: React.FC = () => {
                   activeSubTab={
                     activeTab === 'students' || activeTab === 'parents' || activeTab === 'staff' || activeTab === 'fees' || activeTab === 'operations'
                       ? activeTab
+                      : activeTab === 'marks'
+                      ? 'exams'
                       : 'overview'
                   }
                   onSubTabChange={(t) => setActiveTab(t as TabType)}

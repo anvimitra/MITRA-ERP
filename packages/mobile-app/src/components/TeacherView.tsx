@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Student, StaffLeaveItem, ExamItem, NotificationItem, HomeworkItem } from '../types';
+import { User, Student, StaffLeaveItem, ExamItem, NotificationItem, HomeworkItem, TeacherMarksSubmissionItem } from '../types';
 import {
   submitClassAttendance,
   fetchLiveStudents,
@@ -9,6 +9,8 @@ import {
   applyStaffLeave,
   fetchExamsList,
   fetchMarksSheet,
+  fetchMarksSheetDetails,
+  fetchTeacherMarksSubmissions,
   saveExamMarks,
   fetchLiveNotices,
   fetchMyAllocations,
@@ -38,6 +40,12 @@ import {
   FileText,
   Calendar,
   ClipboardList,
+  History,
+  FolderOpen,
+  FileCheck,
+  Eye,
+  Award,
+  AlertCircle,
 } from 'lucide-react';
 import { LiveBusMapModal } from './LiveBusMapModal';
 
@@ -86,6 +94,9 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   const [allocations, setAllocations] = useState<any>(null);
   const [maxMarks, setMaxMarks] = useState<number>(50);
   const [selectedAllocationId, setSelectedAllocationId] = useState<string>('');
+  const [teacherSubmissions, setTeacherSubmissions] = useState<TeacherMarksSubmissionItem[]>([]);
+  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+  const [isMarksPublishedByPrincipal, setIsMarksPublishedByPrincipal] = useState(false);
 
   // Leaves state
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
@@ -118,6 +129,15 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
   // Notices state
   const [notices, setNotices] = useState<NotificationItem[]>([]);
 
+  const loadTeacherSubmissions = async () => {
+    try {
+      const list = await fetchTeacherMarksSubmissions();
+      setTeacherSubmissions(list || []);
+    } catch (err) {
+      console.warn('Error loading teacher submissions:', err);
+    }
+  };
+
   useEffect(() => {
     loadClassData();
     fetchStaffLeaves().then(setLeaves).catch(() => {});
@@ -127,6 +147,7 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
         setSelectedExam(list[0].id);
       }
     }).catch(() => {});
+    loadTeacherSubmissions();
     fetchLiveNotices().then(setNotices).catch(() => {});
   }, []);
 
@@ -310,15 +331,16 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       const classStudents = await fetchLiveStudents(classId);
       const matching = classStudents.filter((s) => s.classId === classId);
 
-      const sheet = await fetchMarksSheet(examId, classId, sectionId || 'sec-a', subject);
-      const hasExistingMarks = !!(
-        sheet &&
-        Array.isArray(sheet) &&
-        sheet.length > 0 &&
-        sheet.some((sh: any) => sh.marksObtained !== undefined && sh.marksObtained !== null && sh.marksObtained !== '')
-      );
+      const details = await fetchMarksSheetDetails(examId, classId, sectionId || 'sec-a', subject);
+      const sheet = details.students;
+      const hasExistingMarks = details.gradedCount > 0;
+
       setIsMarksSubmitted(hasExistingMarks);
       setIsEditingMarks(false);
+      setIsMarksPublishedByPrincipal(details.isPublished);
+      if (details.maxMarks > 0) {
+        setMaxMarks(details.maxMarks);
+      }
 
       setStudents(
         matching.map((s) => {
@@ -337,6 +359,30 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenSubmittedMarksheet = (sub: TeacherMarksSubmissionItem) => {
+    setSelectedExam(sub.examId);
+    setSelectedClassId(sub.classId);
+    setSelectedSectionId(sub.sectionId);
+    setSelectedSubject(sub.subjectName);
+    setMaxMarks(sub.maxMarks || 100);
+
+    if (allocations?.subjectsAssigned) {
+      const matchedAlloc = allocations.subjectsAssigned.find(
+        (a: any) =>
+          a.classId === sub.classId &&
+          (a.sectionId === sub.sectionId || !a.sectionId) &&
+          (a.subjectId === sub.subjectId || a.subjectName === sub.subjectName)
+      );
+      if (matchedAlloc) {
+        setSelectedAllocationId(matchedAlloc.id);
+      }
+    }
+
+    loadMarksSheetData(sub.examId, sub.classId, sub.sectionId, sub.subjectName);
+    setShowSubmissionsModal(false);
+    setFeedback(`📂 Loaded saved marksheet for ${sub.subjectName} (${sub.className} - ${sub.sectionName})`);
   };
 
   const loadHomeworkData = async (classId?: string, sectionId?: string) => {
@@ -512,7 +558,8 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
 
       setIsMarksSubmitted(true);
       setIsEditingMarks(false);
-      setFeedback(`✅ Subject marks for ${selectedSubject} (Out of ${maxMarks}) saved successfully!`);
+      loadTeacherSubmissions();
+      setFeedback(`✅ Marks for ${selectedSubject} (Out of ${maxMarks}) saved persistently in Cloud ERP! Status: Saved Draft (Awaiting Principal's publication).`);
     } catch (err: any) {
       setFeedback(err.message || 'Failed to save subject marks.');
     } finally {
@@ -930,6 +977,28 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
       {/* MARKS ENTRY MODE */}
       {activeSubTab === 'marks' && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+          {/* Top toolbar with Saved Marksheets button */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                <FileCheck className="w-4 h-4 text-purple-600" />
+                <span>Exam Grading & Marks Entry</span>
+              </h3>
+              <p className="text-[10px] text-slate-500">Record, view & update persistent subject marks</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                loadTeacherSubmissions();
+                setShowSubmissionsModal(true);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition flex items-center space-x-1.5 active:scale-95 shadow-sm"
+            >
+              <History className="w-3.5 h-3.5 text-purple-600" />
+              <span>Saved Marksheets ({teacherSubmissions.length})</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Select Exam</label>
@@ -1068,11 +1137,22 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
                       <CheckCircle2 className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-black tracking-wide">
-                        ✅ Marks Submitted for {selectedSubject}
-                      </h4>
+                      <div className="flex items-center space-x-2">
+                        <h4 className="text-sm font-black tracking-wide">
+                          ✅ Marks Recorded for {selectedSubject}
+                        </h4>
+                        {isMarksPublishedByPrincipal ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-950 text-[9px] font-black uppercase tracking-wider shadow-sm">
+                            🟢 Published
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-300 text-amber-950 text-[9px] font-black uppercase tracking-wider shadow-sm">
+                            ⏳ Draft / Awaiting Publish
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-emerald-100">
-                        Marks (out of {maxMarks}) recorded in cloud database & published to report cards.
+                        Marks (out of {maxMarks}) securely saved in ERP. {isMarksPublishedByPrincipal ? 'Official results are live on student report cards.' : 'Visible on student report cards once released by Principal.'}
                       </p>
                     </div>
                   </div>
@@ -1580,6 +1660,114 @@ export const TeacherView: React.FC<Props> = ({ teacher, activeSubTab: externalTa
           isFleetView={true}
           onClose={() => setShowFleetTracking(false)}
         />
+      )}
+
+      {/* Teacher Saved Marksheets & Submissions History Modal */}
+      {showSubmissionsModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-4 bg-gradient-to-r from-purple-800 to-indigo-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center font-black">
+                  <FolderOpen className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-wide">My Saved Marksheets (दर्ज अंक पत्र)</h3>
+                  <p className="text-[10px] text-purple-200">Select any marksheet to view or update scores</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubmissionsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Submissions List */}
+            <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+              {teacherSubmissions.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 space-y-2">
+                  <FileText className="w-10 h-10 mx-auto text-slate-300" />
+                  <p className="text-xs font-bold text-slate-600">No marksheets saved yet</p>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    Select an exam, class and subject, enter student scores, and click Save Marks. All your marksheets will appear here.
+                  </p>
+                </div>
+              ) : (
+                teacherSubmissions.map((sub) => (
+                  <div
+                    key={sub.key}
+                    className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-purple-50/50 hover:border-purple-200 transition space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-purple-100 text-purple-800">
+                            {sub.examName}
+                          </span>
+                          <span className="text-xs font-black text-slate-800">
+                            {sub.className} - {sub.sectionName}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-black text-slate-900 mt-1">
+                          {sub.subjectName}
+                        </h4>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase shrink-0 ${
+                          sub.isPublished
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {sub.isPublished ? '🟢 Published' : '⏳ Draft'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[11px] pt-1 border-t border-slate-200/80">
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase font-bold block">Graded</span>
+                        <span className="font-extrabold text-slate-700">
+                          {sub.gradedCount} / {sub.totalStudents}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase font-bold block">Max Marks</span>
+                        <span className="font-extrabold text-purple-700">{sub.maxMarks}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase font-bold block">Average</span>
+                        <span className="font-extrabold text-emerald-700">{sub.averagePercentage}%</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSubmittedMarksheet(sub)}
+                      className="w-full py-2 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Open & View / Edit (खोलें और देखें)</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowSubmissionsModal(false)}
+                className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

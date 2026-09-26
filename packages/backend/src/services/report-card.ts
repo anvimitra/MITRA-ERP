@@ -69,8 +69,21 @@ export interface StudentReportCardData {
     attendancePercentage: number;
     totalWorkingDays: number;
     presentDays: number;
+    rank?: number;
+    totalInClass?: number;
   };
   isPublished?: boolean;
+  examId?: string;
+  examName?: string;
+  examType?: string;
+  academicYear?: string;
+  totalMarks?: number;
+  totalMarksObtained?: number;
+  totalMaxMarks?: number;
+  maxTotalMarks?: number;
+  percentage?: number;
+  overallGrade?: string;
+  resultStatus?: string;
 }
 
 export async function generateStudentReportCard(
@@ -173,6 +186,55 @@ export async function generateStudentReportCard(
   const presentDays = studentAttendance.filter((a) => a.status === 'present' || a.status === 'late').length || 112;
   const attendancePct = totalWorkingDays > 0 ? Math.round((presentDays / totalWorkingDays) * 100) : 95;
 
+  // Calculate student rank in class for this exam
+  let rank = 1;
+  let totalClassmates = 1;
+  try {
+    const classmates = db
+      .select()
+      .from(schema.students)
+      .where(
+        and(
+          eq(schema.students.schoolId, schoolId),
+          eq(schema.students.classId, student.classId),
+          eq(schema.students.sectionId, student.sectionId)
+        )
+      )
+      .all();
+    totalClassmates = classmates.length || 1;
+
+    const allClassMarks = db
+      .select()
+      .from(schema.marks)
+      .where(
+        and(
+          eq(schema.marks.schoolId, schoolId),
+          eq(schema.marks.classId, student.classId),
+          eq(schema.marks.sectionId, student.sectionId),
+          eq(schema.marks.examId, examId)
+        )
+      )
+      .all();
+
+    const totalsByStudent = new Map<string, number>();
+    for (const m of allClassMarks) {
+      totalsByStudent.set(m.studentId, (totalsByStudent.get(m.studentId) || 0) + (m.marksObtained || 0));
+    }
+
+    const myScore = totalsByStudent.get(studentId) ?? totalMarksObtained;
+    let higherCount = 0;
+    for (const [stId, score] of totalsByStudent.entries()) {
+      if (stId !== studentId && score > myScore) {
+        higherCount++;
+      }
+    }
+    rank = higherCount + 1;
+  } catch {
+    rank = 1;
+  }
+
+  const isPublished = !!(exam.isPublished === 1 || (studentMarks && studentMarks.some((m: any) => m.isPublished === 1)));
+
   return {
     school: {
       name: school.name,
@@ -210,6 +272,17 @@ export async function generateStudentReportCard(
       examType: exam.examType,
       academicYear: exam.academicYear,
     },
+    examId: exam.id,
+    examName: exam.name,
+    examType: exam.examType,
+    academicYear: exam.academicYear,
+    totalMarks: totalMarksObtained,
+    totalMarksObtained,
+    totalMaxMarks,
+    maxTotalMarks: totalMaxMarks,
+    percentage: Math.round(overallPct * 10) / 10,
+    overallGrade: overallGradeInfo.grade,
+    resultStatus: (overallPct >= 33 ? 'PASSED' : 'FAILED') as 'PASSED' | 'FAILED',
     subjects: subjectResults,
     summary: {
       totalMarksObtained,
@@ -222,7 +295,9 @@ export async function generateStudentReportCard(
       attendancePercentage: attendancePct,
       totalWorkingDays,
       presentDays,
+      rank,
+      totalInClass: totalClassmates,
     },
-    isPublished: !!(exam.isPublished === 1 || (studentMarks && studentMarks.some((m: any) => m.isPublished === 1))),
+    isPublished,
   };
 }

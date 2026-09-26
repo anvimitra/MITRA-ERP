@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ExamReport, Student, School } from '../types';
-import { fetchStudentExamReport } from '../api';
-import { Award, CheckCircle2, Download, Printer, Palette, Sparkles } from 'lucide-react';
+import { ExamReport, Student, School, ExamItem } from '../types';
+import { fetchStudentExamReport, fetchExamsList } from '../api';
+import { Award, CheckCircle2, Download, Printer, Palette, Sparkles, AlertCircle } from 'lucide-react';
 
 interface Props {
   student?: Student | null;
@@ -13,13 +13,37 @@ interface Props {
 export type TemplateMode = 'modern' | 'cbse' | 'minimal' | 'vibrant';
 
 export const ReportCardView: React.FC<Props> = ({ student, school, report: initialReport, canSelectTemplate = false }) => {
-  const [selectedExamKey, setSelectedExamKey] = useState<string>('sa1');
+  const [exams, setExams] = useState<ExamItem[]>([]);
+  const [selectedExamKey, setSelectedExamKey] = useState<string>('exam-sa1-term1');
   const [template, setTemplate] = useState<TemplateMode>('modern');
   const [report, setReport] = useState<ExamReport | null>(initialReport || null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (student?.id) {
+    fetchExamsList()
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setExams(res);
+          setSelectedExamKey(res[0].id);
+        } else {
+          setExams([
+            { id: 'exam-sa1-term1', name: 'SA1 Exam', examType: 'sa1' },
+            { id: 'exam-weekly-test', name: 'Weekly Test', examType: 'weekly' },
+            { id: 'exam-half-yearly', name: 'Half Yearly', examType: 'half_yearly' },
+          ]);
+        }
+      })
+      .catch(() => {
+        setExams([
+          { id: 'exam-sa1-term1', name: 'SA1 Exam', examType: 'sa1' },
+          { id: 'exam-weekly-test', name: 'Weekly Test', examType: 'weekly' },
+          { id: 'exam-half-yearly', name: 'Half Yearly', examType: 'half_yearly' },
+        ]);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (student?.id && selectedExamKey) {
       setLoading(true);
       fetchStudentExamReport(student.id, selectedExamKey)
         .then((res) => setReport(res))
@@ -45,32 +69,23 @@ export const ReportCardView: React.FC<Props> = ({ student, school, report: initi
       {/* Exam Selector & Template Selector */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
         <div>
-          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Select Exam</label>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              onClick={() => setSelectedExamKey('sa1')}
-              className={`py-1.5 px-2 text-xs font-bold rounded-xl transition ${
-                selectedExamKey === 'sa1' ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              SA1 Exam
-            </button>
-            <button
-              onClick={() => setSelectedExamKey('weekly')}
-              className={`py-1.5 px-2 text-xs font-bold rounded-xl transition ${
-                selectedExamKey === 'weekly' ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              Weekly Test
-            </button>
-            <button
-              onClick={() => setSelectedExamKey('half_yearly')}
-              className={`py-1.5 px-2 text-xs font-bold rounded-xl transition ${
-                selectedExamKey === 'half_yearly' ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              Half Yearly
-            </button>
+          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+            Select Examination (परीक्षा चुनें)
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {exams.map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => setSelectedExamKey(ex.id)}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition ${
+                  selectedExamKey === ex.id
+                    ? 'bg-purple-700 text-white shadow-sm'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                {ex.name}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -102,13 +117,21 @@ export const ReportCardView: React.FC<Props> = ({ student, school, report: initi
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-xs text-slate-400 font-bold">
           Loading exam evaluation report...
         </div>
-      ) : !report ? (
-        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
-          <Award className="w-10 h-10 text-slate-300 mx-auto" />
-          <h4 className="font-bold text-slate-700 text-xs">No Report Published Yet</h4>
-          <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-            Marks for this examination have not been finalized or published by the institution yet.
+      ) : !report || !report.isPublished ? (
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 text-center space-y-3 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+            <Sparkles className="w-6 h-6 animate-pulse" />
+          </div>
+          <h4 className="font-black text-slate-800 text-sm">
+            Academic Evaluation in Progress / परिणाम मूल्यांकन जारी है
+          </h4>
+          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+            कक्षा व विषय अध्यापकों द्वारा अंकों का संकलन व सत्यापन कार्य प्रगति पर है। प्रधानाचार्य द्वारा आधिकारिक रूप से परिणाम घोषित (Publish) करते ही आपका डिजिटल रिपोर्ट कार्ड यहाँ उपलब्ध हो जाएगा।
           </p>
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            <span>अंतिम मूल्यांकन जारी • Result Publishing Awaited</span>
+          </div>
         </div>
       ) : (
         <div
@@ -180,7 +203,7 @@ export const ReportCardView: React.FC<Props> = ({ student, school, report: initi
         </div>
 
         {/* Summary Footer */}
-        <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-black/20 text-center my-3">
+        <div className="grid grid-cols-4 gap-2 p-2.5 rounded-xl bg-black/20 text-center my-3">
           <div>
             <span className="text-[9px] uppercase font-bold opacity-60 block">Total</span>
             <span className="font-black text-sm">{report.totalMarks} / {report.maxTotalMarks}</span>
@@ -190,8 +213,14 @@ export const ReportCardView: React.FC<Props> = ({ student, school, report: initi
             <span className="font-black text-sm text-amber-300">{report.percentage}%</span>
           </div>
           <div>
-            <span className="text-[9px] uppercase font-bold opacity-60 block">Result</span>
-            <span className="font-black text-sm text-emerald-400">{report.resultStatus}</span>
+            <span className="text-[9px] uppercase font-bold opacity-60 block">Grade</span>
+            <span className="font-black text-sm text-emerald-400">{report.overallGrade || report.summary?.overallGrade || 'A'}</span>
+          </div>
+          <div>
+            <span className="text-[9px] uppercase font-bold opacity-60 block">Class Rank</span>
+            <span className="font-black text-sm text-amber-400">
+              {report.summary?.rank ? `#${report.summary.rank}` : '1st'}
+            </span>
           </div>
         </div>
 

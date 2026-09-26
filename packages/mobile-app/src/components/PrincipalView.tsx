@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, School, Student, StaffMember, FeePaymentRecord, FeeStructureItem, StaffLeaveItem, NotificationItem, ParentInfo } from '../types';
+import { User, School, Student, StaffMember, FeePaymentRecord, FeeStructureItem, StaffLeaveItem, NotificationItem, ParentInfo, ExamItem, ExamSubmissionMatrix, ClassSubmissionStatus, SubjectSubmissionStatus } from '../types';
 import {
   fetchLiveStudents,
   fetchLiveClasses,
@@ -16,6 +16,10 @@ import {
   createStudent,
   deleteStudent,
   fetchParents,
+  fetchExamsList,
+  fetchExamSubmissionStatus,
+  publishExamResults,
+  sendMarksSubmissionReminder,
 } from '../api';
 import {
   Users,
@@ -41,14 +45,23 @@ import {
   Layers,
   UserCheck,
   Bus,
+  Award,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Sparkles,
+  FileCheck,
+  FileText,
+  AlertCircle,
+  Eye,
 } from 'lucide-react';
 import { LiveBusMapModal } from './LiveBusMapModal';
 
 interface Props {
   principal: User;
   school: School;
-  activeSubTab?: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations';
-  onSubTabChange?: (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations') => void;
+  activeSubTab?: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations' | 'exams';
+  onSubTabChange?: (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations' | 'exams') => void;
 }
 
 export const PrincipalView: React.FC<Props> = ({
@@ -57,9 +70,9 @@ export const PrincipalView: React.FC<Props> = ({
   activeSubTab: externalTab,
   onSubTabChange,
 }) => {
-  const [internalTab, setInternalTab] = useState<'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations'>('overview');
+  const [internalTab, setInternalTab] = useState<'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations' | 'exams'>('overview');
   const currentTab = externalTab || internalTab;
-  const setTab = (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations') => {
+  const setTab = (tab: 'overview' | 'students' | 'parents' | 'staff' | 'fees' | 'operations' | 'exams') => {
     setInternalTab(tab);
     if (onSubTabChange) onSubTabChange(tab);
   };
@@ -144,6 +157,136 @@ export const PrincipalView: React.FC<Props> = ({
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [copiedSyncKey, setCopiedSyncKey] = useState(false);
 
+  // Exam & Marks submission audit states
+  const [examList, setExamList] = useState<ExamItem[]>([]);
+  const [selectedAuditExamId, setSelectedAuditExamId] = useState<string>('');
+  const [submissionMatrix, setSubmissionMatrix] = useState<ExamSubmissionMatrix | null>(null);
+  const [loadingMatrix, setLoadingMatrix] = useState<boolean>(false);
+  const [expandedClasses, setExpandedClasses] = useState<{ [classKey: string]: boolean }>({});
+  const [publishingClassKey, setPublishingClassKey] = useState<string | null>(null);
+  const [remindingTeacherKey, setRemindingTeacherKey] = useState<string | null>(null);
+  const [isPublishingAll, setIsPublishingAll] = useState<boolean>(false);
+  const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
+
+  const loadExamAuditData = async (targetExamId?: string) => {
+    setLoadingMatrix(true);
+    try {
+      const exams = await fetchExamsList();
+      setExamList(exams || []);
+      const activeId = targetExamId || selectedAuditExamId || (exams && exams.length > 0 ? exams[0].id : '');
+      if (activeId) {
+        setSelectedAuditExamId(activeId);
+        const matrix = await fetchExamSubmissionStatus(activeId);
+        setSubmissionMatrix(matrix);
+        // Expand first class by default if none expanded
+        if (matrix?.classes?.length) {
+          setExpandedClasses((prev) => {
+            if (Object.keys(prev).length === 0) {
+              const firstKey = `${matrix.classes[0].classId}_${matrix.classes[0].sectionId}`;
+              return { [firstKey]: true };
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('PrincipalView loadExamAuditData error', err);
+    } finally {
+      setLoadingMatrix(false);
+    }
+  };
+
+  const handleAuditExamChange = async (eId: string) => {
+    setSelectedAuditExamId(eId);
+    setLoadingMatrix(true);
+    try {
+      const matrix = await fetchExamSubmissionStatus(eId);
+      setSubmissionMatrix(matrix);
+    } catch (err) {
+      console.warn('Error fetching matrix for exam', err);
+    } finally {
+      setLoadingMatrix(false);
+    }
+  };
+
+  const toggleClassAccordion = (classKey: string) => {
+    setExpandedClasses((prev) => ({
+      ...prev,
+      [classKey]: !prev[classKey],
+    }));
+  };
+
+  const handlePublishClass = async (classId: string, sectionId: string, publish: boolean) => {
+    if (!selectedAuditExamId) return;
+    const key = `${classId}_${sectionId}`;
+    setPublishingClassKey(key);
+    try {
+      await publishExamResults({
+        examId: selectedAuditExamId,
+        classId,
+        sectionId,
+        isPublished: publish,
+      });
+      setPublishFeedback(publish ? '✅ कक्षा परिणाम सफलतापूर्वक जारी (Publish) किया गया!' : '⚠️ कक्षा परिणाम अप्रकाशित (Unpublished) किया गया।');
+      setTimeout(() => setPublishFeedback(null), 3500);
+      const matrix = await fetchExamSubmissionStatus(selectedAuditExamId);
+      setSubmissionMatrix(matrix);
+    } catch (err: any) {
+      alert(err.message || 'त्रुटि: परिणाम जारी करने में समस्या आई');
+    } finally {
+      setPublishingClassKey(null);
+    }
+  };
+
+  const handlePublishEntireExam = async (publish: boolean) => {
+    if (!selectedAuditExamId) return;
+    if (publish) {
+      const hasPending = (submissionMatrix?.summary?.totalPendingSheets || 0) > 0;
+      const confirmMsg = hasPending
+        ? `⚠️ ध्यान दें: अभी भी ${submissionMatrix?.summary?.totalPendingSheets} विषयों के अंक शिक्षकों द्वारा दर्ज नहीं किए गए हैं।\n\nक्या आप फिर भी सभी कक्षाओं का परिणाम प्रकाशित (Publish) करना चाहते हैं?`
+        : 'क्या आप संपूर्ण विद्यालय के लिए इस परीक्षा का अंतिम परिणाम घोषित (Publish) करना चाहते हैं? सभी छात्र/अभिभावक तुरंत अपनी अंकतालिका देख सकेंगे।';
+      if (!confirm(confirmMsg)) return;
+    }
+    setIsPublishingAll(true);
+    try {
+      await publishExamResults({
+        examId: selectedAuditExamId,
+        isPublished: publish,
+      });
+      setPublishFeedback(publish ? '🎉 संपूर्ण विद्यालय के परीक्षा परिणाम सफलतापूर्वक प्रकाशित हो चुके हैं!' : '⚠️ सभी कक्षाओं के परिणाम अप्रकाशित (Withheld) किए गए।');
+      setTimeout(() => setPublishFeedback(null), 4000);
+      const matrix = await fetchExamSubmissionStatus(selectedAuditExamId);
+      setSubmissionMatrix(matrix);
+    } catch (err: any) {
+      alert(err.message || 'त्रुटि: परिणाम प्रकाशित करने में समस्या आई');
+    } finally {
+      setIsPublishingAll(false);
+    }
+  };
+
+  const handleSendReminder = async (teacherId: string, subjectName: string, className: string) => {
+    if (!selectedAuditExamId || !teacherId) {
+      alert('इस विषय के लिए कोई शिक्षक आवंटित नहीं है।');
+      return;
+    }
+    const currentExam = examList.find((e) => e.id === selectedAuditExamId);
+    const key = `${teacherId}_${subjectName}`;
+    setRemindingTeacherKey(key);
+    try {
+      await sendMarksSubmissionReminder({
+        teacherId,
+        subjectName,
+        className,
+        examName: currentExam?.name || 'Examination',
+      });
+      alert(`🔔 शिक्षक को ${className} - ${subjectName} के अंक शीघ्र दर्ज करने हेतु स्मरण पत्र (Reminder Notification) भेज दिया गया है।`);
+    } catch (err: any) {
+      alert(err.message || 'स्मरण पत्र भेजने में त्रुटि');
+    } finally {
+      setRemindingTeacherKey(null);
+    }
+  };
+
   // Load all live data
   const loadAllData = async () => {
     setLoading(true);
@@ -187,6 +330,12 @@ export const PrincipalView: React.FC<Props> = ({
   useEffect(() => {
     loadAllData();
   }, []);
+
+  useEffect(() => {
+    if (currentTab === 'exams') {
+      loadExamAuditData();
+    }
+  }, [currentTab]);
 
   // Total fees collected sum
   const totalFeesCollected = payments.reduce((acc, p) => acc + (p.amountPaid || 0), 0);
@@ -419,7 +568,7 @@ export const PrincipalView: React.FC<Props> = ({
         </div>
 
         {/* Sub Navigation Bar */}
-        <div className="grid grid-cols-6 gap-1 mt-3.5 pt-3 border-t border-white/10 text-[9px] font-bold">
+        <div className="grid grid-cols-7 gap-1 mt-3.5 pt-3 border-t border-white/10 text-[9px] font-bold">
           <button
             onClick={() => setTab('overview')}
             className={`py-1.5 px-0.5 rounded-xl transition text-center ${
@@ -467,6 +616,14 @@ export const PrincipalView: React.FC<Props> = ({
             }`}
           >
             Circulars
+          </button>
+          <button
+            onClick={() => setTab('exams')}
+            className={`py-1.5 px-0.5 rounded-xl transition text-center ${
+              currentTab === 'exams' ? 'bg-white text-purple-900 shadow font-extrabold' : 'text-amber-300 hover:bg-white/10'
+            }`}
+          >
+            Results
           </button>
         </div>
       </div>
@@ -586,6 +743,14 @@ export const PrincipalView: React.FC<Props> = ({
               >
                 <Radio className="w-4 h-4 text-amber-700" />
                 <span>Circulars ({notices.length})</span>
+              </button>
+
+              <button
+                onClick={() => setTab('exams')}
+                className="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-950 border border-amber-300 font-bold text-xs flex items-center space-x-2 transition col-span-2 shadow-sm"
+              >
+                <Award className="w-4 h-4 text-amber-600" />
+                <span>Exam Results & Marks Audit Desk (परीक्षा व अंक नियंत्रण)</span>
               </button>
 
               <button
@@ -1138,6 +1303,391 @@ export const PrincipalView: React.FC<Props> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB 7: EXAMS AUDIT & RESULTS PUBLISHING DESK */}
+      {currentTab === 'exams' && (
+        <div className="space-y-4">
+          {/* Notification Feedback Toast */}
+          {publishFeedback && (
+            <div className="bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-lg flex items-center space-x-2 text-xs font-bold animate-bounce">
+              <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+              <span>{publishFeedback}</span>
+            </div>
+          )}
+
+          {/* Exam Selector & Control Header */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">Exam Results & Marks Audit Desk</h3>
+                  <p className="text-[10px] text-slate-500">परीक्षा व अंक नियंत्रण • कक्षा व विषयवार निगरानी</p>
+                </div>
+              </div>
+              <button
+                onClick={() => loadExamAuditData(selectedAuditExamId)}
+                disabled={loadingMatrix}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1 transition disabled:opacity-50"
+                title="Refresh Status"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingMatrix ? 'animate-spin text-purple-600' : ''}`} />
+                <span className="hidden sm:inline text-[11px]">Refresh</span>
+              </button>
+            </div>
+
+            {/* Exam Dropdown Selector */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                Select Examination (परीक्षा चुनें)
+              </label>
+              <div className="flex items-center space-x-2">
+                <select
+                  value={selectedAuditExamId}
+                  onChange={(e) => handleAuditExamChange(e.target.value)}
+                  className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {examList.length === 0 ? (
+                    <option value="">No examinations created</option>
+                  ) : (
+                    examList.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name} ({ex.examType?.toUpperCase()} • {ex.academicYear || '2026-2027'})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {loadingMatrix ? (
+            <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+              <RefreshCw className="w-8 h-8 text-purple-600 animate-spin mx-auto" />
+              <p className="text-xs font-bold text-slate-700">Scanning School Marksheets & Submissions...</p>
+              <p className="text-[10px] text-slate-400">सभी कक्षाओं और विषयों के अंक तालिकाओं का मिलान किया जा रहा है...</p>
+            </div>
+          ) : !submissionMatrix ? (
+            <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+              <AlertCircle className="w-10 h-10 text-slate-300 mx-auto" />
+              <h4 className="font-bold text-slate-700 text-xs">No Exam Selected or Configured</h4>
+              <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                कृपया ऊपर दी गई सूची से परीक्षा का चयन करें या विद्यालय में नई परीक्षा बनाएं।
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* School-Wide Audit Meter & Publishing Card */}
+              <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-indigo-950 text-white rounded-2xl p-4 shadow-xl border border-purple-800/40 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-purple-950 text-[10px] font-black uppercase tracking-wider">
+                      Overall School Readiness
+                    </span>
+                    <h3 className="text-base font-black mt-1 text-white">
+                      {submissionMatrix.exam.name}
+                    </h3>
+                    <p className="text-xs text-purple-200">
+                      Academic Year: <span className="font-bold text-white">{submissionMatrix.exam.academicYear}</span>
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-amber-300">
+                      {submissionMatrix.summary.overallCompletionPercentage}%
+                    </span>
+                    <span className="text-[10px] text-purple-200 block font-semibold">Marks Entered</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-500 ${
+                      submissionMatrix.summary.overallCompletionPercentage === 100
+                        ? 'bg-emerald-400'
+                        : submissionMatrix.summary.overallCompletionPercentage >= 50
+                        ? 'bg-amber-400'
+                        : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${submissionMatrix.summary.overallCompletionPercentage}%` }}
+                  />
+                </div>
+
+                {/* Metrics 4-Box Grid */}
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                  <div className="bg-white/10 rounded-xl p-2">
+                    <span className="text-[9px] uppercase font-bold text-purple-200 block">Total Classes</span>
+                    <span className="font-black text-sm text-white">{submissionMatrix.summary.totalClasses}</span>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-2">
+                    <span className="text-[9px] uppercase font-bold text-purple-200 block">Submitted</span>
+                    <span className="font-black text-sm text-emerald-400">
+                      {submissionMatrix.summary.totalSubmittedSheets}
+                    </span>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-2">
+                    <span className="text-[9px] uppercase font-bold text-purple-200 block">Pending</span>
+                    <span className={`font-black text-sm ${submissionMatrix.summary.totalPendingSheets > 0 ? 'text-rose-400 font-extrabold' : 'text-emerald-300'}`}>
+                      {submissionMatrix.summary.totalPendingSheets}
+                    </span>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-2">
+                    <span className="text-[9px] uppercase font-bold text-purple-200 block">Published</span>
+                    <span className="font-black text-sm text-amber-300">
+                      {submissionMatrix.summary.publishedClasses} / {submissionMatrix.summary.totalClasses}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Master Publishing Buttons */}
+                <div className="pt-2 border-t border-white/10 flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePublishEntireExam(true)}
+                    disabled={isPublishingAll}
+                    className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-98 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-1.5 transition disabled:opacity-50"
+                  >
+                    <FileCheck className="w-4 h-4" />
+                    <span>
+                      {isPublishingAll ? 'Publishing Results...' : 'Publish Entire Exam Results (सभी परिणाम जारी करें)'}
+                    </span>
+                  </button>
+
+                  {submissionMatrix.summary.isExamPublished && (
+                    <button
+                      onClick={() => handlePublishEntireExam(false)}
+                      disabled={isPublishingAll}
+                      className="py-2.5 px-3 bg-rose-600/80 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl transition disabled:opacity-50 flex items-center space-x-1"
+                      title="Unpublish entire exam"
+                    >
+                      <X className="w-4 h-4" />
+                      <span className="hidden sm:inline">Unpublish All</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Class-Wise Marksheets Audit Accordion List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Layers className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Class-wise Audit Matrix (कक्षावार विवरण)</span>
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {submissionMatrix.classes.length} Classes Audited
+                  </span>
+                </div>
+
+                {submissionMatrix.classes.map((cls) => {
+                  const classKey = `${cls.classId}_${cls.sectionId}`;
+                  const isExpanded = !!expandedClasses[classKey];
+                  const isPublishingThis = publishingClassKey === classKey;
+
+                  return (
+                    <div
+                      key={classKey}
+                      className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition"
+                    >
+                      {/* Accordion Class Header */}
+                      <div
+                        onClick={() => toggleClassAccordion(classKey)}
+                        className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 select-none transition"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
+                              cls.isClassReady
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : cls.completionPercentage > 0
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {cls.className.replace(/class/i, '').trim()}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h5 className="font-black text-sm text-slate-900">{cls.classLabel}</h5>
+                              <span className="text-[10px] text-slate-500 font-semibold">
+                                ({cls.totalStudents} Students)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-2 mt-0.5">
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                  cls.isClassReady
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {cls.submittedSubjects}/{cls.totalSubjects} Subjects Graded ({cls.completionPercentage}%)
+                              </span>
+
+                              {cls.isClassPublished ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500 text-white flex items-center space-x-0.5">
+                                  <Check className="w-2.5 h-2.5" />
+                                  <span>Published</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                  Unpublished
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Class Action & Expand Toggle */}
+                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handlePublishClass(cls.classId, cls.sectionId, !cls.isClassPublished)}
+                            disabled={isPublishingThis}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1 shadow-sm transition active:scale-95 disabled:opacity-50 ${
+                              cls.isClassPublished
+                                ? 'bg-slate-100 hover:bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-purple-700 hover:bg-purple-800 text-white'
+                            }`}
+                          >
+                            {cls.isClassPublished ? (
+                              <>
+                                <X className="w-3 h-3 text-rose-600" />
+                                <span className="text-[11px]">Unpublish</span>
+                              </>
+                            ) : (
+                              <>
+                                <FileCheck className="w-3.5 h-3.5 text-amber-300" />
+                                <span className="text-[11px]">Publish Class</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => toggleClassAccordion(classKey)}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                          >
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Accordion Body: Subjects Matrix */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/60 p-3 space-y-2">
+                          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1 px-1">
+                            Subject Marks Submission Details (विषयवार अंक स्थिति)
+                          </div>
+
+                          <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            {cls.subjects.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-slate-400">
+                                No subjects mapped to this class.
+                              </div>
+                            ) : (
+                              cls.subjects.map((sub) => {
+                                const teacherKey = `${sub.teacherId}_${sub.subjectName}`;
+                                const isReminding = remindingTeacherKey === teacherKey;
+
+                                return (
+                                  <div
+                                    key={sub.subjectId}
+                                    className="p-3 flex items-center justify-between hover:bg-slate-50 transition"
+                                  >
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="font-bold text-xs text-slate-900">
+                                          {sub.subjectName}
+                                        </span>
+                                        {sub.subjectCode && (
+                                          <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                                            {sub.subjectCode}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center space-x-2 text-[11px] text-slate-500">
+                                        <span>Teacher:</span>
+                                        <strong className="text-slate-700">
+                                          {sub.teacherName || 'Not Assigned (अनावंटित)'}
+                                        </strong>
+                                      </div>
+
+                                      {sub.lastUpdated && (
+                                        <span className="text-[9px] text-slate-400 block">
+                                          अंतिम अपडेट: {new Date(sub.lastUpdated).toLocaleDateString('hi-IN', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Status & Reminder Button */}
+                                    <div className="flex items-center space-x-3 text-right">
+                                      {sub.status === 'SUBMITTED' ? (
+                                        <div className="space-y-0.5">
+                                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold">
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                            <span>Graded ({sub.gradedCount}/{sub.totalStudents})</span>
+                                          </span>
+                                          <div className="text-[10px] text-slate-500 font-semibold">
+                                            Avg: <strong className="text-purple-700">{sub.averagePercentage}%</strong> • Max: {sub.maxMarks}
+                                          </div>
+                                        </div>
+                                      ) : sub.status === 'PARTIAL' ? (
+                                        <div className="space-y-1">
+                                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold">
+                                            <span>Partial ({sub.gradedCount}/{sub.totalStudents})</span>
+                                          </span>
+                                          {sub.teacherId && (
+                                            <button
+                                              onClick={() => handleSendReminder(sub.teacherId!, sub.subjectName, cls.classLabel)}
+                                              disabled={isReminding}
+                                              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[10px] rounded-lg shadow-sm flex items-center space-x-1 transition disabled:opacity-50"
+                                            >
+                                              <BellRing className="w-3 h-3" />
+                                              <span>{isReminding ? 'Sending...' : 'Remind Teacher'}</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center space-x-2">
+                                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-extrabold">
+                                            <AlertCircle className="w-3 h-3 text-rose-600" />
+                                            <span>Pending (बाकी)</span>
+                                          </span>
+
+                                          {sub.teacherId ? (
+                                            <button
+                                              onClick={() => handleSendReminder(sub.teacherId!, sub.subjectName, cls.classLabel)}
+                                              disabled={isReminding}
+                                              className="px-2.5 py-1 bg-purple-700 hover:bg-purple-800 active:scale-95 text-white font-bold text-[10px] rounded-lg shadow-sm flex items-center space-x-1 transition disabled:opacity-50"
+                                            >
+                                              <BellRing className="w-3 h-3" />
+                                              <span>{isReminding ? 'Sending...' : 'Remind (याद दिलाएं)'}</span>
+                                            </button>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-400 italic">No Teacher</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 

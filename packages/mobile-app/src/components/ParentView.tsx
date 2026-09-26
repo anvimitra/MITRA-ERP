@@ -348,7 +348,7 @@ export const ParentView: React.FC<Props> = ({
           )}
         </div>
 
-        {latestReport ? (
+        {latestReport && latestReport.isPublished !== false && latestReport.subjects && latestReport.subjects.length > 0 ? (
           <>
             <p className="text-xs text-slate-500 mb-3">{latestReport.examName}</p>
 

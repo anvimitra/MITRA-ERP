@@ -615,6 +615,10 @@ export function initializeDatabase(dbPath?: string): DatabaseSync {
     sqlite.exec('ALTER TABLE marks ADD COLUMN is_published INTEGER DEFAULT 0;');
   } catch {}
 
+  try {
+    sqlite.exec('ALTER TABLE marks ADD COLUMN updated_at TEXT;');
+  } catch {}
+
   // Auto-merge legacy accountant / cashier accounts into Principal
   try {
     sqlite.exec("UPDATE users SET role = 'principal' WHERE role IN ('accountant', 'cashier');");

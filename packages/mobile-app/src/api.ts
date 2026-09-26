@@ -1,4 +1,4 @@
-import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo, DriverBusInfo, ParentLiveBusTracking, FleetLiveInfo, HomeworkItem } from './types';
+import { School, User, Student, AttendanceRecord, ExamReport, FeeItem, NotificationItem, AppUpdateInfo, TimetablePeriod, StudentLog, CertificateItem, StudentTransportItem, LibraryIssueItem, StaffLeaveItem, StaffMember, FeeStructureItem, FeePaymentRecord, ExamItem, MarksSheetStudent, ParentInfo, DriverBusInfo, ParentLiveBusTracking, FleetLiveInfo, HomeworkItem, ExamSubmissionMatrix, TeacherMarksSubmissionItem } from './types';
 
 // Canonical Live Production Render API Endpoint
 export const PRODUCTION_RENDER_API_URL = 'https://mitra-erp.onrender.com/api';
@@ -292,26 +292,54 @@ export async function fetchStudentFeesLedger(studentId: string): Promise<FeeItem
 export async function fetchStudentExamReport(studentId: string, examId: string = 'exam-sa1-term1'): Promise<ExamReport | null> {
   try {
     const res = await authFetch(`/exams/report-card/${studentId}/${examId}`);
+    if (res.status === 403) {
+      // Evaluation in progress / unpublished
+      return {
+        examId,
+        examName: 'Examination',
+        examType: 'sa1',
+        academicYear: '2026-2027',
+        totalMarks: 0,
+        maxTotalMarks: 0,
+        percentage: 0,
+        overallGrade: '',
+        resultStatus: 'PASSED',
+        subjects: [],
+        isPublished: false,
+      };
+    }
+
     if (res.ok) {
       const data = await res.json();
       if (data.reportCard) {
         const rc = data.reportCard;
+        const examObj = rc.exam || {};
+        const summaryObj = rc.summary || {};
+
+        const totalMarks = summaryObj.totalMarksObtained ?? rc.totalMarksObtained ?? rc.totalMarks ?? 0;
+        const maxTotalMarks = summaryObj.totalMaxMarks ?? rc.totalMaxMarks ?? rc.maxTotalMarks ?? 0;
+        const percentage = summaryObj.overallPercentage ?? rc.percentage ?? (maxTotalMarks > 0 ? Math.round((totalMarks / maxTotalMarks) * 100) : 0);
+        const overallGrade = summaryObj.overallGrade || rc.overallGrade || 'A';
+        const resultStatus = (summaryObj.division?.toLowerCase().includes('repeat') || percentage < 33 ? 'FAILED' : 'PASSED') as 'PASSED' | 'FAILED';
+
         return {
-          examId: rc.examId,
-          examName: rc.examName,
-          examType: rc.examType,
-          academicYear: rc.academicYear,
-          totalMarks: rc.totalMarksObtained,
-          maxTotalMarks: rc.totalMaxMarks,
-          percentage: rc.percentage,
-          overallGrade: rc.overallGrade,
-          resultStatus: rc.resultStatus,
+          examId: examObj.id || rc.examId || examId,
+          examName: examObj.name || rc.examName || 'Examination',
+          examType: (examObj.examType || rc.examType || 'sa1') as any,
+          academicYear: examObj.academicYear || rc.academicYear || '2026-2027',
+          totalMarks,
+          maxTotalMarks,
+          percentage,
+          overallGrade,
+          resultStatus,
+          isPublished: rc.isPublished !== false,
+          summary: summaryObj,
           subjects: (rc.subjects || []).map((sub: any) => ({
-            subjectName: sub.subjectName,
-            subjectCode: sub.subjectCode,
-            marksObtained: sub.totalObtained,
-            maxMarks: sub.maxMarks,
-            grade: sub.grade,
+            subjectName: sub.subjectName || 'Subject',
+            subjectCode: sub.subjectCode || '',
+            marksObtained: sub.marksObtained ?? sub.totalObtained ?? 0,
+            maxMarks: sub.maxMarks ?? 100,
+            grade: sub.grade || 'A',
             remarks: sub.remarks || '',
           })),
         };
@@ -1065,6 +1093,43 @@ export async function fetchMarksSheet(
   return [];
 }
 
+export async function fetchMarksSheetDetails(
+  examId: string,
+  classId: string,
+  sectionId: string,
+  subjectId: string
+): Promise<{
+  students: MarksSheetStudent[];
+  maxMarks: number;
+  isPublished: boolean;
+  gradedCount: number;
+  totalStudents: number;
+}> {
+  try {
+    const query = new URLSearchParams({ examId, classId, sectionId, subjectId }).toString();
+    const res = await authFetch(`/exams/marks-sheet?${query}`);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        students: Array.isArray(data.students) ? data.students : [],
+        maxMarks: data.maxMarks || 100,
+        isPublished: !!data.isPublished,
+        gradedCount: data.gradedCount || 0,
+        totalStudents: data.totalStudents || (Array.isArray(data.students) ? data.students.length : 0),
+      };
+    }
+  } catch (err) {
+    console.warn('Marks sheet details offline:', err);
+  }
+  return {
+    students: [],
+    maxMarks: 100,
+    isPublished: false,
+    gradedCount: 0,
+    totalStudents: 0,
+  };
+}
+
 // 37. Save Exam Marks
 export async function saveExamMarks(
   examId: string,
@@ -1218,6 +1283,53 @@ export async function publishExamResults(data: {
   const resData = await res.json();
   if (!res.ok) {
     throw new Error(resData.error || 'Failed to publish results');
+  }
+  return resData;
+}
+
+// 43b. Fetch Exam Submission Status Matrix (Principal & Teacher Audit)
+export async function fetchExamSubmissionStatus(examId: string): Promise<ExamSubmissionMatrix | null> {
+  try {
+    const res = await authFetch(`/exams/submission-status?examId=${encodeURIComponent(examId)}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('fetchExamSubmissionStatus offline:', err);
+  }
+  return null;
+}
+
+// 43c. Fetch Teacher Marks Submissions History (Teacher / Principal)
+export async function fetchTeacherMarksSubmissions(): Promise<TeacherMarksSubmissionItem[]> {
+  try {
+    const res = await authFetch('/exams/teacher-submissions');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.submissions)) {
+        return data.submissions;
+      }
+    }
+  } catch (err) {
+    console.warn('fetchTeacherMarksSubmissions offline:', err);
+  }
+  return [];
+}
+
+// 43d. Send Reminder to Teacher for Pending Exam Marks (Principal only)
+export async function sendMarksSubmissionReminder(data: {
+  teacherId: string;
+  subjectName: string;
+  className?: string;
+  examName?: string;
+}): Promise<any> {
+  const res = await authFetch('/exams/send-reminder', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to dispatch marks reminder');
   }
   return resData;
 }
